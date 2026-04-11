@@ -14,7 +14,8 @@
     "ejs": "^3.1.9",
     "discord-player": "^6.6.0",
     "@discordjs/voice": "^0.16.0",
-    "ffmpeg-static": "^5.1.0"
+    "ffmpeg-static": "^5.1.0",
+    "canvas": "^2.11.2"
   },
   "scripts": {
     "start": "node index.js"
