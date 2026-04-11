@@ -17,6 +17,7 @@
     "canvafy": "^7.0.0",
     "discord-player": "^6.6.0",
     "@discordjs/voice": "^0.16.0",
+    "discord-backup": "^3.1.0"
     "ffmpeg-static": "^5.1.0",
     "quick.db": "^9.1.7"
   },
