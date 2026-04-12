@@ -342,7 +342,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
             <h3 style="color:white; margin:10px 0;">${g.name}</h3>
             ${hasBot
                 ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none;">⚙️ دخول الإعدادات</a>`
-                : `<a href="https://discord.com{process.env.CLIENT_ID}&permissions=8&scope=bot&guild_id=${g.id}" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
+                : `<a href="https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
             }
         </div>`;
     }).join('');
