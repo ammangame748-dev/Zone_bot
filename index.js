@@ -1187,13 +1187,10 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.editReply("❌ لا يوجد إعدادات للتكت");
         }
 
-        // =========================
-        // مثال زر فتح التكت
-        // =========================
         if (interaction.customId === 'open_ticket') {
-
             const channel = await interaction.guild.channels.create({
                 name: `ticket-${interaction.user.username}`,
+                type: 0, // 0 تعني قناة كتابية (GuildText) - مهمة جداً لـ v14
                 permissionOverwrites: [
                     {
                         id: interaction.guild.id,
@@ -1201,7 +1198,7 @@ client.on('interactionCreate', async (interaction) => {
                     },
                     {
                         id: interaction.user.id,
-                        allow: ['ViewChannel', 'SendMessages']
+                        allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory']
                     }
                 ]
             });
@@ -1212,7 +1209,12 @@ client.on('interactionCreate', async (interaction) => {
     } catch (err) {
         console.log("❌ interaction error:", err);
 
-        if (!interaction.replied) {
+        // هنا التعديل: نستخدم editReply لأننا عملنا defer مسبقاً
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+                content: "❌ صار خطأ بالنظام أثناء معالجة الطلب",
+            }).catch(() => {});
+        } else {
             await interaction.reply({
                 content: "❌ صار خطأ بالنظام",
                 ephemeral: true
