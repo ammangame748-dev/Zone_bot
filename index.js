@@ -227,24 +227,15 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
-app.get('/auth/discord/callback',
-passport.authenticate('discord', { failureRedirect: '/login' }),
+
+// تعديل المسار ليطابق الرابط الذي وضعته في إعدادات ديسكورد
+app.get('/callback', 
+passport.authenticate('discord', { failureRedirect: '/login' }), 
 async (req, res) => {
-
-    // 1. إذا كان المستخدم قادم من عملية إضافة البوت لسيرفر معين
-    const guildId = req.query.guild_id;
-
-    if (guildId) {
-        const guild = client.guilds.cache.get(guildId);
-        if (guild) {
-            return res.redirect(`/manage/${guildId}/home`); // توجيه مباشر لصفحة التحكم بالسيرفر
-        }
-    }
-
-    // 2. إذا كان تسجيل دخول عادي (أو السيرفر لسه ما ظهر في الكاش)
-    // نوجهه للداشبورد الرئيسي ليختار السيرفر بنفسه
+    // بمجرد نجاح تسجيل الدخول، يتم توجيه المستخدم للداشبورد
     res.redirect('/dashboard');
 });
+
 
 
 
