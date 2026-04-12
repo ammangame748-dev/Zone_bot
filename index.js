@@ -52,6 +52,16 @@ const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     }
 }));
 
+client.on('guildCreate', async (guild) => {
+    console.log(`✅ Bot joined: ${guild.name} (${guild.id})`);
+
+    // هون ممكن تحفظ السيرفر في الداشبورد
+    await GuildConfig.findOneAndUpdate(
+        { guildId: guild.id },
+        { guildId: guild.id },
+        { upsert: true }
+    );
+});
 
 const JailData = mongoose.model('JailData', new mongoose.Schema({
     guildId: String,
@@ -1505,13 +1515,26 @@ setInterval(async () => {
 // 1. الرابط الذي يوجه المستخدم لصفحة تسجيل دخول ديسكورد
 app.get('/auth/discord', passport.authenticate('discord'));
 
-// 2. الرابط الذي يستقبل المستخدم بعد موافقته في ديسكورد
-app.get('/auth/discord/callback', passport.authenticate('discord', {
-    failureRedirect: '/login' // إذا فشل يرجعه لصفحة اللوجن
-}), (req, res) => {
-    res.redirect('/dashboard'); // إذا نجح يوديه للداشبورد
-});
+app.get('/auth/discord/callback',
+passport.authenticate('discord', { failureRedirect: '/login' }),
+async (req, res) => {
 
+    const userGuilds = req.user.guilds;
+
+    const botGuilds = client.guilds.cache;
+
+    // مثال: تحقق إذا البوت داخل السيرفرات
+    const guildId = req.query.guild_id;
+
+    const guild = botGuilds.get(guildId);
+
+    if (!guild) {
+        return res.redirect(`/invite-bot/${guildId}`);
+    }
+
+    // إذا موجود → روح داشبورد
+    res.redirect(`/dashboard/${guildId}`);
+});
 // 3. رابط تسجيل الخروج
 app.get('/logout', (req, res) => {
     req.logout(() => {
@@ -1596,7 +1619,117 @@ client.on('guildMemberAdd', async (member) => {
                     .setTimestamp();
 
 
-               
+                client.on('interactionCreate', async (interaction) => {
+                    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
+
+                    // جلب الإعدادات
+                    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+                    if (!config) return;
+
+                    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
+                    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
+                        let ticketType = "عامة";
+                        if (interaction.isButton()) {
+                            const btnIndex = interaction.customId.replace('ticket_btn_', '');
+                            ticketType = config.buttons[btnIndex]?.label || "دعم";
+                        } else {
+                            const optIndex = interaction.values[0].replace('ticket_opt_', '');
+                            ticketType = config.menuOptions[optIndex]?.label || "دعم";
+                        }
+
+                        try {
+                            const channel = await interaction.guild.channels.create({
+                                name: `ticket-${interaction.user.username}`,
+                                type: ChannelType.GuildText,
+                                permissionOverwrites: [
+                                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
+                                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                                ],
+                            });
+
+                            const embed = new EmbedBuilder()
+                                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
+                                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
+                                .setColor(config.color || "#5865F2");
+
+                            // الأزرار: استدعاء (لأدمن فقط)
+                            const adminButtons = new ActionRowBuilder().addComponents(
+                                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
+                                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
+                                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
+                                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
+                            );
+
+                            // منيو الإدارة: إضافة/إزالة أعضاء
+                            const adminMenu = new ActionRowBuilder().addComponents(
+                                new UserSelectMenuBuilder()
+                                    .setCustomId('manage_members')
+                                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
+                                    .setMinValues(1)
+                                    .setMaxValues(1)
+                            );
+
+                            await channel.send({
+                                content: `<@&${config.adminRole}> | ${interaction.user}`,
+                                embeds: [embed],
+                                components: [adminButtons, adminMenu]
+                            });
+
+                            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
+                        } catch (e) { console.error(e); }
+                    }
+
+                    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
+                    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+                    // منع غير الإداريين من استخدام أدوات الإدارة
+                    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
+                    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
+                        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
+                    }
+
+                    // تنفيذ عمليات الأزرار
+                    if (interaction.customId === 'call_owner') {
+                        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
+                    }
+
+                    if (interaction.customId === 'call_admin') {
+                        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
+                    }
+
+                    if (interaction.customId === 'call_user') {
+                        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
+                        const ticketOwnerName = interaction.channel.name.split('-')[1];
+                        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
+                    }
+
+                    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
+                    if (interaction.customId === 'manage_members') {
+                        const targetUser = interaction.users.first();
+                        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
+
+                        if (hasAccess) {
+                            // إذا كان عنده صلاحية، نقوم بإزالتها
+                            await interaction.channel.permissionOverwrites.delete(targetUser.id);
+                            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
+                        } else {
+                            // إذا ما عنده، نقوم بإضافتها
+                            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
+                                ViewChannel: true,
+                                SendMessages: true,
+                                AttachFiles: true
+                            });
+                            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
+                        }
+                    }
+
+                    // إغلاق التذكرة
+                    if (interaction.customId === 'close_ticket') {
+                        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
+                        setTimeout(() => interaction.channel.delete().catch(() => { }), 5000);
+                    }
+                });
 
                 // --- [ دالة كشف المسؤول عن الفعل ] ---
                 async function getExecutor(guild, eventType) {
@@ -1821,117 +1954,13 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     logCh.send({ embeds: [embed] }).catch(e => console.log("Log Error:", e));
 });
 
- client.on('interactionCreate', async (interaction) => {
-                    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
+app.get('/invite-bot/:guildId', (req, res) => {
+    const guildId = req.params.guildId;
 
-                    // جلب الإعدادات
-                    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-                    if (!config) return;
+    const url = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${guildId}&disable_guild_select=true&redirect_uri=${encodeURIComponent("https://zone-bot-5x5s.onrender.com/auth/discord/callback")}&response_type=code`;
 
-                    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
-                    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
-                        let ticketType = "عامة";
-                        if (interaction.isButton()) {
-                            const btnIndex = interaction.customId.replace('ticket_btn_', '');
-                            ticketType = config.buttons[btnIndex]?.label || "دعم";
-                        } else {
-                            const optIndex = interaction.values[0].replace('ticket_opt_', '');
-                            ticketType = config.menuOptions[optIndex]?.label || "دعم";
-                        }
-
-                        try {
-                            const channel = await interaction.guild.channels.create({
-                                name: `ticket-${interaction.user.username}`,
-                                type: ChannelType.GuildText,
-                                permissionOverwrites: [
-                                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
-                                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                                ],
-                            });
-
-                            const embed = new EmbedBuilder()
-                                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
-                                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
-                                .setColor(config.color || "#5865F2");
-
-                            // الأزرار: استدعاء (لأدمن فقط)
-                            const adminButtons = new ActionRowBuilder().addComponents(
-                                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
-                                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
-                            );
-
-                            // منيو الإدارة: إضافة/إزالة أعضاء
-                            const adminMenu = new ActionRowBuilder().addComponents(
-                                new UserSelectMenuBuilder()
-                                    .setCustomId('manage_members')
-                                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
-                                    .setMinValues(1)
-                                    .setMaxValues(1)
-                            );
-
-                            await channel.send({
-                                content: `<@&${config.adminRole}> | ${interaction.user}`,
-                                embeds: [embed],
-                                components: [adminButtons, adminMenu]
-                            });
-
-                            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
-                        } catch (e) { console.error(e); }
-                    }
-
-                    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
-                    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-
-                    // منع غير الإداريين من استخدام أدوات الإدارة
-                    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
-                    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
-                        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
-                    }
-
-                    // تنفيذ عمليات الأزرار
-                    if (interaction.customId === 'call_owner') {
-                        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
-                    }
-
-                    if (interaction.customId === 'call_admin') {
-                        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
-                    }
-
-                    if (interaction.customId === 'call_user') {
-                        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
-                        const ticketOwnerName = interaction.channel.name.split('-')[1];
-                        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
-                    }
-
-                    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
-                    if (interaction.customId === 'manage_members') {
-                        const targetUser = interaction.users.first();
-                        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
-
-                        if (hasAccess) {
-                            // إذا كان عنده صلاحية، نقوم بإزالتها
-                            await interaction.channel.permissionOverwrites.delete(targetUser.id);
-                            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
-                        } else {
-                            // إذا ما عنده، نقوم بإضافتها
-                            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
-                                ViewChannel: true,
-                                SendMessages: true,
-                                AttachFiles: true
-                            });
-                            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
-                        }
-                    }
-
-                    // إغلاق التذكرة
-                    if (interaction.customId === 'close_ticket') {
-                        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
-                        setTimeout(() => interaction.channel.delete().catch(() => { }), 5000);
-                    }
-                });
+    res.redirect(url);
+});
 
 
 app.listen(3000, () => {
