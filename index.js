@@ -1176,6 +1176,16 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
     }
 });
 
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
+
+    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+    if (!config) return;
+
+    // كمل كود التكت هون...
+});
+
+
 client.on('messageCreate', async (msg) => {
     if (!msg.guild || msg.author.bot) return;
 
@@ -1578,16 +1588,16 @@ client.on('guildMemberAdd', async (member) => {
     if (logCh) logCh.send({ embeds: [embed] });
 });
 
-
 client.on('guildMemberAdd', async (member) => {
     try {
         // 1. جلب إعدادات السيرفر من الداتابيز
         const s = await GuildConfig.findOne({ guildId: member.guild.id });
         if (!s) return;
 
-        // --- [ أولاً: نظام اللوق (Logs) ] ---
+        // --- [ نظام اللوق (Logs) ] ---
         if (s.logs?.members?.enabled && s.logs.members.channel) {
             const logCh = member.guild.channels.cache.get(s.logs.members.channel);
+
             if (logCh) {
                 const logEmbed = new EmbedBuilder()
                     .setAuthor({ name: '📥 عضو دخل السيرفر' })
@@ -1595,199 +1605,74 @@ client.on('guildMemberAdd', async (member) => {
                     .setDescription(`**العضو:** ${member.user.tag}\n**الأيدي:** ${member.id}`)
                     .setTimestamp();
 
-
-               client.on('interactionCreate', async (interaction) => {
-                    // جلب الإعدادات
-                    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-                    if (!config) return;
-
-                    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
-                    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
-                        let ticketType = "عامة";
-                        if (interaction.isButton()) {
-                            const btnIndex = interaction.customId.replace('ticket_btn_', '');
-                            ticketType = config.buttons[btnIndex]?.label || "دعم";
-                        } else {
-                            const optIndex = interaction.values[0].replace('ticket_opt_', '');
-                            ticketType = config.menuOptions[optIndex]?.label || "دعم";
-                        }
-
-                        try {
-                            const channel = await interaction.guild.channels.create({
-                                name: `ticket-${interaction.user.username}`,
-                                type: ChannelType.GuildText,
-                                permissionOverwrites: [
-                                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
-                                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                                ],
-                            });
-
-                            const embed = new EmbedBuilder()
-                                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
-                                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
-                                .setColor(config.color || "#5865F2");
-
-                            // الأزرار: استدعاء (لأدمن فقط)
-                            const adminButtons = new ActionRowBuilder().addComponents(
-                                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
-                                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
-                            );
-
-                            // منيو الإدارة: إضافة/إزالة أعضاء
-                            const adminMenu = new ActionRowBuilder().addComponents(
-                                new UserSelectMenuBuilder()
-                                    .setCustomId('manage_members')
-                                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
-                                    .setMinValues(1)
-                                    .setMaxValues(1)
-                            );
-
-                            await channel.send({
-                                content: `<@&${config.adminRole}> | ${interaction.user}`,
-                                embeds: [embed],
-                                components: [adminButtons, adminMenu]
-                            });
-
-                            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
-                        } catch (e) { console.error(e); }
-                    }
-
-                    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
-                    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-
-                    // منع غير الإداريين من استخدام أدوات الإدارة
-                    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
-                    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
-                        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
-                    }
-
-                    // تنفيذ عمليات الأزرار
-                    if (interaction.customId === 'call_owner') {
-                        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
-                    }
-
-                    if (interaction.customId === 'call_admin') {
-                        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
-                    }
-
-                    if (interaction.customId === 'call_user') {
-                        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
-                        const ticketOwnerName = interaction.channel.name.split('-')[1];
-                        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
-                    }
-
-                    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
-                    if (interaction.customId === 'manage_members') {
-                        const targetUser = interaction.users.first();
-                        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
-
-                        if (hasAccess) {
-                            // إذا كان عنده صلاحية، نقوم بإزالتها
-                            await interaction.channel.permissionOverwrites.delete(targetUser.id);
-                            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
-                        } else {
-                            // إذا ما عنده، نقوم بإضافتها
-                            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
-                                ViewChannel: true,
-                                SendMessages: true,
-                                AttachFiles: true
-                            });
-                            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
-                        }
-                    }
-
-                    // إغلاق التذكرة
-                    if (interaction.customId === 'close_ticket') {
-                        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
-                        setTimeout(() => interaction.channel.delete().catch(() => { }), 5000);
-                    }
-                });
-
-                // --- [ دالة كشف المسؤول عن الفعل ] ---
-                async function getExecutor(guild, eventType) {
-                    try {
-                        await new Promise(resolve => setTimeout(resolve, 1500)); // انتظار بسيط لضمان تسجيل الحدث
-                        const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
-                        const entry = auditLogs.entries.first();
-                        if (!entry) return "غير معروف (تلقائي)";
-                        return `${entry.executor.tag}`;
-                    } catch (e) { return "صلاحيات ناقصة"; }
-                }
-
-                // --- [ 1. لوق حذف الرسائل ] ---
-                client.on('messageDelete', async (message) => {
-                    if (!message.guild || message.author?.bot) return;
-                    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-                    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
-
-                    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
-                    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
-
-                    const embed = new EmbedBuilder()
-                        .setAuthor({ name: '🗑️ حذف رسالة' })
-                        .setColor('#ff4757')
-                        .addFields(
-                            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
-                            { name: '🛡️ الحاذف:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor, inline: true },
-                            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
-                            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
-                        ).setTimestamp();
-                    if (logCh) logCh.send({ embeds: [embed] }).catch(() => { });
-                });
-                logCh.send({ embeds: [logEmbed] }).catch(() => { });
+                await logCh.send({ embeds: [logEmbed] }).catch(() => {});
             }
         }
-
-        // --- ---
-        // --- [ داخل نظام الترحيب بالصورة ] ---
-        if (s.welcome?.enabled && s.welcome.channel) {
-            const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
-            if (welcomeCh) {
-                // 1. إنشاء الكانفاس بنفس أبعاد المعاينة
-                const canvas = createCanvas(800, 400);
-                const ctx = canvas.getContext('2d');
-
-                // 2. تحميل الصورة الخلفية
-                if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
-                    const background = await loadImage(s.welcome.imagePath);
-                    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.fillStyle = '#1a1a2e';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                }
-
-                // 3. جلب الإعدادات "المحفوظة" من الداتابيز
-                const fontSize = parseInt(s.welcome.fontSize) || 40;
-                const posX = parseInt(s.welcome.textX) || 250; // القيمة المحفوظة لـ X
-                const posY = parseInt(s.welcome.textY) || 150; // القيمة المحفوظة لـ Y
-
-                // 4. إعدادات الخط
-                ctx.font = `bold ${fontSize}px sans-serif`;
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = "black";
-
-                // 5. معالجة النص
-                let welcomeText = s.welcome.customText || 'Welcome {user}';
-                welcomeText = welcomeText.replace('{user}', member.user.username);
-
-                // 6. الرسم في المكان الدقيق
-                // ملاحظة: تأكد أن posX و posY هما نفس القيم التي تظهر في المعاينة بالداشبورد
-                ctx.fillText(welcomeText, posX, posY);
-
-                const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
-                await welcomeCh.send({ content: `✨ حياك الله ${member} في سيرفرنا!`, files: [attachment] }).catch(() => { });
-            }
-        }
-
 
     } catch (error) {
-        console.error("❌ خطأ في حدث دخول العضو:", error);
+        console.error("❌ خطأ في دخول عضو:", error);
     }
 });
+
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.guild) return;
+    if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+    if (!config) return;
+
+    // كود التكت هون
+});
+
+// --- [ داخل نظام الترحيب بالصورة ] ---
+if (s.welcome?.enabled && s.welcome.channel) {
+    const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
+
+    if (welcomeCh) {
+        try {
+            // 1. إنشاء الكانفاس
+            const canvas = createCanvas(800, 400);
+            const ctx = canvas.getContext('2d');
+
+            // 2. الخلفية
+            if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
+                const background = await loadImage(s.welcome.imagePath);
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 3. الإعدادات
+            const fontSize = parseInt(s.welcome.fontSize) || 40;
+            const posX = parseInt(s.welcome.textX) || 250;
+            const posY = parseInt(s.welcome.textY) || 150;
+
+            // 4. الخط
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "black";
+
+            // 5. النص
+            let welcomeText = s.welcome.customText || 'Welcome {user}';
+            welcomeText = welcomeText.replace('{user}', member.user.username);
+
+            // 6. الرسم
+            ctx.fillText(welcomeText, posX, posY);
+
+            const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
+
+            await welcomeCh.send({
+                content: `✨ حياك الله ${member} في سيرفرنا!`,
+                files: [attachment]
+            }).catch(() => {});
+
+        } catch (error) {
+            console.error("❌ خطأ في نظام الترحيب:", error);
+        }
+    }
+}
 
 // --- [ 4. لوق خروج الأعضاء ] ---
 client.on('guildMemberRemove', async (member) => {
