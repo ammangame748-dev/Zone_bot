@@ -216,8 +216,12 @@ passport.use(new Strategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
     callbackURL: process.env.CALLBACK_URL,
-    scope: ['identify', 'guilds']
-}, (accessToken, refreshToken, profile, done) => done(null, profile)));
+    scope: ['identify', 'guilds'],
+    // أضف هذا السطر لضمان قبول الاتصال من Render
+    proxy: true 
+}, (accessToken, refreshToken, profile, done) => {
+    return done(null, profile);
+}));
 
 app.use(session({
     secret: 'zone-ultra-secret-123',
