@@ -1969,3 +1969,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
 });
+client.login(process.env.TOKEN);
+client.on('ready', () => {
+    console.log(`✅ البوت شغال وشايف سيرفرات عددها: ${client.guilds.cache.size}`);
+});
