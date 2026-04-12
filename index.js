@@ -1575,26 +1575,14 @@ client.on('guildMemberUpdate', async (oldM, newM) => {
     }
 });
 
-// --- [ 4. لوق دخول الأعضاء ] ---
-client.on('guildMemberAdd', async (member) => {
-    const s = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (!s?.logs?.members?.enabled || !s.logs.members.channel) return;
-    const logCh = member.guild.channels.cache.get(s.logs.members.channel);
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: '📥 دخول عضو' })
-        .setColor('#2ed573')
-        .setDescription(`**العضو:** <@${member.id}>\n**الأيدي:** ${member.id}`)
-        .setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] });
-});
-
 client.on('guildMemberAdd', async (member) => {
     try {
-        // 1. جلب إعدادات السيرفر من الداتابيز
         const s = await GuildConfig.findOne({ guildId: member.guild.id });
         if (!s) return;
 
-        // --- [ نظام اللوق (Logs) ] ---
+        // =========================
+        // 📥 LOGS - دخول عضو
+        // =========================
         if (s.logs?.members?.enabled && s.logs.members.channel) {
             const logCh = member.guild.channels.cache.get(s.logs.members.channel);
 
@@ -1609,32 +1597,18 @@ client.on('guildMemberAdd', async (member) => {
             }
         }
 
-    } catch (error) {
-        console.error("❌ خطأ في دخول عضو:", error);
-    }
-});
+        // =========================
+        // 🎉 WELCOME IMAGE
+        // =========================
+        if (s.welcome?.enabled && s.welcome.channel) {
 
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.guild) return;
-    if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+            const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
+            if (!welcomeCh) return;
 
-    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-    if (!config) return;
-
-    // كود التكت هون
-});
-
-// --- [ داخل نظام الترحيب بالصورة ] ---
-if (s.welcome?.enabled && s.welcome.channel) {
-    const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
-
-    if (welcomeCh) {
-        try {
-            // 1. إنشاء الكانفاس
             const canvas = createCanvas(800, 400);
             const ctx = canvas.getContext('2d');
 
-            // 2. الخلفية
+            // الخلفية
             if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
                 const background = await loadImage(s.welcome.imagePath);
                 ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
@@ -1643,36 +1617,35 @@ if (s.welcome?.enabled && s.welcome.channel) {
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
-            // 3. الإعدادات
+            // النص
             const fontSize = parseInt(s.welcome.fontSize) || 40;
             const posX = parseInt(s.welcome.textX) || 250;
             const posY = parseInt(s.welcome.textY) || 150;
 
-            // 4. الخط
             ctx.font = `bold ${fontSize}px sans-serif`;
             ctx.fillStyle = '#ffffff';
             ctx.shadowBlur = 10;
             ctx.shadowColor = "black";
 
-            // 5. النص
             let welcomeText = s.welcome.customText || 'Welcome {user}';
             welcomeText = welcomeText.replace('{user}', member.user.username);
 
-            // 6. الرسم
             ctx.fillText(welcomeText, posX, posY);
 
-            const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
+            const attachment = new AttachmentBuilder(canvas.toBuffer(), {
+                name: 'welcome.png'
+            });
 
             await welcomeCh.send({
                 content: `✨ حياك الله ${member} في سيرفرنا!`,
                 files: [attachment]
             }).catch(() => {});
-
-        } catch (error) {
-            console.error("❌ خطأ في نظام الترحيب:", error);
         }
+
+    } catch (error) {
+        console.error("❌ خطأ في guildMemberAdd:", error);
     }
-}
+});
 
 // --- [ 4. لوق خروج الأعضاء ] ---
 client.on('guildMemberRemove', async (member) => {
