@@ -227,9 +227,24 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
-app.get('/auth/discord', passport.authenticate('discord'));
-app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
-    res.redirect('/dashboard');
+
+app.get('/auth/discord/callback',
+passport.authenticate('discord', { failureRedirect: '/login' }),
+async (req, res) => {
+
+    const guildId = req.query.guild_id;
+
+    if (!guildId) {
+        return res.redirect('/dashboard');
+    }
+
+    const guild = client.guilds.cache.get(guildId);
+
+    if (!guild) {
+        return res.redirect(`/invite-bot/${guildId}`);
+    }
+
+    res.redirect(`/dashboard/${guildId}`);
 });
 
 
@@ -1167,10 +1182,11 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
 });
 
 client.on('messageCreate', async (msg) => {
-    // 1. التحقق الأساسي (تجاهل البوتات والرسائل الخاصة)
     if (!msg.guild || msg.author.bot) return;
 
-    // --- [ تسجيل إحصائيات الرسائل والقنوات ] ---
+    // =========================
+    // 📊 الإحصائيات
+    // =========================
     await Stats.findOneAndUpdate(
         { guildId: msg.guild.id },
         {
@@ -1183,213 +1199,180 @@ client.on('messageCreate', async (msg) => {
             }
         },
         { upsert: true }
-    ).catch(e => console.log("Stats Save Error:", e));
+    ).catch(() => { });
 
-
-    // 2. جلب إعدادات السيرفر من الداتابيز
+    // =========================
+    // ⚙️ جلب إعدادات السيرفر
+    // =========================
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
     if (!s) return;
 
-    // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
-    const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
+    // =========================
+    // 🛡️ الباي باس رولز
+    // =========================
+    const hasBypass = msg.member.roles.cache.some(role =>
+        s.security?.bypassRoles?.includes(role.id)
+    );
 
     if (!hasBypass) {
-        // --- [ نظام الكلمات الممنوعة ] ---
-        if (s.security?.badWords && s.security.badWords.trim().length > 0) {
+
+        // 🚫 bad words
+        if (s.security?.badWords) {
             const forbidden = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
-            const hasBadWord = forbidden.some(word => word !== "" && msg.content.toLowerCase().includes(word));
-
-            if (hasBadWord) {
+            if (forbidden.some(w => w && msg.content.toLowerCase().includes(w))) {
                 await msg.delete().catch(() => { });
-                try {
-                    await msg.member.timeout(5 * 60 * 1000, 'استخدام كلمات ممنوعة');
-                    return msg.channel.send(`⚠️ ${msg.author}، ممنوع استخدام الكلمات الممنوعة!`);
-                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
-                return;
+                await msg.member.timeout(5 * 60 * 1000, 'Bad words').catch(() => { });
+                return msg.channel.send(`⚠️ ${msg.author} ممنوع استخدام كلمات محظورة`);
             }
         }
 
-        // --- [ نظام الإيموجي الممنوع ] ---
-        if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
-            const forbiddenEmojis = s.security.badEmojis.split(',').map(e => e.trim());
-            const hasBadEmoji = forbiddenEmojis.some(emoji => emoji !== "" && msg.content.includes(emoji));
-
-            if (hasBadEmoji) {
+        // 🚫 bad emojis
+        if (s.security?.badEmojis) {
+            const emojis = s.security.badEmojis.split(',').map(e => e.trim());
+            if (emojis.some(e => e && msg.content.includes(e))) {
                 await msg.delete().catch(() => { });
-                try {
-                    await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
-                    return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
-                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
-                return;
+                await msg.member.timeout(5 * 60 * 1000, 'Bad emoji').catch(() => { });
+                return msg.channel.send(`⚠️ ${msg.author} هذا الإيموجي ممنوع`);
             }
         }
 
-        // --- [ نظام منع الروابط ] ---
+        // 🚫 links
         if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
             await msg.delete().catch(() => { });
-            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
+            return msg.channel.send(`⚠️ ${msg.author} الروابط ممنوعة`).then(m =>
+                setTimeout(() => m.delete().catch(() => { }), 3000)
+            );
         }
     }
 
-    // 4. 🤖 الرد الآلي (Auto Reply)
-    const r = s.autoReply?.find(x => x.trigger && msg.content.toLowerCase() === x.trigger.toLowerCase());
-    if (r) return msg.reply(r.reply).catch(() => { });
+    // =========================
+    // 🤖 Auto Reply
+    // =========================
+    const auto = s.autoReply?.find(x =>
+        x.trigger?.toLowerCase() === msg.content.toLowerCase()
+    );
 
-    // 5. 🏆 نظام المستويات (Levels)
+    if (auto) return msg.reply(auto.reply).catch(() => { });
+
+    // =========================
+    // 🏆 Levels
+    // =========================
     if (s.levels?.enabled) {
-        let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
+        let u = await UserLevel.findOne({
+            guildId: msg.guild.id,
+            userId: msg.author.id
+        });
+
         if (!u) {
-            u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id, xp: 0, level: 1, msgCount: 0 });
+            u = new UserLevel({
+                guildId: msg.guild.id,
+                userId: msg.author.id,
+                xp: 0,
+                level: 1,
+                msgCount: 0
+            });
         }
+
         u.xp += s.levels.xpPerMessage || 10;
         u.msgCount++;
+
         if (u.xp >= u.level * u.level * 100) {
             u.level++;
-            const lvChannel = msg.guild.channels.cache.get(s.levels.levelUpChannel) || msg.channel;
-            lvChannel.send(`🎉 مبروك ${msg.author}! صرت لفل **${u.level}**`).catch(() => { });
+
+            const ch =
+                msg.guild.channels.cache.get(s.levels.levelUpChannel) ||
+                msg.channel;
+
+            ch.send(`🎉 مبروك ${msg.author} وصلت لفل **${u.level}**`);
         }
+
         await u.save();
     }
 
-    // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
-    if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    // =========================
+    // 🎫 Ticket setup
+    // =========================
+    if (msg.content === '!setup' &&
+        msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+
         const tConfig = await TicketConfig.findOne({ guildId: msg.guild.id });
-        if (!tConfig) return msg.reply("⚠️ اضبط الإعدادات من الداشبورد أولاً!");
+        if (!tConfig) return msg.reply("اضبط التذاكر من الداشبورد أولاً");
 
         const embed = new EmbedBuilder()
-            .setTitle(tConfig.title || "الدعم الفني")
-            .setDescription(tConfig.description || "اضغط أدناه لفتح تذكرة")
+            .setTitle(tConfig.title || "Tickets")
+            .setDescription(tConfig.description || "افتح تذكرة")
             .setColor(tConfig.color || "#5865F2");
 
-        const files = [];
-        if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
-            const topName = path.basename(tConfig.topImagePath);
-            files.push(new AttachmentBuilder(tConfig.topImagePath, { name: topName }));
-            embed.setThumbnail(`attachment://${topName}`);
-        }
-        if (tConfig.bottomImagePath && fs.existsSync(tConfig.bottomImagePath)) {
-            const bottomName = path.basename(tConfig.bottomImagePath);
-            files.push(new AttachmentBuilder(tConfig.bottomImagePath, { name: bottomName }));
-            embed.setImage(`attachment://${bottomName}`);
-        }
-
-        const components = [];
-        // بناء الأزرار
-        if (Array.isArray(tConfig.buttons) && tConfig.buttons.length > 0) {
-            const btnRow = new ActionRowBuilder();
-            tConfig.buttons.forEach((btn, i) => {
-                if (!btn.label) return;
-                const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
-                if (btn.emoji) {
-                    const em = btn.emoji.trim();
-                    try { button.setEmoji(/^\d+$/.test(em) ? { id: em } : em); } catch (e) { }
-                }
-                btnRow.addComponents(button);
-            });
-            if (btnRow.components.length > 0) components.push(btnRow);
-        }
-
-        // بناء المنيو
-        if (Array.isArray(tConfig.menuOptions) && tConfig.menuOptions.length > 0) {
-            const select = new StringSelectMenuBuilder().setCustomId('ticket_menu').setPlaceholder('🔽 اختر من القائمة...');
-            tConfig.menuOptions.forEach((opt, i) => {
-                if (!opt.label) return;
-                const option = { label: opt.label, value: `ticket_opt_${i}` };
-                if (opt.emoji) {
-                    const em = opt.emoji.trim();
-                    try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) { }
-                }
-                select.addOptions(option);
-            });
-            if (select.options.length > 0) components.push(new ActionRowBuilder().addComponents(select));
-        }
-
-        // زر افتراضي
-        if (components.length === 0) {
-            components.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة 🎫').setStyle(ButtonStyle.Primary)));
-        }
-
-        return msg.channel.send({ embeds: [embed], components: components, files: files });
+        return msg.channel.send({ embeds: [embed] });
     }
-    // ==========================================
-    // 🛡️ نظام السجن المطور (للأدمن فقط)
-    // ==========================================
+
+    // =========================
+    // 🛡️ MOD SYSTEM
+    // =========================
     const modConfig = await ModConfig.findOne({ guildId: msg.guild.id });
 
-    if (modConfig && modConfig.jail) {
-        const prefix = "!";
-        const args = msg.content.slice(prefix.length).trim().split(/ +/);
-        const command = args.shift().toLowerCase();
+    if (!modConfig?.jail) return;
 
-        // 🛑 [1] أمر السجن (للأدمن فقط)
-        if (command === modConfig.jail.commandName.toLowerCase()) {
-            // فحص صارم: فقط من لديه صلاحية Administrator يمكنه السجن
-            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
-            }
+    const prefix = "!";
+    if (!msg.content.startsWith(prefix)) return;
 
-            const target = msg.mentions.members.first();
-            const timeInput = args.find(arg => /[smhdw]/.test(arg));
+    const args = msg.content.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift()?.toLowerCase();
 
-            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h\``);
-            if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
+    // =========================
+    // 🔒 JAIL
+    // =========================
+    if (command === modConfig.jail.commandName?.toLowerCase()) {
 
-            const durationMs = ms(timeInput);
-            if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 1h, 30m).");
+        if (!msg.member.permissions.has(PermissionFlagsBits.Administrator))
+            return msg.reply("❌ فقط الإدارة");
 
-            const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
+        const target = msg.mentions.members.first();
+        const time = args.find(a => /[smhd]/.test(a));
 
-            if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
+        if (!target || !time)
+            return msg.reply("❌ !jail @user 1h");
 
-            try {
-                // حفظ الرتب القديمة قبل سحبها
-                const currentRoles = target.roles.cache.filter(r => r.name !== '@everyone').map(r => r.id);
-                await JailData.findOneAndUpdate(
-                    { guildId: msg.guild.id, userId: target.id },
-                    { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
-                    { upsert: true }
-                );
+        const duration = ms(time);
+        if (!duration) return msg.reply("❌ وقت خطأ");
 
-                // 📩 إرسال رسالة خاصة (DM) للعضو المسجون
-                const dmEmbed = new EmbedBuilder()
-                    .setTitle('⚖️ لقد تم سجنك!')
-                    .setThumbnail(msg.guild.iconURL())
-                    .setDescription(`مرحباً ${target.user.username}، تم سجنك في سيرفر **${msg.guild.name}**.`)
-                    .addFields(
-                        { name: '⏳ المدة:', value: timeInput, inline: true },
-                        { name: '📍 الروم المخصص:', value: `<#${modConfig.jail.channelId}>`, inline: true },
-                        { name: '🛡️ المسؤول:', value: `${msg.author.tag}`, inline: true }
-                    )
-                    .setColor('Red').setTimestamp();
+        const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
+        if (!jailRole) return msg.reply("❌ رتبة السجن غير موجودة");
 
-                await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
+        const oldRoles = target.roles.cache
+            .filter(r => r.name !== "@everyone")
+            .map(r => r.id);
 
-                // سحب الرتب وإعطاء رتبة السجن
-                await target.roles.set([jailRole.id]);
-                msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
+        await JailData.findOneAndUpdate(
+            { guildId: msg.guild.id, userId: target.id },
+            { oldRoles, endAt: Date.now() + duration },
+            { upsert: true }
+        );
 
-                // فك السجن تلقائياً بعد انتهاء الوقت
-                setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
-            } catch (e) { console.error(e); }
-        }
+        await target.roles.set([jailRole.id]).catch(() => { });
 
-        // 🔓 [2] أمر فك السجن (تحته مباشرة - للأدمن فقط)
-        if (command === (modConfig.jail.unjailCommand || 'unjail').toLowerCase()) {
-            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return msg.reply("❌ عذراً، لا تملك صلاحيات الأدمن لفك السجن!");
-            }
+        msg.channel.send(`🔒 تم سجن ${target}`);
 
-            const target = msg.mentions.members.first();
-            if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
-
-            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
-            await handleUnjail(target, msg.guild.id, jailChannel);
-            msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
-        }
+        setTimeout(() => {
+            handleUnjail(target, msg.guild.id).catch(() => { });
+        }, duration);
     }
 
-}); // إغلاق حدث messageCreate بشكل صحيح
+    // =========================
+    // 🔓 UNJAIL
+    // =========================
+    if (command === modConfig.jail.unjailCommand?.toLowerCase()) {
+
+        if (!msg.member.permissions.has(PermissionFlagsBits.Administrator))
+            return msg.reply("❌ فقط الإدارة");
+
+        const target = msg.mentions.members.first();
+        if (!target) return msg.reply("منشن الشخص");
+
+        await handleUnjail(target, msg.guild.id);
+        msg.channel.send(`✅ تم فك سجن ${target}`);
+    }
+});
 
 async function handleUnjail(member, guildId, channel) {
     const data = await JailData.findOne({ guildId: guildId, userId: member.id });
@@ -1523,13 +1506,12 @@ async (req, res) => {
 
     const botGuilds = client.guilds.cache;
 
-    // مثال: تحقق إذا البوت داخل السيرفرات
-    const guildId = req.query.guild_id;
+    const guildId = req.query.state;
 
     const guild = botGuilds.get(guildId);
 
     if (!guild) {
-        return res.redirect(`/invite-bot/${guildId}`);
+       return res.redirect('/dashboard');
     }
 
     // إذا موجود → روح داشبورد
@@ -1619,9 +1601,7 @@ client.on('guildMemberAdd', async (member) => {
                     .setTimestamp();
 
 
-                client.on('interactionCreate', async (interaction) => {
-                    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
-
+               client.on('interactionCreate', async (interaction) => {
                     // جلب الإعدادات
                     const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
                     if (!config) return;
@@ -1957,13 +1937,10 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 app.get('/invite-bot/:guildId', (req, res) => {
     const guildId = req.params.guildId;
 
-    const url =
-        `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}` +
-        `&permissions=8` +
-        `&scope=bot%20applications.commands` +
-        `&guild_id=${guildId}` +
-        `&disable_guild_select=true`;
-
+const url =
+    `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}` +
+    `&scope=bot%20applications.commands` +
+    `&permissions=8`;
     res.redirect(url);
 });
 
