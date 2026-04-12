@@ -52,16 +52,6 @@ const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     }
 }));
 
-client.on('guildCreate', async (guild) => {
-    console.log(`✅ Bot joined: ${guild.name} (${guild.id})`);
-
-    // هون ممكن تحفظ السيرفر في الداشبورد
-    await GuildConfig.findOneAndUpdate(
-        { guildId: guild.id },
-        { guildId: guild.id },
-        { upsert: true }
-    );
-});
 
 const JailData = mongoose.model('JailData', new mongoose.Schema({
     guildId: String,
@@ -227,24 +217,9 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-app.get('/auth/discord/callback',
-passport.authenticate('discord', { failureRedirect: '/login' }),
-async (req, res) => {
-
-    const guildId = req.query.guild_id;
-
-    if (!guildId) {
-        return res.redirect('/dashboard');
-    }
-
-    const guild = client.guilds.cache.get(guildId);
-
-    if (!guild) {
-        return res.redirect(`/invite-bot/${guildId}`);
-    }
-
-    res.redirect(`/dashboard/${guildId}`);
+app.get('/auth/discord', passport.authenticate('discord'));
+app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
+    res.redirect('/dashboard');
 });
 
 
@@ -342,7 +317,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
             <h3 style="color:white; margin:10px 0;">${g.name}</h3>
             ${hasBot
                 ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none;">⚙️ دخول الإعدادات</a>`
-                : `<a href="https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
+                : `<a href="https://discord.com{process.env.CLIENT_ID}&permissions=8&scope=bot&guild_id=${g.id}" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
             }
         </div>`;
     }).join('');
@@ -1182,11 +1157,10 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
 });
 
 client.on('messageCreate', async (msg) => {
+    // 1. التحقق الأساسي (تجاهل البوتات والرسائل الخاصة)
     if (!msg.guild || msg.author.bot) return;
 
-    // =========================
-    // 📊 الإحصائيات
-    // =========================
+    // --- [ تسجيل إحصائيات الرسائل والقنوات ] ---
     await Stats.findOneAndUpdate(
         { guildId: msg.guild.id },
         {
@@ -1199,180 +1173,213 @@ client.on('messageCreate', async (msg) => {
             }
         },
         { upsert: true }
-    ).catch(() => { });
+    ).catch(e => console.log("Stats Save Error:", e));
 
-    // =========================
-    // ⚙️ جلب إعدادات السيرفر
-    // =========================
+
+    // 2. جلب إعدادات السيرفر من الداتابيز
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
     if (!s) return;
 
-    // =========================
-    // 🛡️ الباي باس رولز
-    // =========================
-    const hasBypass = msg.member.roles.cache.some(role =>
-        s.security?.bypassRoles?.includes(role.id)
-    );
+    // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
+    const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
 
     if (!hasBypass) {
-
-        // 🚫 bad words
-        if (s.security?.badWords) {
+        // --- [ نظام الكلمات الممنوعة ] ---
+        if (s.security?.badWords && s.security.badWords.trim().length > 0) {
             const forbidden = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
-            if (forbidden.some(w => w && msg.content.toLowerCase().includes(w))) {
+            const hasBadWord = forbidden.some(word => word !== "" && msg.content.toLowerCase().includes(word));
+
+            if (hasBadWord) {
                 await msg.delete().catch(() => { });
-                await msg.member.timeout(5 * 60 * 1000, 'Bad words').catch(() => { });
-                return msg.channel.send(`⚠️ ${msg.author} ممنوع استخدام كلمات محظورة`);
+                try {
+                    await msg.member.timeout(5 * 60 * 1000, 'استخدام كلمات ممنوعة');
+                    return msg.channel.send(`⚠️ ${msg.author}، ممنوع استخدام الكلمات الممنوعة!`);
+                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
+                return;
             }
         }
 
-        // 🚫 bad emojis
-        if (s.security?.badEmojis) {
-            const emojis = s.security.badEmojis.split(',').map(e => e.trim());
-            if (emojis.some(e => e && msg.content.includes(e))) {
+        // --- [ نظام الإيموجي الممنوع ] ---
+        if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
+            const forbiddenEmojis = s.security.badEmojis.split(',').map(e => e.trim());
+            const hasBadEmoji = forbiddenEmojis.some(emoji => emoji !== "" && msg.content.includes(emoji));
+
+            if (hasBadEmoji) {
                 await msg.delete().catch(() => { });
-                await msg.member.timeout(5 * 60 * 1000, 'Bad emoji').catch(() => { });
-                return msg.channel.send(`⚠️ ${msg.author} هذا الإيموجي ممنوع`);
+                try {
+                    await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
+                    return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
+                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
+                return;
             }
         }
 
-        // 🚫 links
+        // --- [ نظام منع الروابط ] ---
         if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
             await msg.delete().catch(() => { });
-            return msg.channel.send(`⚠️ ${msg.author} الروابط ممنوعة`).then(m =>
-                setTimeout(() => m.delete().catch(() => { }), 3000)
-            );
+            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
         }
     }
 
-    // =========================
-    // 🤖 Auto Reply
-    // =========================
-    const auto = s.autoReply?.find(x =>
-        x.trigger?.toLowerCase() === msg.content.toLowerCase()
-    );
+    // 4. 🤖 الرد الآلي (Auto Reply)
+    const r = s.autoReply?.find(x => x.trigger && msg.content.toLowerCase() === x.trigger.toLowerCase());
+    if (r) return msg.reply(r.reply).catch(() => { });
 
-    if (auto) return msg.reply(auto.reply).catch(() => { });
-
-    // =========================
-    // 🏆 Levels
-    // =========================
+    // 5. 🏆 نظام المستويات (Levels)
     if (s.levels?.enabled) {
-        let u = await UserLevel.findOne({
-            guildId: msg.guild.id,
-            userId: msg.author.id
-        });
-
+        let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
         if (!u) {
-            u = new UserLevel({
-                guildId: msg.guild.id,
-                userId: msg.author.id,
-                xp: 0,
-                level: 1,
-                msgCount: 0
-            });
+            u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id, xp: 0, level: 1, msgCount: 0 });
         }
-
         u.xp += s.levels.xpPerMessage || 10;
         u.msgCount++;
-
         if (u.xp >= u.level * u.level * 100) {
             u.level++;
-
-            const ch =
-                msg.guild.channels.cache.get(s.levels.levelUpChannel) ||
-                msg.channel;
-
-            ch.send(`🎉 مبروك ${msg.author} وصلت لفل **${u.level}**`);
+            const lvChannel = msg.guild.channels.cache.get(s.levels.levelUpChannel) || msg.channel;
+            lvChannel.send(`🎉 مبروك ${msg.author}! صرت لفل **${u.level}**`).catch(() => { });
         }
-
         await u.save();
     }
 
-    // =========================
-    // 🎫 Ticket setup
-    // =========================
-    if (msg.content === '!setup' &&
-        msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-
+    // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
+    if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
         const tConfig = await TicketConfig.findOne({ guildId: msg.guild.id });
-        if (!tConfig) return msg.reply("اضبط التذاكر من الداشبورد أولاً");
+        if (!tConfig) return msg.reply("⚠️ اضبط الإعدادات من الداشبورد أولاً!");
 
         const embed = new EmbedBuilder()
-            .setTitle(tConfig.title || "Tickets")
-            .setDescription(tConfig.description || "افتح تذكرة")
+            .setTitle(tConfig.title || "الدعم الفني")
+            .setDescription(tConfig.description || "اضغط أدناه لفتح تذكرة")
             .setColor(tConfig.color || "#5865F2");
 
-        return msg.channel.send({ embeds: [embed] });
-    }
+        const files = [];
+        if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
+            const topName = path.basename(tConfig.topImagePath);
+            files.push(new AttachmentBuilder(tConfig.topImagePath, { name: topName }));
+            embed.setThumbnail(`attachment://${topName}`);
+        }
+        if (tConfig.bottomImagePath && fs.existsSync(tConfig.bottomImagePath)) {
+            const bottomName = path.basename(tConfig.bottomImagePath);
+            files.push(new AttachmentBuilder(tConfig.bottomImagePath, { name: bottomName }));
+            embed.setImage(`attachment://${bottomName}`);
+        }
 
-    // =========================
-    // 🛡️ MOD SYSTEM
-    // =========================
+        const components = [];
+        // بناء الأزرار
+        if (Array.isArray(tConfig.buttons) && tConfig.buttons.length > 0) {
+            const btnRow = new ActionRowBuilder();
+            tConfig.buttons.forEach((btn, i) => {
+                if (!btn.label) return;
+                const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
+                if (btn.emoji) {
+                    const em = btn.emoji.trim();
+                    try { button.setEmoji(/^\d+$/.test(em) ? { id: em } : em); } catch (e) { }
+                }
+                btnRow.addComponents(button);
+            });
+            if (btnRow.components.length > 0) components.push(btnRow);
+        }
+
+        // بناء المنيو
+        if (Array.isArray(tConfig.menuOptions) && tConfig.menuOptions.length > 0) {
+            const select = new StringSelectMenuBuilder().setCustomId('ticket_menu').setPlaceholder('🔽 اختر من القائمة...');
+            tConfig.menuOptions.forEach((opt, i) => {
+                if (!opt.label) return;
+                const option = { label: opt.label, value: `ticket_opt_${i}` };
+                if (opt.emoji) {
+                    const em = opt.emoji.trim();
+                    try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) { }
+                }
+                select.addOptions(option);
+            });
+            if (select.options.length > 0) components.push(new ActionRowBuilder().addComponents(select));
+        }
+
+        // زر افتراضي
+        if (components.length === 0) {
+            components.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة 🎫').setStyle(ButtonStyle.Primary)));
+        }
+
+        return msg.channel.send({ embeds: [embed], components: components, files: files });
+    }
+    // ==========================================
+    // 🛡️ نظام السجن المطور (للأدمن فقط)
+    // ==========================================
     const modConfig = await ModConfig.findOne({ guildId: msg.guild.id });
 
-    if (!modConfig?.jail) return;
+    if (modConfig && modConfig.jail) {
+        const prefix = "!";
+        const args = msg.content.slice(prefix.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
 
-    const prefix = "!";
-    if (!msg.content.startsWith(prefix)) return;
+        // 🛑 [1] أمر السجن (للأدمن فقط)
+        if (command === modConfig.jail.commandName.toLowerCase()) {
+            // فحص صارم: فقط من لديه صلاحية Administrator يمكنه السجن
+            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
+            }
 
-    const args = msg.content.slice(prefix.length).trim().split(/ +/);
-    const command = args.shift()?.toLowerCase();
+            const target = msg.mentions.members.first();
+            const timeInput = args.find(arg => /[smhdw]/.test(arg));
 
-    // =========================
-    // 🔒 JAIL
-    // =========================
-    if (command === modConfig.jail.commandName?.toLowerCase()) {
+            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h\``);
+            if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
 
-        if (!msg.member.permissions.has(PermissionFlagsBits.Administrator))
-            return msg.reply("❌ فقط الإدارة");
+            const durationMs = ms(timeInput);
+            if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 1h, 30m).");
 
-        const target = msg.mentions.members.first();
-        const time = args.find(a => /[smhd]/.test(a));
+            const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
+            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
 
-        if (!target || !time)
-            return msg.reply("❌ !jail @user 1h");
+            if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
 
-        const duration = ms(time);
-        if (!duration) return msg.reply("❌ وقت خطأ");
+            try {
+                // حفظ الرتب القديمة قبل سحبها
+                const currentRoles = target.roles.cache.filter(r => r.name !== '@everyone').map(r => r.id);
+                await JailData.findOneAndUpdate(
+                    { guildId: msg.guild.id, userId: target.id },
+                    { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
+                    { upsert: true }
+                );
 
-        const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-        if (!jailRole) return msg.reply("❌ رتبة السجن غير موجودة");
+                // 📩 إرسال رسالة خاصة (DM) للعضو المسجون
+                const dmEmbed = new EmbedBuilder()
+                    .setTitle('⚖️ لقد تم سجنك!')
+                    .setThumbnail(msg.guild.iconURL())
+                    .setDescription(`مرحباً ${target.user.username}، تم سجنك في سيرفر **${msg.guild.name}**.`)
+                    .addFields(
+                        { name: '⏳ المدة:', value: timeInput, inline: true },
+                        { name: '📍 الروم المخصص:', value: `<#${modConfig.jail.channelId}>`, inline: true },
+                        { name: '🛡️ المسؤول:', value: `${msg.author.tag}`, inline: true }
+                    )
+                    .setColor('Red').setTimestamp();
 
-        const oldRoles = target.roles.cache
-            .filter(r => r.name !== "@everyone")
-            .map(r => r.id);
+                await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
 
-        await JailData.findOneAndUpdate(
-            { guildId: msg.guild.id, userId: target.id },
-            { oldRoles, endAt: Date.now() + duration },
-            { upsert: true }
-        );
+                // سحب الرتب وإعطاء رتبة السجن
+                await target.roles.set([jailRole.id]);
+                msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
 
-        await target.roles.set([jailRole.id]).catch(() => { });
+                // فك السجن تلقائياً بعد انتهاء الوقت
+                setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
+            } catch (e) { console.error(e); }
+        }
 
-        msg.channel.send(`🔒 تم سجن ${target}`);
+        // 🔓 [2] أمر فك السجن (تحته مباشرة - للأدمن فقط)
+        if (command === (modConfig.jail.unjailCommand || 'unjail').toLowerCase()) {
+            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return msg.reply("❌ عذراً، لا تملك صلاحيات الأدمن لفك السجن!");
+            }
 
-        setTimeout(() => {
-            handleUnjail(target, msg.guild.id).catch(() => { });
-        }, duration);
+            const target = msg.mentions.members.first();
+            if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
+
+            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
+            await handleUnjail(target, msg.guild.id, jailChannel);
+            msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
+        }
     }
 
-    // =========================
-    // 🔓 UNJAIL
-    // =========================
-    if (command === modConfig.jail.unjailCommand?.toLowerCase()) {
-
-        if (!msg.member.permissions.has(PermissionFlagsBits.Administrator))
-            return msg.reply("❌ فقط الإدارة");
-
-        const target = msg.mentions.members.first();
-        if (!target) return msg.reply("منشن الشخص");
-
-        await handleUnjail(target, msg.guild.id);
-        msg.channel.send(`✅ تم فك سجن ${target}`);
-    }
-});
+}); // إغلاق حدث messageCreate بشكل صحيح
 
 async function handleUnjail(member, guildId, channel) {
     const data = await JailData.findOne({ guildId: guildId, userId: member.id });
@@ -1498,25 +1505,13 @@ setInterval(async () => {
 // 1. الرابط الذي يوجه المستخدم لصفحة تسجيل دخول ديسكورد
 app.get('/auth/discord', passport.authenticate('discord'));
 
-app.get('/auth/discord/callback',
-passport.authenticate('discord', { failureRedirect: '/login' }),
-async (req, res) => {
-
-    const userGuilds = req.user.guilds;
-
-    const botGuilds = client.guilds.cache;
-
-    const guildId = req.query.state;
-
-    const guild = botGuilds.get(guildId);
-
-    if (!guild) {
-       return res.redirect('/dashboard');
-    }
-
-    // إذا موجود → روح داشبورد
-    res.redirect(`/dashboard/${guildId}`);
+// 2. الرابط الذي يستقبل المستخدم بعد موافقته في ديسكورد
+app.get('/auth/discord/callback', passport.authenticate('discord', {
+    failureRedirect: '/login' // إذا فشل يرجعه لصفحة اللوجن
+}), (req, res) => {
+    res.redirect('/dashboard'); // إذا نجح يوديه للداشبورد
 });
+
 // 3. رابط تسجيل الخروج
 app.get('/logout', (req, res) => {
     req.logout(() => {
@@ -1601,115 +1596,7 @@ client.on('guildMemberAdd', async (member) => {
                     .setTimestamp();
 
 
-               client.on('interactionCreate', async (interaction) => {
-                    // جلب الإعدادات
-                    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-                    if (!config) return;
-
-                    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
-                    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
-                        let ticketType = "عامة";
-                        if (interaction.isButton()) {
-                            const btnIndex = interaction.customId.replace('ticket_btn_', '');
-                            ticketType = config.buttons[btnIndex]?.label || "دعم";
-                        } else {
-                            const optIndex = interaction.values[0].replace('ticket_opt_', '');
-                            ticketType = config.menuOptions[optIndex]?.label || "دعم";
-                        }
-
-                        try {
-                            const channel = await interaction.guild.channels.create({
-                                name: `ticket-${interaction.user.username}`,
-                                type: ChannelType.GuildText,
-                                permissionOverwrites: [
-                                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
-                                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                                ],
-                            });
-
-                            const embed = new EmbedBuilder()
-                                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
-                                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
-                                .setColor(config.color || "#5865F2");
-
-                            // الأزرار: استدعاء (لأدمن فقط)
-                            const adminButtons = new ActionRowBuilder().addComponents(
-                                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
-                                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
-                            );
-
-                            // منيو الإدارة: إضافة/إزالة أعضاء
-                            const adminMenu = new ActionRowBuilder().addComponents(
-                                new UserSelectMenuBuilder()
-                                    .setCustomId('manage_members')
-                                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
-                                    .setMinValues(1)
-                                    .setMaxValues(1)
-                            );
-
-                            await channel.send({
-                                content: `<@&${config.adminRole}> | ${interaction.user}`,
-                                embeds: [embed],
-                                components: [adminButtons, adminMenu]
-                            });
-
-                            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
-                        } catch (e) { console.error(e); }
-                    }
-
-                    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
-                    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-
-                    // منع غير الإداريين من استخدام أدوات الإدارة
-                    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
-                    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
-                        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
-                    }
-
-                    // تنفيذ عمليات الأزرار
-                    if (interaction.customId === 'call_owner') {
-                        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
-                    }
-
-                    if (interaction.customId === 'call_admin') {
-                        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
-                    }
-
-                    if (interaction.customId === 'call_user') {
-                        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
-                        const ticketOwnerName = interaction.channel.name.split('-')[1];
-                        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
-                    }
-
-                    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
-                    if (interaction.customId === 'manage_members') {
-                        const targetUser = interaction.users.first();
-                        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
-
-                        if (hasAccess) {
-                            // إذا كان عنده صلاحية، نقوم بإزالتها
-                            await interaction.channel.permissionOverwrites.delete(targetUser.id);
-                            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
-                        } else {
-                            // إذا ما عنده، نقوم بإضافتها
-                            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
-                                ViewChannel: true,
-                                SendMessages: true,
-                                AttachFiles: true
-                            });
-                            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
-                        }
-                    }
-
-                    // إغلاق التذكرة
-                    if (interaction.customId === 'close_ticket') {
-                        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
-                        setTimeout(() => interaction.channel.delete().catch(() => { }), 5000);
-                    }
-                });
+               
 
                 // --- [ دالة كشف المسؤول عن الفعل ] ---
                 async function getExecutor(guild, eventType) {
@@ -1934,15 +1821,118 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     logCh.send({ embeds: [embed] }).catch(e => console.log("Log Error:", e));
 });
 
-app.get('/invite-bot/:guildId', (req, res) => {
-    const guildId = req.params.guildId;
+ client.on('interactionCreate', async (interaction) => {
+                    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
 
-const url =
-    `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}` +
-    `&scope=bot%20applications.commands` +
-    `&permissions=8`;
-    res.redirect(url);
-});
+                    // جلب الإعدادات
+                    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+                    if (!config) return;
+
+                    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
+                    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
+                        let ticketType = "عامة";
+                        if (interaction.isButton()) {
+                            const btnIndex = interaction.customId.replace('ticket_btn_', '');
+                            ticketType = config.buttons[btnIndex]?.label || "دعم";
+                        } else {
+                            const optIndex = interaction.values[0].replace('ticket_opt_', '');
+                            ticketType = config.menuOptions[optIndex]?.label || "دعم";
+                        }
+
+                        try {
+                            const channel = await interaction.guild.channels.create({
+                                name: `ticket-${interaction.user.username}`,
+                                type: ChannelType.GuildText,
+                                permissionOverwrites: [
+                                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
+                                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                                ],
+                            });
+
+                            const embed = new EmbedBuilder()
+                                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
+                                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
+                                .setColor(config.color || "#5865F2");
+
+                            // الأزرار: استدعاء (لأدمن فقط)
+                            const adminButtons = new ActionRowBuilder().addComponents(
+                                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
+                                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
+                                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
+                                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
+                            );
+
+                            // منيو الإدارة: إضافة/إزالة أعضاء
+                            const adminMenu = new ActionRowBuilder().addComponents(
+                                new UserSelectMenuBuilder()
+                                    .setCustomId('manage_members')
+                                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
+                                    .setMinValues(1)
+                                    .setMaxValues(1)
+                            );
+
+                            await channel.send({
+                                content: `<@&${config.adminRole}> | ${interaction.user}`,
+                                embeds: [embed],
+                                components: [adminButtons, adminMenu]
+                            });
+
+                            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
+                        } catch (e) { console.error(e); }
+                    }
+
+                    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
+                    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+                    // منع غير الإداريين من استخدام أدوات الإدارة
+                    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
+                    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
+                        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
+                    }
+
+                    // تنفيذ عمليات الأزرار
+                    if (interaction.customId === 'call_owner') {
+                        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
+                    }
+
+                    if (interaction.customId === 'call_admin') {
+                        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
+                    }
+
+                    if (interaction.customId === 'call_user') {
+                        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
+                        const ticketOwnerName = interaction.channel.name.split('-')[1];
+                        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
+                    }
+
+                    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
+                    if (interaction.customId === 'manage_members') {
+                        const targetUser = interaction.users.first();
+                        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
+
+                        if (hasAccess) {
+                            // إذا كان عنده صلاحية، نقوم بإزالتها
+                            await interaction.channel.permissionOverwrites.delete(targetUser.id);
+                            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
+                        } else {
+                            // إذا ما عنده، نقوم بإضافتها
+                            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
+                                ViewChannel: true,
+                                SendMessages: true,
+                                AttachFiles: true
+                            });
+                            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
+                        }
+                    }
+
+                    // إغلاق التذكرة
+                    if (interaction.customId === 'close_ticket') {
+                        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
+                        setTimeout(() => interaction.channel.delete().catch(() => { }), 5000);
+                    }
+                });
+
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
