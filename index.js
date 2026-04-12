@@ -1177,12 +1177,48 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
 });
 
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
+    try {
+        if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-    if (!config) return;
+        await interaction.deferReply({ ephemeral: true });
 
-    // كمل كود التكت هون...
+        const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+        if (!config) {
+            return interaction.editReply("❌ لا يوجد إعدادات للتكت");
+        }
+
+        // =========================
+        // مثال زر فتح التكت
+        // =========================
+        if (interaction.customId === 'open_ticket') {
+
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${interaction.user.username}`,
+                permissionOverwrites: [
+                    {
+                        id: interaction.guild.id,
+                        deny: ['ViewChannel']
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: ['ViewChannel', 'SendMessages']
+                    }
+                ]
+            });
+
+            return interaction.editReply(`✅ تم فتح التكت: ${channel}`);
+        }
+
+    } catch (err) {
+        console.log("❌ interaction error:", err);
+
+        if (!interaction.replied) {
+            await interaction.reply({
+                content: "❌ صار خطأ بالنظام",
+                ephemeral: true
+            }).catch(() => {});
+        }
+    }
 });
 
 
