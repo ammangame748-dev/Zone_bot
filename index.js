@@ -1957,11 +1957,15 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 app.get('/invite-bot/:guildId', (req, res) => {
     const guildId = req.params.guildId;
 
-    const url = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${guildId}&disable_guild_select=true&redirect_uri=${encodeURIComponent("https://zone-bot-5x5s.onrender.com/auth/discord/callback")}&response_type=code`;
+    const url =
+        `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}` +
+        `&permissions=8` +
+        `&scope=bot%20applications.commands` +
+        `&guild_id=${guildId}` +
+        `&disable_guild_select=true`;
 
     res.redirect(url);
 });
-
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
