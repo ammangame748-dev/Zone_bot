@@ -1212,7 +1212,8 @@ client.on('interactionCreate', async (interaction) => {
         }
 
     } catch (err) {
-        console.log("❌ interaction error:", err);
+        console.log("❌ interaction error:");
+console.log(err);
 
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply({
@@ -1449,6 +1450,25 @@ app.post('/save/:guildId/security', checkAuth, async (req, res) => {
     );
 
     res.redirect(`/manage/${req.params.guildId}/security`);
+});
+const channel = await interaction.guild.channels.create({
+    name: `ticket-${interaction.user.username}`,
+    type: 0,
+    parent: config.categoryId, // لازم يكون عندك كاتيجوري ID
+    permissionOverwrites: [
+        {
+            id: interaction.guild.id,
+            deny: [PermissionsBitField.Flags.ViewChannel]
+        },
+        {
+            id: interaction.user.id,
+            allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory
+            ]
+        }
+    ]
 });
 
 // حفظ إعدادات اللوق
