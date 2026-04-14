@@ -1175,6 +1175,7 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
         res.status(500).send("Internal Error");
     }
 });
+const { PermissionsBitField } = require('discord.js');
 
 client.on('interactionCreate', async (interaction) => {
     try {
@@ -1190,15 +1191,19 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.customId === 'open_ticket') {
             const channel = await interaction.guild.channels.create({
                 name: `ticket-${interaction.user.username}`,
-                type: 0, // 0 تعني قناة كتابية (GuildText) - مهمة جداً لـ v14
+                type: 0,
                 permissionOverwrites: [
                     {
                         id: interaction.guild.id,
-                        deny: ['ViewChannel']
+                        deny: [PermissionsBitField.Flags.ViewChannel]
                     },
                     {
                         id: interaction.user.id,
-                        allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory']
+                        allow: [
+                            PermissionsBitField.Flags.ViewChannel,
+                            PermissionsBitField.Flags.SendMessages,
+                            PermissionsBitField.Flags.ReadMessageHistory
+                        ]
                     }
                 ]
             });
@@ -1209,7 +1214,6 @@ client.on('interactionCreate', async (interaction) => {
     } catch (err) {
         console.log("❌ interaction error:", err);
 
-        // هنا التعديل: نستخدم editReply لأننا عملنا defer مسبقاً
         if (interaction.deferred || interaction.replied) {
             await interaction.editReply({
                 content: "❌ صار خطأ بالنظام أثناء معالجة الطلب",
@@ -1222,7 +1226,6 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 });
-
 
 client.on('messageCreate', async (msg) => {
     if (!msg.guild || msg.author.bot) return;
