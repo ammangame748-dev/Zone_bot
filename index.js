@@ -1181,7 +1181,7 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.reply({ content: "⏳ جاري فتح التكت...", ephemeral: true });
 
         const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
         if (!config) {
@@ -1208,7 +1208,7 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            return interaction.editReply(`✅ تم فتح التكت: ${channel}`);
+            return interaction.followUp({ content: `✅ تم فتح التكت: ${channel}`, ephemeral: true });
         }
 
     } catch (err) {
