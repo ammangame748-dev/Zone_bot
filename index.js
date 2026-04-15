@@ -1363,6 +1363,21 @@ client.on('messageCreate', async (msg) => {
                 // سحب الرتب وإعطاء رتبة السجن
                 await target.roles.set([jailRole.id]);
                 msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
+const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
+
+if (logChannel) {
+    const logEmbed = new EmbedBuilder()
+        .setTitle('🔒 سجن عضو')
+        .setColor('Red')
+        .addFields(
+            { name: '👤 العضو:', value: `${target.user.tag} (${target.id})`, inline: true },
+            { name: '🛡️ بواسطة:', value: `${msg.author.tag}`, inline: true },
+            { name: '⏳ المدة:', value: timeInput, inline: true }
+        )
+        .setTimestamp();
+
+    logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+}
 
                 // فك السجن تلقائياً بعد انتهاء الوقت
                 setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
@@ -1383,6 +1398,11 @@ client.on('messageCreate', async (msg) => {
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
+const logChannel = member.guild.channels.cache.get(modConfig.jail.logChannelId);
+
+if (logChannel) {
+    logChannel.send(`🔓 تم فك سجن ${member.user.tag}`);
+}
 
 }); // إغلاق حدث messageCreate بشكل صحيح
 
