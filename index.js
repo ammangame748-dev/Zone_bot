@@ -1663,53 +1663,63 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 async function handleUnjail(member, guildId, channel = null) {
     try {
+        // 1. جلب بيانات السجن من الداتابيز
         const data = await JailData.findOne({ guildId, userId: member.id });
         if (!data) return;
 
-        // 🔓 رجوع الرتب
-        if (data.oldRoles && data.oldRoles.length > 0) {
-            await member.roles.set(data.oldRoles).catch(() => {});
+        // 2. جلب إعدادات السيرفر لمعرفة رتبة السجن
+        const modConfig = await ModConfig.findOne({ guildId });
+        const jailRoleId = modConfig?.jail?.roleId;
+
+        // --- [ 🔓 بـدء عملية فك السجن ] ---
+
+        // أ. إزالة رتبة السجن أولاً
+        if (jailRoleId && member.roles.cache.has(jailRoleId)) {
+            await member.roles.remove(jailRoleId).catch(e => console.log("⚠️ فشل إزالة رتبة السجن:", e.message));
         }
 
-        // 🗑 حذف من الداتابيز
+        // ب. إرجاع الرتب القديمة (باستخدام set لضمان الدقة)
+        if (data.oldRoles && data.oldRoles.length > 0) {
+            await member.roles.set(data.oldRoles).catch(e => console.log("⚠️ فشل إرجاع الرتب القديمة:", e.message));
+        }
+
+        // ج. حذف بيانات السجن من قاعدة البيانات
         await JailData.deleteOne({ _id: data._id });
 
-        // =========================
-        // 📩 DM فك السجن
-        // =========================
+        // --- [ 📩 إرسال رسالة خاصّة (DM) ] ---
         try {
             const dmEmbed = new EmbedBuilder()
-                .setTitle("🔓 تم فك السجن")
+                .setTitle("🔓 تم فك سجنك")
+                .setDescription(`أهلاً بك مجدداً في السيرفر، تم فك سجنك وإعادة رتبك الأصلية.`)
                 .setColor("#2ed573")
-                .addFields(
-                    { name: "👤 الحساب:", value: `${member.user}`, inline: true }
-                )
+                .addFields({ name: "👤 العضو:", value: `${member.user.tag}`, inline: true })
                 .setTimestamp();
 
             await member.send({ embeds: [dmEmbed] });
         } catch (e) {
-            console.log("❌ ما قدر يرسل DM لفك السجن");
+            console.log("ℹ️ لم يتمكن البوت من إرسال DM للعضو (قد يكون مغلقاً).");
         }
 
-        // =========================
-        // 📢 لوق السيرفر
-        // =========================
+        // --- [ 📢 إرسال اللوق للسيرفر ] ---
         if (channel) {
-            const embed = new EmbedBuilder()
+            const logEmbed = new EmbedBuilder()
                 .setTitle("🔓 تم فك سجن عضو")
                 .setColor("#2ed573")
                 .addFields(
-                    { name: "👤 العضو:", value: `${member}`, inline: true }
+                    { name: "👤 العضو:", value: `${member}`, inline: true },
+                    { name: "📝 الحالة:", value: "تم إرجاع الرتب تلقائياً", inline: true }
                 )
+                .setFooter({ text: "نظام السجن التلقائي" })
                 .setTimestamp();
 
-            channel.send({ embeds: [embed] });
+            await channel.send({ embeds: [logEmbed] }).catch(() => {});
         }
 
     } catch (err) {
-        console.log("❌ خطأ في فك السجن:", err);
+        console.error("❌ خطأ فادح في نظام فك السجن:", err);
     }
 }
+
 
 // --- 📂 لوق تعديل الرومات (اسم، وصف، نوع) ---
 client.on('channelUpdate', async (oldChannel, newChannel) => {
