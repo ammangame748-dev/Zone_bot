@@ -48,17 +48,11 @@ const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
         unjailCommand: { type: String, default: 'unjail' }, // الخانة الجديدة لفك السجن
         roleId: String,
         channelId: String,
+        logChannelId: String,
         adminRoles: [String]
     }
 }));
 
-
-const JailData = mongoose.model('JailData', new mongoose.Schema({
-    guildId: String,
-    userId: String,
-    oldRoles: [String], // مصفوفة لتخزين رتب العضو قبل السجن
-    endAt: Date
-}));
 
 
 // ملاحظة: احتفظ بباقي الـ Schemas (GuildConfig, Stats, UserLevel, Giveaway) كما هي بالأسفل
@@ -968,7 +962,15 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
             <label>🔓 اسم أمر فك السجن (الاختصار):</label>
             <input type="text" name="unjailCommand" value="${s.jail?.unjailCommand || 'فك'}" required>
             <small style="color:#777; display:block; margin-bottom:15px;">* اكتب الاسم بدون بريفكس (مثلاً: فك)</small>
-
+<div style="margin-top:20px;">
+    <label>📜 روم لوق السجن:</label>
+    <select name="logChannelId" required>
+        <option value="">-- اختر الروم --</option>
+        ${g.channels.cache.filter(c => c.type === 0).map(c =>
+            `<option value="${c.id}" ${s.jail?.logChannelId === c.id ? 'selected' : ''}># ${c.name}</option>`
+        ).join('')}
+    </select>
+</div>
             <div style="margin-top:20px;">
                 <label>⛓️ رتبة السجن (التي ستعطى للمخالف):</label>
                 <select name="roleId" required>
@@ -1008,12 +1010,13 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
         await ModConfig.findOneAndUpdate(
             { guildId: req.params.guildId },
             {
-                $set: {
-                    "jail.commandName": cmdName,
-                    "jail.unjailCommand": unjailCmd,
-                    "jail.roleId": req.body.roleId,
-                    "jail.channelId": req.body.channelId
-                }
+              $set: {
+    "jail.commandName": cmdName,
+    "jail.unjailCommand": unjailCmd,
+    "jail.roleId": req.body.roleId,
+    "jail.channelId": req.body.channelId,
+    "jail.logChannelId": req.body.logChannelId
+}
             },
             { upsert: true, new: true }
         );
