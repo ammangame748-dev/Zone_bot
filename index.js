@@ -1193,6 +1193,118 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
 });
 const { PermissionsBitField } = require('discord.js');
 
+client.on('messageCreate', async (msg) => {
+    if (!msg.guild || msg.author.bot) return;
+
+    // جلب الإعدادات من الداتابيز
+    const modConfig = await ModConfig.findOne({ guildId: msg.guild.id });
+    if (!modConfig?.jail) return;
+
+    const prefix = "!"; 
+    const args = msg.content.slice(prefix.length).trim().split(/ +/);
+    const command = args.shift()?.toLowerCase();
+
+    // ==========================================
+    // 🔒 JAIL COMMAND (نظام السجن الكامل)
+    // ==========================================
+    if (command === modConfig.jail.commandName?.toLowerCase()) {
+        
+        // فحص الصلاحيات
+        if (!msg.member.permissions.has(PermissionFlagsBits.Administrator))
+            return msg.reply("❌ هذا الأمر مخصص للإدارة فقط.");
+
+        const target = msg.mentions.members.first();
+        const time = args.find(a => /[smhd]/.test(a));
+
+        if (!target || !time)
+            return msg.reply(`❌ الاستخدام: ${prefix}${modConfig.jail.commandName} @user 1h [السبب]`);
+
+        const duration = require('ms')(time);
+        if (!duration) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 10m, 1h, 1d)");
+
+        // 📄 استخراج السبب بشكل دقيق
+        let reason = args.slice(1).join(' ').replace(time, '').trim();
+        reason = reason.replace(/^(السبب:|reason:)/i, '').trim() || "لا يوجد سبب محدد";
+
+        const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
+        if (!jailRole) return msg.reply("❌ رتبة السجن غير موجودة، تأكد من إعدادها في الداشبورد.");
+
+        // حفظ الرتب الأصلية (باستثناء الرتبة الأساسية)
+        const oldRoles = target.roles.cache
+            .filter(r => r.id !== msg.guild.id)
+            .map(r => r.id);
+
+        // تحديث قاعدة البيانات
+        await JailData.findOneAndUpdate(
+            { guildId: msg.guild.id, userId: target.id },
+            {
+                guildId: msg.guild.id,
+                userId: target.id,
+                oldRoles,
+                endAt: new Date(Date.now() + duration),
+                reason,
+                by: msg.author.id
+            },
+            { upsert: true }
+        );
+
+        // تنفيذ عملية السجن (إزالة كل الرتب وإعطاء رتبة السجن)
+        await target.roles.set([jailRole.id]).catch(e => console.log("خطأ في تغيير الرتب:", e));
+
+        // 📩 إرسال رسالة خاصّة (DM) للعضو
+        try {
+            const dmEmbed = new EmbedBuilder()
+                .setTitle("🔒 تم سجنك")
+                .setColor("#ff4757")
+                .addFields(
+                    { name: "👮 بواسطة:", value: `${msg.author.tag}`, inline: true },
+                    { name: "⏱️ المدة:", value: time, inline: true },
+                    { name: "📄 السبب:", value: reason }
+                )
+                .setTimestamp();
+            await target.send({ embeds: [dmEmbed] });
+        } catch (e) { console.log("لا يمكن إرسال DM للعضو."); }
+
+        // 📢 إرسال اللوق (Embed)
+        const logEmbed = new EmbedBuilder()
+            .setTitle("🔒 تسجيل حالة سجن")
+            .setColor("#ff4757")
+            .addFields(
+                { name: "👮 المسؤول:", value: `${msg.author}`, inline: true },
+                { name: "👤 المسجون:", value: `${target}`, inline: true },
+                { name: "⏱️ المدة:", value: time, inline: true },
+                { name: "📄 السبب:", value: reason }
+            )
+            .setTimestamp();
+
+        const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
+        if (logChannel) logChannel.send({ embeds: [logEmbed] });
+        else msg.channel.send({ embeds: [logEmbed] });
+
+        // فك السجن تلقائياً بعد انتهاء المدة
+        setTimeout(() => {
+            handleUnjail(target, msg.guild.id, logChannel).catch(() => {});
+        }, duration);
+    }
+
+    // ==========================================
+    // 🔓 UNJAIL COMMAND (أمر فك السجن اليدوي)
+    // ==========================================
+    if (command === modConfig.jail.unjailCommand?.toLowerCase()) {
+        if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) 
+            return msg.reply("❌ للإدارة فقط");
+
+        const target = msg.mentions.members.first();
+        if (!target) return msg.reply(`❌ الاستخدام: ${prefix}${modConfig.jail.unjailCommand} @user`);
+
+        const logCh = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
+        await handleUnjail(target, msg.guild.id, logCh);
+
+        msg.reply(`✅ تم فك سجن ${target.user.tag} بنجاح.`);
+    }
+});
+
+
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
@@ -1204,27 +1316,27 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.editReply("❌ لا يوجد إعدادات للتكت");
         }
 
-        if (interaction.customId === 'open_ticket') {
-            const channel = await interaction.guild.channels.create({
-                name: `ticket-${interaction.user.username}`,
-                type: 0,
-                permissionOverwrites: [
-                    {
-                        id: interaction.guild.id,
-                        deny: [PermissionsBitField.Flags.ViewChannel]
-                    },
-                    {
-                        id: interaction.user.id,
-                        allow: [
-                            PermissionsBitField.Flags.ViewChannel,
-                            PermissionsBitField.Flags.SendMessages,
-                            PermissionsBitField.Flags.ReadMessageHistory
-                        ]
-                    }
-                ]
-            });
+        if (interaction.customId.startsWith('ticket_btn_'))  {
+const channel = await interaction.guild.channels.create({
+    name: `ticket-${interaction.user.username}`,
+    type: 0,
+    permissionOverwrites: [
+        {
+            id: interaction.guild.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+        },
+        {
+            id: interaction.user.id,
+            allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory
+            ]
+        }
+    ]
+});
 
-            return interaction.followUp({ content: `✅ تم فتح التكت: ${channel}`, ephemeral: true });
+return interaction.followUp({ content: `✅ تم فتح التكت: ${channel}`, ephemeral: true });
         }
 
     } catch (err) {
@@ -1244,108 +1356,6 @@ console.log(err);
     }
 });
 
-// =========================
-// 🛡️ MOD SYSTEM
-// =========================
-
-const modConfig = await ModConfig.findOne({ guildId: msg.guild.id });
-
-if (!modConfig?.jail) return;
-
-const prefix = "!";
-if (!msg.content.startsWith(prefix)) return;
-
-const args = msg.content.slice(prefix.length).trim().split(/ +/);
-const command = args.shift()?.toLowerCase();
-
-
-// =========================
-// 🔒 JAIL COMMAND
-// =========================
-if (command === modConfig.jail.commandName?.toLowerCase()) {
-
-    if (!msg.member.permissions.has(PermissionFlagsBits.Administrator))
-        return msg.reply("❌ فقط الإدارة");
-
-    const target = msg.mentions.members.first();
-    const time = args.find(a => /[smhd]/.test(a));
-
-    if (!target || !time)
-        return msg.reply("❌ !سجن @user 1h السبب:سرقة");
-
-    const duration = ms(time);
-    if (!duration) return msg.reply("❌ وقت خطأ");
-
-    // 📄 السبب (كل النص بعد المدة)
-    let reason = msg.content.split(' ').slice(3).join(' ');
-    reason = reason.replace(/^(السبب:|reason:)/i, '').trim() || "لا يوجد سبب";
-
-    const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-    if (!jailRole) return msg.reply("❌ رتبة السجن غير موجودة");
-
-    // حفظ الرتب
-    const oldRoles = target.roles.cache
-        .filter(r => r.id !== msg.guild.id)
-        .map(r => r.id);
-
-    await JailData.findOneAndUpdate(
-        { guildId: msg.guild.id, userId: target.id },
-        {
-            guildId: msg.guild.id,
-            userId: target.id,
-            oldRoles,
-            endAt: Date.now() + duration,
-            reason,
-            by: msg.author.id
-        },
-        { upsert: true }
-    );
-
-    // إعطاء السجن
-    await target.roles.set([jailRole.id]).catch(() => {});
-
-    // =========================
-    // 📩 DM للسجن
-    // =========================
-    try {
-        const dmEmbed = new EmbedBuilder()
-            .setTitle("🔒 تم سجنك")
-            .setColor("#ff4757")
-            .addFields(
-                { name: "👮 بواسطة:", value: `${msg.author}`, inline: true },
-                { name: "⏱️ المدة:", value: time, inline: true },
-                { name: "📄 السبب:", value: reason }
-            )
-            .setTimestamp();
-
-        await target.send({ embeds: [dmEmbed] });
-    } catch {}
-
-    // =========================
-    // 📢 لوق
-    // =========================
-    const embed = new EmbedBuilder()
-        .setTitle("🔒 تم سجن عضو")
-        .setColor("#ff4757")
-        .addFields(
-            { name: "👮 بواسطة:", value: `${msg.author}`, inline: true },
-            { name: "🔒 العضو:", value: `${target}`, inline: true },
-            { name: "⏱️ المدة:", value: time, inline: true },
-            { name: "📄 السبب:", value: reason }
-        )
-        .setTimestamp();
-
-    const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
-
-    if (logChannel) logChannel.send({ embeds: [embed] });
-    else msg.channel.send({ embeds: [embed] });
-
-    // فك تلقائي
-    setTimeout(() => {
-        const ch = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
-        handleUnjail(target, msg.guild.id, ch).catch(() => {});
-    }, duration);
-}
 
 app.post('/save/:guildId/security', checkAuth, async (req, res) => {
     const b = req.body;
@@ -1507,32 +1517,7 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
     if (logCh) logCh.send({ embeds: [embed] }).catch(() => { });
 });
 
-// --- [ 3. لوق إعطاء/إزالة رتبة ] ---
-client.on('guildMemberUpdate', async (oldM, newM) => {
-    const s = await GuildConfig.findOne({ guildId: newM.guild.id });
-    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
-    const logCh = newM.guild.channels.cache.get(s.logs.roles.channel);
 
-    const addedRoles = newM.roles.cache.filter(r => !oldM.roles.cache.has(r.id));
-    const removedRoles = oldM.roles.cache.filter(r => !newM.roles.cache.has(r.id));
-
-    if (addedRoles.size > 0 || removedRoles.size > 0) {
-        const executor = await getExecutor(newM.guild, AuditLogEvent.MemberRoleUpdate);
-        const embed = new EmbedBuilder().setAuthor({ name: '🎭 تحديث رتب' }).setTimestamp();
-
-        if (addedRoles.size > 0) {
-            embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        } else if (removedRoles.size > 0) {
-            embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        }
-
-        embed.addFields(
-            { name: '👤 المستلم:', value: `<@${newM.id}>` },
-            { name: '🛡️ المسؤول:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor }
-        );
-        if (logCh) logCh.send({ embeds: [embed] });
-    }
-});
 
 client.on('guildMemberAdd', async (member) => {
     try {
@@ -1681,35 +1666,33 @@ async function handleUnjail(member, guildId, channel = null) {
         const data = await JailData.findOne({ guildId, userId: member.id });
         if (!data) return;
 
-        // =========================
         // 🔓 رجوع الرتب
-        // =========================
-        if (data.oldRoles?.length) {
-            await member.roles.set(data.oldRoles).catch(err => {
-                console.log("❌ ما قدرت أرجع الرتب (غالباً ترتيب الرتب)");
-            });
+        if (data.oldRoles && data.oldRoles.length > 0) {
+            await member.roles.set(data.oldRoles).catch(() => {});
         }
 
-        // حذف من الداتابيز
+        // 🗑 حذف من الداتابيز
         await JailData.deleteOne({ _id: data._id });
 
         // =========================
-        // 📩 DM للمستخدم
+        // 📩 DM فك السجن
         // =========================
         try {
             const dmEmbed = new EmbedBuilder()
-                .setTitle("🔓 تم فك سجنك")
+                .setTitle("🔓 تم فك السجن")
                 .setColor("#2ed573")
-                .setDescription("تم فك سجنك داخل السيرفر وتم استرجاع رتبك")
+                .addFields(
+                    { name: "👤 الحساب:", value: `${member.user}`, inline: true }
+                )
                 .setTimestamp();
 
             await member.send({ embeds: [dmEmbed] });
-        } catch {
+        } catch (e) {
             console.log("❌ ما قدر يرسل DM لفك السجن");
         }
 
         // =========================
-        // 📢 لوق بالسيرفر
+        // 📢 لوق السيرفر
         // =========================
         if (channel) {
             const embed = new EmbedBuilder()
@@ -1720,7 +1703,7 @@ async function handleUnjail(member, guildId, channel = null) {
                 )
                 .setTimestamp();
 
-            channel.send({ embeds: [embed] }).catch(() => {});
+            channel.send({ embeds: [embed] });
         }
 
     } catch (err) {
