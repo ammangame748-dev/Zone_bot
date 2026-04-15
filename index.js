@@ -1420,6 +1420,22 @@ if (reasonText) {
         );
 
         await target.roles.set([jailRole.id]).catch(() => { });
+        // 📩 إرسال رسالة خاصة (DM)
+try {
+    const dmEmbed = new EmbedBuilder()
+        .setTitle("🔒 تم سجنك")
+        .setColor("#ff4757")
+        .addFields(
+            { name: "👮 بواسطة:", value: `${msg.author}`, inline: true },
+            { name: "⏱️ المدة:", value: `${time}`, inline: true },
+            { name: "📄 السبب:", value: reason }
+        )
+        .setTimestamp();
+
+    await target.send({ embeds: [dmEmbed] });
+} catch (e) {
+    console.log("❌ ما قدر يرسل DM");
+}
 
        const embed = new EmbedBuilder()
     .setTitle("🔒 تم سجن عضو")
