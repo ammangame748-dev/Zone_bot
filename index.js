@@ -43,13 +43,14 @@ const client = new Client({
 });
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     guildId: String,
-    jail: {
-        commandName: { type: String, default: 'jail' },
-        unjailCommand: { type: String, default: 'unjail' }, // الخانة الجديدة لفك السجن
-        roleId: String,
-        channelId: String,
-        adminRoles: [String]
-    }
+jail: {
+    commandName: { type: String, default: 'jail' },
+    unjailCommand: { type: String, default: 'unjail' },
+    roleId: String,
+    channelId: String,
+    logChannelId: String, // ✅ جديد (روم الإيمبد)
+    adminRoles: [String]
+}
 }));
 
 client.on('guildCreate', async (guild) => {
@@ -971,7 +972,12 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
     if (!g) return res.redirect('/dashboard');
 
     // جلب الإعدادات أو وضع قيم افتراضية
-    let s = await ModConfig.findOne({ guildId: g.id }) || { jail: { commandName: 'سجن', unjailCommand: 'فك' } };
+    let s = await ModConfig.findOne({ guildId: g.id }) || {
+        jail: {
+            commandName: 'سجن',
+            unjailCommand: 'فك'
+        }
+    };
 
     let content = `
     <form method="POST" action="/save/${g.id}/mod">
@@ -979,38 +985,48 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
             <h3 style="color:var(--s)">🛡️ إعدادات أوامر الإشراف</h3>
             <p style="color:#aaa; font-size:13px;">هنا يمكنك تخصيص اختصارات أوامر السجن والفك وتحديد الصلاحيات.</p>
 
-            <!-- خانة أمر السجن -->
+            <!-- أمر السجن -->
             <label>💬 اسم أمر السجن (الاختصار):</label>
             <input type="text" name="commandName" value="${s.jail?.commandName || 'سجن'}" required>
-            <small style="color:#777; display:block; margin-bottom:15px;">* اكتب الاسم بدون بريفكس (مثلاً: سجن)</small>
 
-            <!-- خانة أمر فك السجن (تم نقلها هنا داخل الكارد) -->
-            <label>🔓 اسم أمر فك السجن (الاختصار):</label>
+            <!-- أمر فك السجن -->
+            <label>🔓 اسم أمر فك السجن:</label>
             <input type="text" name="unjailCommand" value="${s.jail?.unjailCommand || 'فك'}" required>
-            <small style="color:#777; display:block; margin-bottom:15px;">* اكتب الاسم بدون بريفكس (مثلاً: فك)</small>
 
+            <!-- رتبة السجن -->
             <div style="margin-top:20px;">
-                <label>⛓️ رتبة السجن (التي ستعطى للمخالف):</label>
+                <label>⛓️ رتبة السجن:</label>
                 <select name="roleId" required>
                     <option value="">-- اختر الرتبة --</option>
                     ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
-        `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
-    ).join('')}
+                        `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
+                    ).join('')}
                 </select>
             </div>
 
+            <!-- روم السجن -->
             <div style="margin-top:20px;">
-                <label>📍 روم السجن (المخصص للمسجونين):</label>
+                <label>📍 روم السجن:</label>
                 <select name="channelId" required>
                     <option value="">-- اختر الروم --</option>
                     ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
-    ).join('')}
+                        `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
+                    ).join('')}
                 </select>
             </div>
-            
-            <!-- زر الحفظ في مكانه الصحيح بالأسفل -->
-            <button type="submit" class="btn-save" style="margin-top:30px;">💾 حفظ إعدادات الإشراف</button>
+
+            <!-- ✅ روم اللوق الجديد -->
+            <div style="margin-top:20px;">
+                <label>📢 روم لوق السجن (الإيمبد):</label>
+                <select name="logChannelId">
+                    <option value="">-- اختياري --</option>
+                    ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                        `<option value="${c.id}" ${s.jail?.logChannelId === c.id ? 'selected' : ''}># ${c.name}</option>`
+                    ).join('')}
+                </select>
+            </div>
+
+            <button type="submit" class="btn-save" style="margin-top:30px;">💾 حفظ الإعدادات</button>
         </div>
     </form>
     `;
@@ -1018,10 +1034,8 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
     res.send(ui(g, 'mod', content));
 });
 
-
 app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
     try {
-        // تأمين المدخلات: نستخدم قيمة افتراضية إذا كانت الخانة فارغة لمنع خطأ toLowerCase
         const cmdName = (req.body.commandName || 'jail').toLowerCase().trim();
         const unjailCmd = (req.body.unjailCommand || 'unjail').toLowerCase().trim();
 
@@ -1032,11 +1046,13 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
                     "jail.commandName": cmdName,
                     "jail.unjailCommand": unjailCmd,
                     "jail.roleId": req.body.roleId,
-                    "jail.channelId": req.body.channelId
+                    "jail.channelId": req.body.channelId,
+                    "jail.logChannelId": req.body.logChannelId // ✅ الجديد
                 }
             },
             { upsert: true, new: true }
         );
+
         res.redirect(`/manage/${req.params.guildId}/mod`);
     } catch (err) {
         console.error("Save Error:", err);
@@ -1376,6 +1392,13 @@ client.on('messageCreate', async (msg) => {
 
         const target = msg.mentions.members.first();
         const time = args.find(a => /[smhd]/.test(a));
+        // 📄 استخراج السبب
+let reason = "لا يوجد سبب";
+const reasonText = msg.content.split(' ').slice(3).join(' ');
+
+if (reasonText) {
+    reason = reasonText.replace(/^(السبب:|reason:)/i, '').trim();
+}
 
         if (!target || !time)
             return msg.reply("❌ !jail @user 1h");
@@ -1398,7 +1421,24 @@ client.on('messageCreate', async (msg) => {
 
         await target.roles.set([jailRole.id]).catch(() => { });
 
-        msg.channel.send(`🔒 تم سجن ${target}`);
+       const embed = new EmbedBuilder()
+    .setTitle("🔒 تم سجن عضو")
+    .setColor("#ff4757")
+    .addFields(
+        { name: "👮 بواسطة:", value: `${msg.author}`, inline: true },
+        { name: "🔒 العضو:", value: `${target}`, inline: true },
+        { name: "⏱️ المدة:", value: `${time}`, inline: true },
+        { name: "📄 السبب:", value: reason }
+    )
+    .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
+    .setTimestamp();
+    const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
+
+if (logChannel) {
+    logChannel.send({ embeds: [embed] });
+} else {
+    msg.channel.send({ embeds: [embed] });
+}
 
         setTimeout(() => {
             handleUnjail(target, msg.guild.id).catch(() => { });
@@ -1451,25 +1491,7 @@ app.post('/save/:guildId/security', checkAuth, async (req, res) => {
 
     res.redirect(`/manage/${req.params.guildId}/security`);
 });
-const channel = await interaction.guild.channels.create({
-    name: `ticket-${interaction.user.username}`,
-    type: 0,
-    parent: config.categoryId, // لازم يكون عندك كاتيجوري ID
-    permissionOverwrites: [
-        {
-            id: interaction.guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel]
-        },
-        {
-            id: interaction.user.id,
-            allow: [
-                PermissionsBitField.Flags.ViewChannel,
-                PermissionsBitField.Flags.SendMessages,
-                PermissionsBitField.Flags.ReadMessageHistory
-            ]
-        }
-    ]
-});
+
 
 // حفظ إعدادات اللوق
 app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
