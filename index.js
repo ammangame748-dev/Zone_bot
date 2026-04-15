@@ -1334,7 +1334,9 @@ client.on('messageCreate', async (msg) => {
 
             try {
                 // حفظ الرتب القديمة قبل سحبها
-                const currentRoles = target.roles.cache.filter(r => r.name !== '@everyone').map(r => r.id);
+               const currentRoles = target.roles.cache
+    .filter(r => r.id !== msg.guild.id && r.id !== modConfig.jail.roleId)
+    .map(r => r.id);
                 await JailData.findOneAndUpdate(
                     { guildId: msg.guild.id, userId: target.id },
                     { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
@@ -1382,11 +1384,28 @@ client.on('messageCreate', async (msg) => {
 }); // إغلاق حدث messageCreate بشكل صحيح
 
 async function handleUnjail(member, guildId, channel) {
-    const data = await JailData.findOne({ guildId: guildId, userId: member.id });
-    if (data) {
-        await member.roles.set(data.oldRoles).catch(() => { });
+    const data = await JailData.findOne({ guildId, userId: member.id });
+    if (!data) return;
+
+    try {
+        // 1. نشيل كل الرتب الحالية
+        await member.roles.set([]);
+
+        // 2. نرجع الرتب القديمة
+        if (data.oldRoles && data.oldRoles.length > 0) {
+            await member.roles.add(data.oldRoles);
+        }
+
+        // 3. حذف بيانات السجن
         await JailData.deleteOne({ _id: data._id });
-        if (channel) channel.send(`🔓 ${member}، مبروك! انتهت مدة سجنك وتم استرجاع رتبك.`);
+
+        // 4. رسالة
+        if (channel) {
+            channel.send(`🔓 ${member} تم فك السجن ورجعت كل رتبك 👌`);
+        }
+
+    } catch (err) {
+        console.log("Unjail Error:", err);
     }
 }
 
@@ -1538,32 +1557,6 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
     if (logCh) logCh.send({ embeds: [embed] }).catch(() => { });
 });
 
-// --- [ 3. لوق إعطاء/إزالة رتبة ] ---
-client.on('guildMemberUpdate', async (oldM, newM) => {
-    const s = await GuildConfig.findOne({ guildId: newM.guild.id });
-    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
-    const logCh = newM.guild.channels.cache.get(s.logs.roles.channel);
-
-    const addedRoles = newM.roles.cache.filter(r => !oldM.roles.cache.has(r.id));
-    const removedRoles = oldM.roles.cache.filter(r => !newM.roles.cache.has(r.id));
-
-    if (addedRoles.size > 0 || removedRoles.size > 0) {
-        const executor = await getExecutor(newM.guild, AuditLogEvent.MemberRoleUpdate);
-        const embed = new EmbedBuilder().setAuthor({ name: '🎭 تحديث رتب' }).setTimestamp();
-
-        if (addedRoles.size > 0) {
-            embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        } else if (removedRoles.size > 0) {
-            embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        }
-
-        embed.addFields(
-            { name: '👤 المستلم:', value: `<@${newM.id}>` },
-            { name: '🛡️ المسؤول:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor }
-        );
-        if (logCh) logCh.send({ embeds: [embed] });
-    }
-});
 
 // --- [ 4. لوق دخول الأعضاء ] ---
 client.on('guildMemberAdd', async (member) => {
