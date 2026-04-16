@@ -69,6 +69,11 @@ mongoose.connect(process.env.MONGO_URI)
 // ==========================================
 // 4️⃣ تعريف الـ Schemas (قاعدة البيانات)
 // ==========================================
+const JailedUser = mongoose.model('JailedUser', new mongoose.Schema({
+    guildId: String,
+    userId: String,
+    oldRoles: [String]
+}));
 
 // 4.1 إعدادات السيرفر العامة
 const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
@@ -1314,25 +1319,34 @@ client.on('messageCreate', async (msg) => {
         const command = args.shift().toLowerCase();
 
         // 🛑 [1] أمر السجن (مصلح مع السبب والرتب)
-        if (command === (modConfig.jail.commandName || 'jail').toLowerCase()) {
-            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
-            }
+               if (command === (modConfig.jail.commandName || 'jail').toLowerCase()) {
+            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) return msg.reply("❌ للإدارة فقط!");
 
             const target = msg.mentions.members.first();
             const timeInput = args.find(arg => /[smhdw]/.test(arg));
-            
-            // استخراج السبب (تجاهل المنشن والوقت وما تبقى هو السبب)
             const reason = args.filter(arg => arg !== timeInput && !arg.includes(target?.id)).join(' ') || "لا يوجد سبب محدد";
 
-            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h [السبب]\``);
-            if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
-
-            const durationMs = ms(timeInput);
-            if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 1h, 30m).");
+            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`!${command} @user 1h\``);
 
             const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-            if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
+            if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة!");
+
+            try {
+                const currentRoles = target.roles.cache.filter(r => r.id !== msg.guild.id && r.id !== jailRole.id).map(r => r.id);
+                
+                // حفظ الرتب في الداتابيز
+                await JailedUser.findOneAndUpdate(
+                    { guildId: msg.guild.id, userId: target.id },
+                    { oldRoles: currentRoles },
+                    { upsert: true }
+                );
+
+                await target.roles.set([jailRole.id]);
+                msg.channel.send(`🔒 تم سجن ${target} واستخراج رتبه بنجاح.`);
+
+                setTimeout(async () => { await handleUnjail(target, msg.guild.id); }, ms(timeInput));
+            } catch (e) { console.error(e); }
+        
 
             try {
                 // حفظ الرتب القديمة في الذاكرة (Map)
@@ -1854,35 +1868,28 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
                     }
                 });
 
-    // استبدل الدالة القديمة بهذا الكود في أسفل الملف
-async function handleUnjail(member, guildId) {
+   async function handleUnjail(member, guildId) {
     try {
         const guild = client.guilds.cache.get(guildId);
         if (!guild) return;
 
+        // البحث عن الرتب المخزنة في الداتابيز
+        const jailData = await JailedUser.findOne({ guildId, userId: member.id });
         const modConfig = await ModConfig.findOne({ guildId });
-        if (!modConfig) return;
 
-        const jailRoleId = modConfig.jail?.roleId;
-        
-        // جلب الرتب القديمة من الذاكرة
-        const oldRoles = jailStorage.get(member.id);
-
-        if (oldRoles && oldRoles.length > 0) {
-            // إرجاع الرتب القديمة (هذا السطر يسحب السجن ويرجع القديم تلقائياً)
-            await member.roles.set(oldRoles).catch(() => {});
+        if (jailData && jailData.oldRoles.length > 0) {
+            // إرجاع الرتب القديمة كاملة
+            await member.roles.set(jailData.oldRoles).catch(() => {});
+            // حذف البيانات بعد الاسترجاع
+            await JailedUser.deleteOne({ guildId, userId: member.id });
         } else {
-            // إذا ما في رتب مخزنة بس بنشيل رتبة السجن
+            // إذا ما في بيانات، بس بنشيل رتبة السجن
+            const jailRoleId = modConfig?.jail?.roleId;
             if (jailRoleId) await member.roles.remove(jailRoleId).catch(() => {});
         }
 
-        // تنظيف الذاكرة
-        jailStorage.delete(member.id);
-
-        const jailChannel = guild.channels.cache.get(modConfig.jail.channelId);
-        if (jailChannel) {
-            jailChannel.send(`🔓 تم فك سجن <@${member.id}> واستعادة رتبه.`);
-        }
+        const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
+        if (jailChannel) jailChannel.send(`🔓 تم فك سجن <@${member.id}> واستعادة رتبه كاملة.`);
     } catch (err) {
         console.error("❌ Unjail Error:", err);
     }
