@@ -1861,7 +1861,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
                     }
                 });
 
-                async function handleUnjail(member, guildId, jailChannel) {
+     async function handleUnjail(member, guildId, jailChannel) {
     try {
         const modConfig = await ModConfig.findOne({ guildId });
         if (!modConfig) return;
@@ -1869,20 +1869,27 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
         const jailRole = member.guild.roles.cache.get(modConfig.jail.roleId);
         if (!jailRole) return;
 
-    await member.roles.remove(jailRole);
+        // 🔓 جلب الرتب القديمة
+        const oldRoles = jailStorage.get(member.id);
 
-// رجّع الرتب القديمة إذا موجودة
-if (member._oldRoles && member._oldRoles.length > 0) {
-    await member.roles.add(member._oldRoles).catch(() => {});
-}
+        // ❌ إزالة رتبة السجن
+        await member.roles.remove(jailRole).catch(() => {});
+await target.roles.add(jailRole);
+        // ✅ ترجيع الرتب
+        if (oldRoles && oldRoles.length > 0) {
+            await member.roles.add(oldRoles).catch(() => {});
+        }
 
-        // (اختياري) رسالة
+        // 🧹 حذف من التخزين
+        jailStorage.delete(member.id);
+
+        // 📢 رسالة
         if (jailChannel) {
             jailChannel.send(`🔓 تم فك سجن ${member}`);
         }
 
     } catch (err) {
-        console.error("Unjail Error:", err);
+        console.error("❌ Unjail Error:", err);
     }
 }
 
