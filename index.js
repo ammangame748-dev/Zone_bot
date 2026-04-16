@@ -301,10 +301,9 @@ app.get('/dashboard', checkAuth, (req, res) => {
     // 2. تحويل السيرفرات لبطاقات (Cards)
     const cards = adminGuilds.map(g => {
         const hasBot = client.guilds.cache.has(g.id);
-        const iconURL = g.icon
-            ? `https://discordapp.com{g.id}/${g.icon}.png?size=256`
-            : 'https://placeholder.com';
-
+      const iconURL = g.icon
+    ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
+    : 'https://via.placeholder.com/256';
         return `
         <div class="guild-card">
             <img src="${iconURL}" class="guild-icon">
@@ -661,8 +660,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                         <button type="button" onclick="changeSize(4)" class="btn-save" style="padding: 10px 20px; width: auto;">+</button>
                     </div>
                 </div>
-        // ابحث عن الحقول في صفحة الـ welcome واستبدلها بهذا الجزء:
-<div>
+
     <label>🎯 موقع النص (أفقي - عمودي):</label>
     <div style="display: flex; gap: 10px;">
         <!-- تأكد أن الـ name هو textX و textY -->
@@ -1315,8 +1313,7 @@ client.on('messageCreate', async (msg) => {
         const command = args.shift().toLowerCase();
 
         // 🛑 [1] أمر السجن (للأدمن فقط)
-        if (command === modConfig.jail.commandName.toLowerCase()) {
-            // فحص صارم: فقط من لديه صلاحية Administrator يمكنه السجن
+if (command === (modConfig.jail.commandName || 'jail').toLowerCase()) {            // فحص صارم: فقط من لديه صلاحية Administrator يمكنه السجن
             if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
                 return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
             }
@@ -1357,7 +1354,7 @@ client.on('messageCreate', async (msg) => {
                 await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
 
                 // سحب الرتب وإعطاء رتبة السجن
-               await target.roles.add(jailRole);
+               await target.roles.set([jailRole]);
                 msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
 const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
 
@@ -1388,7 +1385,7 @@ if (logChannel) {
 
             const target = msg.mentions.members.first();
             if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
-
+const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
             if (!jailChannel) return msg.reply("❌ روم السجن غير موجود");
             await handleUnjail(target, msg.guild.id, jailChannel);
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
@@ -1433,30 +1430,6 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     res.redirect(`/manage/${req.params.guildId}/logs`);
 });
 
-// تشغيل القيف اواي
-app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
-    const { prize, duration, winners, channel, description } = req.body;
-    const g = client.guilds.cache.get(req.params.guildId);
-    const timeMs = ms(duration);
-    if (!timeMs) return res.send("خطأ في صيغة الوقت! استخدم 1h أو 1d");
-
-    const endAt = new Date(Date.now() + timeMs);
-    const targetCh = g.channels.cache.get(channel);
-
-    const embed = new EmbedBuilder()
-        .setTitle(`🎉 قيف اواي: ${prize}`)
-        .setDescription(`${description}\n\n**ينتهي:** <t:${Math.floor(endAt / 1000)}:R>\n**الفائزين:** ${winners}`)
-        .setColor('Blue');
-
-    const giveawayMsg = await targetCh.send({ embeds: [embed] });
-    await giveawayMsg.react('🎉');
-
-    await Giveaway.create({
-        guildId: g.id, messageId: giveawayMsg.id, channelId: channel,
-        endAt, winnersCount: parseInt(winners), prize
-    });
-    res.redirect(`/manage/${g.id}/giveaway`);
-});
 
 // 🕒 نظام إنهاء القيف اواي التلقائي
 setInterval(async () => {
@@ -1564,11 +1537,13 @@ client.on('guildMemberAdd', async (member) => {
 
 client.on('guildMemberAdd', async (member) => {
     try {
-        // 1. جلب إعدادات السيرفر من الداتابيز
+        // جلب إعدادات السيرفر
         const s = await GuildConfig.findOne({ guildId: member.guild.id });
         if (!s) return;
 
-        // --- [ أولاً: نظام اللوق (Logs) ] ---
+        // ===============================
+        // 📥 لوق دخول عضو
+        // ===============================
         if (s.logs?.members?.enabled && s.logs.members.channel) {
             const logCh = member.guild.channels.cache.get(s.logs.members.channel);
             if (logCh) {
@@ -1578,54 +1553,20 @@ client.on('guildMemberAdd', async (member) => {
                     .setDescription(`**العضو:** ${member.user.tag}\n**الأيدي:** ${member.id}`)
                     .setTimestamp();
 
-
-               
-
-                // --- [ دالة كشف المسؤول عن الفعل ] ---
-                async function getExecutor(guild, eventType) {
-                    try {
-                        await new Promise(resolve => setTimeout(resolve, 1500)); // انتظار بسيط لضمان تسجيل الحدث
-                        const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
-                        const entry = auditLogs.entries.first();
-                        if (!entry) return "غير معروف (تلقائي)";
-                        return `${entry.executor.tag}`;
-                    } catch (e) { return "صلاحيات ناقصة"; }
-                }
-                // --- [ 1. لوق حذف الرسائل ] ---
-                client.on('messageDelete', async (message) => {
-                    if (!message.guild || message.author?.bot) return;
-                    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-                    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
-
-                    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
-                    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
-
-                    const embed = new EmbedBuilder()
-                        .setAuthor({ name: '🗑️ حذف رسالة' })
-                        .setColor('#ff4757')
-                        .addFields(
-                            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
-                            { name: '🛡️ الحاذف:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor, inline: true },
-                            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
-                            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
-                        ).setTimestamp();
-                    if (logCh) logCh.send({ embeds: [embed] }).catch(() => { });
-                });
-                logCh.send({ embeds: [logEmbed] }).catch(() => { });
+                logCh.send({ embeds: [logEmbed] }).catch(() => {});
             }
         }
 
-
-        // --- ---
-        // --- [ داخل نظام الترحيب بالصورة ] ---
+        // ===============================
+        // 🎨 نظام الترحيب بالصورة
+        // ===============================
         if (s.welcome?.enabled && s.welcome.channel) {
             const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
             if (welcomeCh) {
-                // 1. إنشاء الكانفاس بنفس أبعاد المعاينة
                 const canvas = createCanvas(800, 400);
                 const ctx = canvas.getContext('2d');
 
-                // 2. تحميل الصورة الخلفية
+                // الخلفية
                 if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
                     const background = await loadImage(s.welcome.imagePath);
                     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
@@ -1634,37 +1575,59 @@ client.on('guildMemberAdd', async (member) => {
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                 }
 
-                // 3. جلب الإعدادات "المحفوظة" من الداتابيز
+                // الإعدادات
                 const fontSize = parseInt(s.welcome.fontSize) || 40;
-                const posX = parseInt(s.welcome.textX) || 250; // القيمة المحفوظة لـ X
-                const posY = parseInt(s.welcome.textY) || 150; // القيمة المحفوظة لـ Y
+                const posX = parseInt(s.welcome.textX) || 250;
+                const posY = parseInt(s.welcome.textY) || 150;
 
-                // 4. إعدادات الخط
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.fillStyle = '#ffffff';
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = "black";
 
-                // 5. معالجة النص
                 let welcomeText = s.welcome.customText || 'Welcome {user}';
                 welcomeText = welcomeText.replace('{user}', member.user.username);
 
-                // 6. الرسم في المكان الدقيق
-                // ملاحظة: تأكد أن posX و posY هما نفس القيم التي تظهر في المعاينة بالداشبورد
                 ctx.fillText(welcomeText, posX, posY);
 
                 const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
-                await welcomeCh.send({ content: `✨ حياك الله ${member} في سيرفرنا!`, files: [attachment] }).catch(() => { });
+
+                await welcomeCh.send({
+                    content: `✨ حياك الله ${member} في سيرفرنا!`,
+                    files: [attachment]
+                }).catch(() => {});
             }
         }
-
 
     } catch (error) {
         console.error("❌ خطأ في حدث دخول العضو:", error);
     }
 });
 
+client.on('messageDelete', async (message) => {
+    if (!message.guild || message.author?.bot) return;
 
+    const s = await GuildConfig.findOne({ guildId: message.guild.id });
+    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
+
+    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
+    if (!logCh) return;
+
+    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
+
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: '🗑️ حذف رسالة' })
+        .setColor('#ff4757')
+        .addFields(
+            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
+            { name: '🛡️ الحاذف:', value: executor, inline: true },
+            { name: '📍 القناة:', value: `<#${message.channel.id}>` },
+            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
+        )
+        .setTimestamp();
+
+    logCh.send({ embeds: [embed] }).catch(() => {});
+});
 // --- [ 4. لوق خروج الأعضاء ] ---
 client.on('guildMemberRemove', async (member) => {
     const s = await GuildConfig.findOne({ guildId: member.guild.id });
@@ -1673,7 +1636,7 @@ client.on('guildMemberRemove', async (member) => {
     const embed = new EmbedBuilder().setAuthor({ name: '📤 عضو خرج/طُرد' }).setColor('#ff4757')
         .setDescription(`**العضو:** ${member.user.tag}`).setTimestamp();
     if (logCh) logCh.send({ embeds: [embed] });
-});
+})
 
 // --- 📂 لوق حذف الرومات ---
 client.on('channelDelete', async (channel) => {
@@ -1873,7 +1836,7 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 
                     // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
                     if (interaction.customId === 'manage_members') {
-                        const targetUser = interaction.users.first();
+                        const targetUser = interaction.values[0];
                         const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
 
                         if (hasAccess) {
@@ -1898,6 +1861,30 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
                     }
                 });
 
+                async function handleUnjail(member, guildId, jailChannel) {
+    try {
+        const modConfig = await ModConfig.findOne({ guildId });
+        if (!modConfig) return;
+
+        const jailRole = member.guild.roles.cache.get(modConfig.jail.roleId);
+        if (!jailRole) return;
+
+    await member.roles.remove(jailRole);
+
+// رجّع الرتب القديمة إذا موجودة
+if (member._oldRoles && member._oldRoles.length > 0) {
+    await member.roles.add(member._oldRoles).catch(() => {});
+}
+
+        // (اختياري) رسالة
+        if (jailChannel) {
+            jailChannel.send(`🔓 تم فك سجن ${member}`);
+        }
+
+    } catch (err) {
+        console.error("Unjail Error:", err);
+    }
+}
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
