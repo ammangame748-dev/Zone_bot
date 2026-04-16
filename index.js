@@ -1381,14 +1381,6 @@ client.on('messageCreate', async (msg) => {
 
 }); // إغلاق حدث messageCreate بشكل صحيح
 
-async function handleUnjail(member, guildId, channel) {
-    const data = await JailData.findOne({ guildId: guildId, userId: member.id });
-    if (data) {
-        await member.roles.set(data.oldRoles).catch(() => {});
-        await JailData.deleteOne({ _id: data._id });
-        if (channel) channel.send(`🔓 ${member}، مبروك! انتهت مدة سجنك وتم استرجاع رتبك.`);
-    }
-}
 
 
 app.post('/save/:guildId/security', checkAuth, async (req, res) => {
@@ -1860,25 +1852,52 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         if (logCh) logCh.send({ embeds: [embed] }).catch(e => console.log("Error sending log:", e));
     }
 });
-
-async function handleUnjail(member, guildId, channel) {
+async function handleUnjail(member, guildId) {
     try {
-        const data = await JailData.findOne({ guildId: guildId, userId: member.id });
-        if (!data) return;
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) return console.log("السيرفر غير موجود");
 
-        // إرجاع الرتب القديمة (هذا السطر بمسح رتبة السجن وبرجع القديم تلقائياً)
-        await member.roles.set(data.oldRoles).catch(e => console.log("رتبة البوت نازلة ما قدرت ارجع الرتب"));
-        
-        // مسح البيانات
-        await JailData.deleteOne({ _id: data._id });
-        
-        if (channel) {
-            channel.send(`🔓 ${member}، انتهت مدة سجنك! تم استرجاع رتبك بالكامل.`);
+        // 1. جلب البيانات من الداتابيز
+        const jailData = await JailedUser.findOne({ guildId, userId: member.id });
+        const modConfig = await ModConfig.findOne({ guildId });
+
+        console.log(`محاولة فك سجن العضو: ${member.id}`);
+
+        if (jailData && jailData.oldRoles && jailData.oldRoles.length > 0) {
+            // 2. تصفية الرتب (نتأكد إنها لسا موجودة بالسيرفر ومش رتبة الجميع)
+            const rolesToRestore = jailData.oldRoles.filter(rId => 
+                guild.roles.cache.has(rId) && rId !== guild.id
+            );
+
+            console.log(`الرتب اللي رح ترجع: ${rolesToRestore.join(', ')}`);
+
+            // 🌟 الخطوة السحرية: نصفر رتبه (نشيل السجن وكل شي) ثم نعطيه القديم دفعة وحدة
+            await member.roles.set(rolesToRestore).catch(async (err) => {
+                console.error("فشل في استرجاع الرتب، بحاول طريقة بديلة...");
+                // طريقة بديلة لو فشل الـ set
+                if (modConfig?.jail?.roleId) await member.roles.remove(modConfig.jail.roleId);
+                await member.roles.add(rolesToRestore);
+            });
+
+            // 3. مسح بيانات السجن عشان ما يتكرر
+            await JailedUser.deleteOne({ guildId, userId: member.id });
+            
+        } else {
+            // 4. إذا ما في رتب مخزنة، بس بنشيل رتبة السجن
+            console.log("لا يوجد رتب مخزنة، جاري حذف رتبة السجن فقط");
+            const jailRoleId = modConfig?.jail?.roleId;
+            if (jailRoleId) await member.roles.remove(jailRoleId).catch(() => {});
         }
-    } catch (e) {
-        console.log("خطأ في فك السجن:", e);
+
+        // 5. إشعار في روم السجن
+        const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
+        if (jailChannel) jailChannel.send(`🔓 تم فك سجن <@${member.id}> بنجاح واستعادة رتبه.`);
+
+    } catch (err) {
+        console.error("❌ خطأ قاتل في فك السجن:", err);
     }
 }
+
 
 
 
