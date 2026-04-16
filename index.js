@@ -2,10 +2,10 @@
 // 1️⃣ استدعاء المكتبات (Requires)
 // ==========================================
 require('dotenv').config();
-const {
-    Client, GatewayIntentBits, Partials, EmbedBuilder, AuditLogEvent,
-    AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-    StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, PermissionFlagsBits
+const { 
+    Client, GatewayIntentBits, Partials, EmbedBuilder, AuditLogEvent, 
+    AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
+    StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, PermissionFlagsBits 
 } = require('discord.js');
 
 const express = require('express');
@@ -68,8 +68,8 @@ const JailData = mongoose.model('JailData', new mongoose.Schema({
 // 3️⃣ اتصال قاعدة البيانات (MongoDB)
 // ==========================================
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB Database'))
-    .catch(err => console.log("❌ DB Connection Error:", err));
+.then(() => console.log('✅ Connected to MongoDB Database'))
+.catch(err => console.log("❌ DB Connection Error:", err));
 
 // ==========================================
 // 4️⃣ تعريف الـ Schemas (قاعدة البيانات)
@@ -274,15 +274,15 @@ function ui(guild, active, content) {
         <div class="sidebar">
             <h2>ZONE SYSTEM</h2>
             <div class="nav">
-                <a class="${active == 'home' ? 'active' : ''}" href="/dashboard">📊 الإحصائيات</a>
-                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
-                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">📜 اللوج</a>
-                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
-                <a class="${active == 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply">💬 الرد الآلي</a>
-                <a class="${active == 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">🏆 المستويات</a>
-                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
-                <a class="${active == 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway">🎉 القيف اواي</a>
-                <a class="${active == 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">🛡️ أوامر الإشراف</a>
+                <a class="${active=='home'?'active':''}" href="/dashboard">📊 الإحصائيات</a>
+                <a class="${active=='security'?'active':''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
+                <a class="${active=='logs'?'active':''}" href="/manage/${guild.id}/logs">📜 اللوج</a>
+                <a class="${active=='tickets'?'active':''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
+                <a class="${active=='autoreply'?'active':''}" href="/manage/${guild.id}/autoreply">💬 الرد الآلي</a>
+                <a class="${active=='levels'?'active':''}" href="/manage/${guild.id}/levels">🏆 المستويات</a>
+                <a class="${active=='welcome'?'active':''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
+                <a class="${active=='giveaway'?'active':''}" href="/manage/${guild.id}/giveaway">🎉 القيف اواي</a>
+                <a class="${active=='mod'?'active':''}" href="/manage/${guild.id}/mod">🛡️ أوامر الإشراف</a>
 
             </div>
         </div>
@@ -307,24 +307,24 @@ app.get('/dashboard', checkAuth, (req, res) => {
     // 2. تحويل السيرفرات لبطاقات (Cards)
     const cards = adminGuilds.map(g => {
         const hasBot = client.guilds.cache.has(g.id);
-        const iconURL = g.icon
-            ? `https://discordapp.com{g.id}/${g.icon}.png?size=256`
+        const iconURL = g.icon 
+            ? `https://discordapp.com{g.id}/${g.icon}.png?size=256` 
             : 'https://placeholder.com';
 
         return `
         <div class="guild-card">
             <img src="${iconURL}" class="guild-icon">
             <h3 style="color:white; margin:10px 0;">${g.name}</h3>
-            ${hasBot
-                ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none;">⚙️ دخول الإعدادات</a>`
+            ${hasBot 
+                ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none;">⚙️ دخول الإعدادات</a>` 
                 : `<a href="https://discord.com{process.env.CLIENT_ID}&permissions=8&scope=bot&guild_id=${g.id}" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
             }
         </div>`;
     }).join('');
 
     const content = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 25px;">${cards}</div>`;
-
-    res.send(ui({ id: null, name: 'قائمة السيرفرات' }, 'home', content));
+    
+    res.send(ui({id:null, name:'قائمة السيرفرات'}, 'home', content));
 });
 
 
@@ -337,7 +337,7 @@ app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
     if (!targetChannel) return res.send("الروم غير موجود!");
 
     // تحويل الوقت باستخدام مكتبة ms اللي عندك
-    const durationMs = ms(duration);
+    const durationMs = ms(duration); 
     if (!durationMs) return res.send("صيغة الوقت خطأ (مثال: 1h, 1d)");
 
     const endAt = new Date(Date.now() + durationMs);
@@ -369,11 +369,11 @@ app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
 app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    // حط السطر هاد وشغل الصفحة مرة وحدة بس، وبعدين احذفه
-    await Stats.deleteOne({ guildId: req.params.guildId });
+// حط السطر هاد وشغل الصفحة مرة وحدة بس، وبعدين احذفه
+await Stats.deleteOne({ guildId: req.params.guildId }); 
 
     // 1. جلب البيانات من الداتابيز
-    const statsData = await Stats.findOne({ guildId: g.id }) || {
+    const statsData = await Stats.findOne({ guildId: g.id }) || { 
         messages: { total: 0, daily: 0, weekly: 0, monthly: 0 },
         activeChannels: new Map(),
         membersLog: { joined: [], left: [] }
@@ -520,8 +520,8 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
             <label>روم الترقية</label>
             <select name="channel">
                 ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-    )}
+                    `<option value="${c.id}">${c.name}</option>`
+                )}
             </select>
         </div>
 
@@ -541,19 +541,19 @@ app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
         // تحديث قاعدة البيانات
         await GuildConfig.findOneAndUpdate(
             { guildId },
-            {
-                $set: {
+            { 
+                $set: { 
                     "levels.enabled": b.enabled === 'on', // فحص إذا كان التفعيل شغّال
                     "levels.xpPerMessage": Number(b.xp) || 10, // تحويل الـ XP لرقم
                     "levels.levelUpChannel": b.channel // قناة الترقية
-                }
+                } 
             },
             { upsert: true }
         );
 
         // بعد الحفظ، يرجعه لنفس الصفحة عشان ما تطلع الشاشة البيضاء
         res.redirect(`/manage/${guildId}/levels`);
-
+        
     } catch (err) {
         console.error("❌ Level Save Error:", err);
         res.status(500).send("حدث خطأ أثناء حفظ إعدادات الليفل.");
@@ -565,7 +565,7 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
 
-    const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
+    const types = ['messages','moderation','members','channels','roles','voice'];
 
     let content = `
     <form method="POST" action="/save/${g.id}/logs">
@@ -576,9 +576,9 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
                 <label>${t}</label>
                 <input type="checkbox" name="${t}_st" ${s.logs?.[t]?.enabled ? 'checked' : ''}>
                 <select name="${t}_ch">
-                    ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}" ${s.logs?.[t]?.channel == c.id ? 'selected' : ''}>${c.name}</option>`
-    )}
+                    ${g.channels.cache.filter(c=>c.type===0).map(c =>
+                        `<option value="${c.id}" ${s.logs?.[t]?.channel==c.id?'selected':''}>${c.name}</option>`
+                    )}
                 </select>
                 <hr>
             `).join('')}
@@ -593,7 +593,7 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
 
 app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     const b = req.body;
-    const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
+    const types = ['messages','moderation','members','channels','roles','voice'];
     let logData = {};
 
     types.forEach(t => {
@@ -616,7 +616,7 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
 app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-
+    
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
 
     let img = s.welcome?.imagePath ? `/uploads/${path.basename(s.welcome.imagePath)}` : 'https://placeholder.com';
@@ -641,9 +641,9 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                     <label>📍 قناة الترحيب:</label>
                     <select name="channel" required style="border: 1px solid var(--p);">
                         <option value="">-- اختر القناة --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
-    ).join('')}
+                        ${g.channels.cache.filter(c => c.type === 0).map(c => 
+                            `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
+                        ).join('')}
                     </select>
                 </div>
                 <div>
@@ -734,7 +734,7 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
         const data = s.autoReply && s.autoReply[i] ? s.autoReply[i] : { trigger: '', reply: '' };
         rows += `
         <div class="card" style="margin-bottom:10px;">
-            <h4>الرد #${i + 1}</h4>
+            <h4>الرد #${i+1}</h4>
             <input type="text" name="trigger" value="${data.trigger || ''}" placeholder="الكلمة (Trigger)">
             <textarea name="reply" placeholder="رد البوت (Reply)">${data.reply || ''}</textarea>
         </div>`;
@@ -781,7 +781,7 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         console.log(`✅ Welcome settings updated for ${guildId}: X=${b.textX}, Y=${b.textY}`);
 
         res.redirect(`/manage/${guildId}/welcome`);
-
+        
     } catch (err) {
         console.error("❌ Welcome Save Error:", err);
         res.status(500).send("خطأ في حفظ إعدادات الترحيب");
@@ -841,9 +841,9 @@ app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
             <input type="number" name="winners" value="1">
 
             <select name="channel">
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-    )}
+                ${g.channels.cache.filter(c=>c.type===0).map(c =>
+                    `<option value="${c.id}">${c.name}</option>`
+                )}
             </select>
         </div>
 
@@ -859,7 +859,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
     if (!g) return res.redirect('/dashboard');
 
     let s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
-
+    
     let topImg = s.topImagePath ? `/uploads/${path.basename(s.topImagePath)}` : 'https://via.placeholder.com';
     let bottomImg = s.bottomImagePath ? `/uploads/${path.basename(s.bottomImagePath)}` : 'https://via.placeholder.com';
 
@@ -894,7 +894,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     <label>رتبة الإدارة (التي ستظهر لها التذكرة):</label>
                     <select name="adminRole">
                         <option value="">-- اختر الرتبة --</option>
-                        ${g.roles.cache.map(r => `<option value="${r.id}" ${s.adminRole == r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+                        ${g.roles.cache.map(r => `<option value="${r.id}" ${s.adminRole==r.id?'selected':''}>${r.name}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -908,9 +908,9 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                 <!-- قسم الأزرار -->
                 <div>
                     <h4 style="color:var(--accent)">🔘 الأزرار (أقصى حد 4)</h4>
-                    ${[0, 1, 2, 3].map(i => `
+                    ${[0,1,2,3].map(i => `
                         <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.05)">
-                            <input name="btn_label_${i}" placeholder="اسم الزر ${i + 1}" value="${s.buttons?.[i]?.label || ''}" style="margin:2px 0; font-size:13px;">
+                            <input name="btn_label_${i}" placeholder="اسم الزر ${i+1}" value="${s.buttons?.[i]?.label || ''}" style="margin:2px 0; font-size:13px;">
                             <input name="btn_emoji_${i}" placeholder="ID الإيموجي" value="${s.buttons?.[i]?.emoji || ''}" style="margin:2px 0; font-size:13px;">
                         </div>
                     `).join('')}
@@ -919,9 +919,9 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                 <!-- قسم المنيو -->
                 <div>
                     <h4 style="color:var(--s)">🔽 خيارات المنيو (أقصى حد 4)</h4>
-                    ${[0, 1, 2, 3].map(i => `
+                    ${[0,1,2,3].map(i => `
                         <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.05)">
-                            <input name="menu_label_${i}" placeholder="خيار المنيو ${i + 1}" value="${s.menuOptions?.[i]?.label || ''}" style="margin:2px 0; font-size:13px;">
+                            <input name="menu_label_${i}" placeholder="خيار المنيو ${i+1}" value="${s.menuOptions?.[i]?.label || ''}" style="margin:2px 0; font-size:13px;">
                             <input name="menu_emoji_${i}" placeholder="ID الإيموجي" value="${s.menuOptions?.[i]?.emoji || ''}" style="margin:2px 0; font-size:13px;">
                         </div>
                     `).join('')}
@@ -933,9 +933,9 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
             <label>📍 قناة إرسال التكت:</label>
             <select name="targetChannel" style="border: 1px solid var(--p);">
                 <option value="">-- حفظ الإعدادات فقط --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-    ).join('')}
+                ${g.channels.cache.filter(c => c.type === 0).map(c => 
+                    `<option value="${c.id}">${c.name}</option>`
+                ).join('')}
             </select>
 
             <button type="submit" class="btn-save" style="margin-top:20px; letter-spacing:1px;">💾 حفظ وإرسال التكت نيون</button>
@@ -973,9 +973,9 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
                 <label>⛓️ رتبة السجن (التي ستعطى للمخالف):</label>
                 <select name="roleId" required>
                     <option value="">-- اختر الرتبة --</option>
-                    ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
-        `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
-    ).join('')}
+                    ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => 
+                        `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
+                    ).join('')}
                 </select>
             </div>
 
@@ -983,9 +983,9 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
                 <label>📍 روم السجن (المخصص للمسجونين):</label>
                 <select name="channelId" required>
                     <option value="">-- اختر الروم --</option>
-                    ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
-    ).join('')}
+                    ${g.channels.cache.filter(c => c.type === 0).map(c => 
+                        `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
+                    ).join('')}
                 </select>
             </div>
             
@@ -1007,8 +1007,8 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
 
         await ModConfig.findOneAndUpdate(
             { guildId: req.params.guildId },
-            {
-                $set: {
+            { 
+                $set: { 
                     "jail.commandName": cmdName,
                     "jail.unjailCommand": unjailCmd,
                     "jail.roleId": req.body.roleId,
@@ -1037,29 +1037,29 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
         let buttons = [];
         let menuOptions = [];
 
-        // 1. تجميع الأزرار والمنيو من الفورم (نسخة مصححة)
-        for (let i = 0; i < 4; i++) {
+       // 1. تجميع الأزرار والمنيو من الفورم (نسخة مصححة)
+for (let i = 0; i < 4; i++) {
 
-            const btnLabel = b[`btn_label_${i}`]?.trim();
-            const btnEmoji = b[`btn_emoji_${i}`]?.trim();
+    const btnLabel = b[`btn_label_${i}`]?.trim();
+    const btnEmoji = b[`btn_emoji_${i}`]?.trim();
 
-            const menuLabel = b[`menu_label_${i}`]?.trim();
-            const menuEmoji = b[`menu_emoji_${i}`]?.trim();
+    const menuLabel = b[`menu_label_${i}`]?.trim();
+    const menuEmoji = b[`menu_emoji_${i}`]?.trim();
 
-            if (btnLabel) {
-                buttons.push({
-                    label: btnLabel,
-                    emoji: btnEmoji || ""
-                });
-            }
+    if (btnLabel) {
+        buttons.push({
+            label: btnLabel,
+            emoji: btnEmoji || ""
+        });
+    }
 
-            if (menuLabel) {
-                menuOptions.push({
-                    label: menuLabel,
-                    emoji: menuEmoji || ""
-                });
-            }
-        }
+    if (menuLabel) {
+        menuOptions.push({
+            label: menuLabel,
+            emoji: menuEmoji || ""
+        });
+    }
+}
 
         // 2. تحضير البيانات للتحديث
         let updateData = {
@@ -1111,7 +1111,7 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
                             .setCustomId(`ticket_btn_${i}`)
                             .setLabel(btn.label)
                             .setStyle(ButtonStyle.Primary);
-
+                        
                         if (btn.emoji && btn.emoji.trim() !== "") {
                             const em = btn.emoji.trim();
                             try {
@@ -1128,7 +1128,7 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
                     const select = new StringSelectMenuBuilder()
                         .setCustomId('ticket_menu')
                         .setPlaceholder('🔽 اختر من القائمة...');
-
+                    
                     config.menuOptions.forEach((opt, i) => {
                         const option = { label: opt.label, value: `ticket_opt_${i}` };
                         if (opt.emoji && opt.emoji.trim() !== "") {
@@ -1142,17 +1142,17 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
                     components.push(new ActionRowBuilder().addComponents(select));
                 }
 
-                await channel.send({
-                    embeds: [embed],
-                    components: components,
-                    files: files
+                await channel.send({ 
+                    embeds: [embed], 
+                    components: components, 
+                    files: files 
                 }).catch(e => console.error("Discord Send Error:", e));
             }
         }
         res.redirect(`/manage/${req.params.guildId}/tickets`);
-    } catch (error) {
-        console.error(error);
-        res.status(500).send("Internal Error");
+    } catch (error) { 
+        console.error(error); 
+        res.status(500).send("Internal Error"); 
     }
 });
 
@@ -1163,14 +1163,14 @@ client.on('messageCreate', async (msg) => {
     // --- [ تسجيل إحصائيات الرسائل والقنوات ] ---
     await Stats.findOneAndUpdate(
         { guildId: msg.guild.id },
-        {
-            $inc: {
-                "messages.total": 1,
-                "messages.daily": 1,
-                "messages.weekly": 1,
+        { 
+            $inc: { 
+                "messages.total": 1, 
+                "messages.daily": 1, 
+                "messages.weekly": 1, 
                 "messages.monthly": 1,
-                [`activeChannels.${msg.channel.id}`]: 1
-            }
+                [`activeChannels.${msg.channel.id}`]: 1 
+            } 
         },
         { upsert: true }
     ).catch(e => console.log("Stats Save Error:", e));
@@ -1188,9 +1188,9 @@ client.on('messageCreate', async (msg) => {
         if (s.security?.badWords && s.security.badWords.trim().length > 0) {
             const forbidden = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
             const hasBadWord = forbidden.some(word => word !== "" && msg.content.toLowerCase().includes(word));
-
+            
             if (hasBadWord) {
-                await msg.delete().catch(() => { });
+                await msg.delete().catch(() => {});
                 try {
                     await msg.member.timeout(5 * 60 * 1000, 'استخدام كلمات ممنوعة');
                     return msg.channel.send(`⚠️ ${msg.author}، ممنوع استخدام الكلمات الممنوعة!`);
@@ -1205,7 +1205,7 @@ client.on('messageCreate', async (msg) => {
             const hasBadEmoji = forbiddenEmojis.some(emoji => emoji !== "" && msg.content.includes(emoji));
 
             if (hasBadEmoji) {
-                await msg.delete().catch(() => { });
+                await msg.delete().catch(() => {});
                 try {
                     await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
                     return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
@@ -1216,14 +1216,14 @@ client.on('messageCreate', async (msg) => {
 
         // --- [ نظام منع الروابط ] ---
         if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
-            await msg.delete().catch(() => { });
+            await msg.delete().catch(() => {});
             return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
         }
     }
 
     // 4. 🤖 الرد الآلي (Auto Reply)
     const r = s.autoReply?.find(x => x.trigger && msg.content.toLowerCase() === x.trigger.toLowerCase());
-    if (r) return msg.reply(r.reply).catch(() => { });
+    if (r) return msg.reply(r.reply).catch(() => {});
 
     // 5. 🏆 نظام المستويات (Levels)
     if (s.levels?.enabled) {
@@ -1236,7 +1236,7 @@ client.on('messageCreate', async (msg) => {
         if (u.xp >= u.level * u.level * 100) {
             u.level++;
             const lvChannel = msg.guild.channels.cache.get(s.levels.levelUpChannel) || msg.channel;
-            lvChannel.send(`🎉 مبروك ${msg.author}! صرت لفل **${u.level}**`).catch(() => { });
+            lvChannel.send(`🎉 مبروك ${msg.author}! صرت لفل **${u.level}**`).catch(() => {});
         }
         await u.save();
     }
@@ -1272,7 +1272,7 @@ client.on('messageCreate', async (msg) => {
                 const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
                 if (btn.emoji) {
                     const em = btn.emoji.trim();
-                    try { button.setEmoji(/^\d+$/.test(em) ? { id: em } : em); } catch (e) { }
+                    try { button.setEmoji(/^\d+$/.test(em) ? { id: em } : em); } catch (e) {}
                 }
                 btnRow.addComponents(button);
             });
@@ -1287,7 +1287,7 @@ client.on('messageCreate', async (msg) => {
                 const option = { label: opt.label, value: `ticket_opt_${i}` };
                 if (opt.emoji) {
                     const em = opt.emoji.trim();
-                    try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) { }
+                    try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) {}
                 }
                 select.addOptions(option);
             });
@@ -1305,9 +1305,9 @@ client.on('messageCreate', async (msg) => {
     // 🛡️ نظام السجن المطور (للأدمن فقط)
     // ==========================================
     const modConfig = await ModConfig.findOne({ guildId: msg.guild.id });
-
+    
     if (modConfig && modConfig.jail) {
-        const prefix = "!";
+        const prefix = "!"; 
         const args = msg.content.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
@@ -1352,7 +1352,7 @@ client.on('messageCreate', async (msg) => {
                         { name: '🛡️ المسؤول:', value: `${msg.author.tag}`, inline: true }
                     )
                     .setColor('Red').setTimestamp();
-
+                
                 await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
 
                 // سحب الرتب وإعطاء رتبة السجن
@@ -1384,7 +1384,7 @@ client.on('messageCreate', async (msg) => {
 async function handleUnjail(member, guildId, channel) {
     const data = await JailData.findOne({ guildId: guildId, userId: member.id });
     if (data) {
-        await member.roles.set(data.oldRoles).catch(() => { });
+        await member.roles.set(data.oldRoles).catch(() => {});
         await JailData.deleteOne({ _id: data._id });
         if (channel) channel.send(`🔓 ${member}، مبروك! انتهت مدة سجنك وتم استرجاع رتبك.`);
     }
@@ -1415,7 +1415,7 @@ app.post('/save/:guildId/security', checkAuth, async (req, res) => {
 // حفظ إعدادات اللوق
 app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     const b = req.body;
-    const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
+    const types = ['messages','moderation','members','channels','roles','voice'];
     let updateData = {};
     types.forEach(t => {
         updateData[`logs.${t}`] = { enabled: b[`${t}_st`] === 'on', channel: b[`${t}_ch`] };
@@ -1436,7 +1436,7 @@ app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
 
     const embed = new EmbedBuilder()
         .setTitle(`🎉 قيف اواي: ${prize}`)
-        .setDescription(`${description}\n\n**ينتهي:** <t:${Math.floor(endAt / 1000)}:R>\n**الفائزين:** ${winners}`)
+        .setDescription(`${description}\n\n**ينتهي:** <t:${Math.floor(endAt/1000)}:R>\n**الفائزين:** ${winners}`)
         .setColor('Blue');
 
     const giveawayMsg = await targetCh.send({ embeds: [embed] });
@@ -1535,7 +1535,7 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
             { name: '⬅️ قبل:', value: oldMsg.content || 'فارغ' },
             { name: '➡️ بعد:', value: newMsg.content || 'فارغ' }
         ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] }).catch(() => { });
+    if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
 });
 
 // --- [ 3. لوق إعطاء/إزالة رتبة ] ---
@@ -1550,13 +1550,13 @@ client.on('guildMemberUpdate', async (oldM, newM) => {
     if (addedRoles.size > 0 || removedRoles.size > 0) {
         const executor = await getExecutor(newM.guild, AuditLogEvent.MemberRoleUpdate);
         const embed = new EmbedBuilder().setAuthor({ name: '🎭 تحديث رتب' }).setTimestamp();
-
+        
         if (addedRoles.size > 0) {
             embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => `<@&${r.id}>`).join(', ') });
         } else if (removedRoles.size > 0) {
             embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => `<@&${r.id}>`).join(', ') });
         }
-
+        
         embed.addFields(
             { name: '👤 المستلم:', value: `<@${newM.id}>` },
             { name: '🛡️ المسؤول:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor }
@@ -1594,86 +1594,196 @@ client.on('guildMemberAdd', async (member) => {
                     .setColor('#2ed573')
                     .setDescription(`**العضو:** ${member.user.tag}\n**الأيدي:** ${member.id}`)
                     .setTimestamp();
+       
 
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
 
-               
+    // جلب الإعدادات
+    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+    if (!config) return;
 
-                // --- [ دالة كشف المسؤول عن الفعل ] ---
-                async function getExecutor(guild, eventType) {
-                    try {
-                        await new Promise(resolve => setTimeout(resolve, 1500)); // انتظار بسيط لضمان تسجيل الحدث
-                        const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
-                        const entry = auditLogs.entries.first();
-                        if (!entry) return "غير معروف (تلقائي)";
-                        return `${entry.executor.tag}`;
-                    } catch (e) { return "صلاحيات ناقصة"; }
-                }
+    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
+    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
+        let ticketType = "عامة";
+        if (interaction.isButton()) {
+            const btnIndex = interaction.customId.replace('ticket_btn_', '');
+            ticketType = config.buttons[btnIndex]?.label || "دعم";
+        } else {
+            const optIndex = interaction.values[0].replace('ticket_opt_', '');
+            ticketType = config.menuOptions[optIndex]?.label || "دعم";
+        }
 
-                // --- [ 1. لوق حذف الرسائل ] ---
-                client.on('messageDelete', async (message) => {
-                    if (!message.guild || message.author?.bot) return;
-                    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-                    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
+        try {
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${interaction.user.username}`,
+                type: ChannelType.GuildText,
+                permissionOverwrites: [
+                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
+                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                ],
+            });
 
-                    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
-                    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
+            const embed = new EmbedBuilder()
+                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
+                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
+                .setColor(config.color || "#5865F2");
 
-                    const embed = new EmbedBuilder()
-                        .setAuthor({ name: '🗑️ حذف رسالة' })
-                        .setColor('#ff4757')
-                        .addFields(
-                            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
-                            { name: '🛡️ الحاذف:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor, inline: true },
-                            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
-                            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
-                        ).setTimestamp();
-                    if (logCh) logCh.send({ embeds: [embed] }).catch(() => { });
-                });
-                logCh.send({ embeds: [logEmbed] }).catch(() => { });
+            // الأزرار: استدعاء (لأدمن فقط)
+            const adminButtons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
+            );
+
+            // منيو الإدارة: إضافة/إزالة أعضاء
+            const adminMenu = new ActionRowBuilder().addComponents(
+                new UserSelectMenuBuilder()
+                    .setCustomId('manage_members')
+                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
+                    .setMinValues(1)
+                    .setMaxValues(1)
+            );
+
+            await channel.send({ 
+                content: `<@&${config.adminRole}> | ${interaction.user}`, 
+                embeds: [embed], 
+                components: [adminButtons, adminMenu] 
+            });
+
+            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
+        } catch (e) { console.error(e); }
+    }
+
+    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
+    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+    // منع غير الإداريين من استخدام أدوات الإدارة
+    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
+    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
+        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
+    }
+
+    // تنفيذ عمليات الأزرار
+    if (interaction.customId === 'call_owner') {
+        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
+    }
+    
+    if (interaction.customId === 'call_admin') {
+        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
+    }
+
+    if (interaction.customId === 'call_user') {
+        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
+        const ticketOwnerName = interaction.channel.name.split('-')[1];
+        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
+    }
+
+    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
+    if (interaction.customId === 'manage_members') {
+        const targetUser = interaction.users.first();
+        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
+
+        if (hasAccess) {
+            // إذا كان عنده صلاحية، نقوم بإزالتها
+            await interaction.channel.permissionOverwrites.delete(targetUser.id);
+            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
+        } else {
+            // إذا ما عنده، نقوم بإضافتها
+            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
+                ViewChannel: true,
+                SendMessages: true,
+                AttachFiles: true
+            });
+            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
+        }
+    }
+
+    // إغلاق التذكرة
+    if (interaction.customId === 'close_ticket') {
+        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
+        setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+    }
+});
+
+// --- [ دالة كشف المسؤول عن الفعل ] ---
+async function getExecutor(guild, eventType) {
+    try {
+        await new Promise(resolve => setTimeout(resolve, 1500)); // انتظار بسيط لضمان تسجيل الحدث
+        const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
+        const entry = auditLogs.entries.first();
+        if (!entry) return "غير معروف (تلقائي)";
+        return `${entry.executor.tag}`;
+    } catch (e) { return "صلاحيات ناقصة"; }
+}
+
+// --- [ 1. لوق حذف الرسائل ] ---
+client.on('messageDelete', async (message) => {
+    if (!message.guild || message.author?.bot) return;
+    const s = await GuildConfig.findOne({ guildId: message.guild.id });
+    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
+
+    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
+    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
+
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: '🗑️ حذف رسالة' })
+        .setColor('#ff4757')
+        .addFields(
+            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
+            { name: '🛡️ الحاذف:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor, inline: true },
+            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
+            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
+        ).setTimestamp();
+    if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
+});
+         logCh.send({ embeds: [logEmbed] }).catch(() => {});
             }
         }
 
         // --- ---
-        // --- [ داخل نظام الترحيب بالصورة ] ---
-        if (s.welcome?.enabled && s.welcome.channel) {
-            const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
-            if (welcomeCh) {
-                // 1. إنشاء الكانفاس بنفس أبعاد المعاينة
-                const canvas = createCanvas(800, 400);
-                const ctx = canvas.getContext('2d');
+      // --- [ داخل نظام الترحيب بالصورة ] ---
+if (s.welcome?.enabled && s.welcome.channel) {
+    const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
+    if (welcomeCh) {
+        // 1. إنشاء الكانفاس بنفس أبعاد المعاينة
+        const canvas = createCanvas(800, 400); 
+        const ctx = canvas.getContext('2d');
 
-                // 2. تحميل الصورة الخلفية
-                if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
-                    const background = await loadImage(s.welcome.imagePath);
-                    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.fillStyle = '#1a1a2e';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                }
-
-                // 3. جلب الإعدادات "المحفوظة" من الداتابيز
-                const fontSize = parseInt(s.welcome.fontSize) || 40;
-                const posX = parseInt(s.welcome.textX) || 250; // القيمة المحفوظة لـ X
-                const posY = parseInt(s.welcome.textY) || 150; // القيمة المحفوظة لـ Y
-
-                // 4. إعدادات الخط
-                ctx.font = `bold ${fontSize}px sans-serif`;
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = "black";
-
-                // 5. معالجة النص
-                let welcomeText = s.welcome.customText || 'Welcome {user}';
-                welcomeText = welcomeText.replace('{user}', member.user.username);
-
-                // 6. الرسم في المكان الدقيق
-                // ملاحظة: تأكد أن posX و posY هما نفس القيم التي تظهر في المعاينة بالداشبورد
-                ctx.fillText(welcomeText, posX, posY);
-
-                const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
-                await welcomeCh.send({ content: `✨ حياك الله ${member} في سيرفرنا!`, files: [attachment] }).catch(() => { });
-            }
+        // 2. تحميل الصورة الخلفية
+        if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
+            const background = await loadImage(s.welcome.imagePath);
+            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+
+        // 3. جلب الإعدادات "المحفوظة" من الداتابيز
+        const fontSize = parseInt(s.welcome.fontSize) || 40;
+        const posX = parseInt(s.welcome.textX) || 250; // القيمة المحفوظة لـ X
+        const posY = parseInt(s.welcome.textY) || 150; // القيمة المحفوظة لـ Y
+
+        // 4. إعدادات الخط
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "black";
+
+        // 5. معالجة النص
+        let welcomeText = s.welcome.customText || 'Welcome {user}';
+        welcomeText = welcomeText.replace('{user}', member.user.username);
+
+        // 6. الرسم في المكان الدقيق
+        // ملاحظة: تأكد أن posX و posY هما نفس القيم التي تظهر في المعاينة بالداشبورد
+        ctx.fillText(welcomeText, posX, posY);
+
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
+        await welcomeCh.send({ content: `✨ حياك الله ${member} في سيرفرنا!`, files: [attachment] }).catch(() => {});
+    }
+}
 
 
     } catch (error) {
@@ -1758,10 +1868,10 @@ async function handleUnjail(member, guildId, channel) {
 
         // إرجاع الرتب القديمة (هذا السطر بمسح رتبة السجن وبرجع القديم تلقائياً)
         await member.roles.set(data.oldRoles).catch(e => console.log("رتبة البوت نازلة ما قدرت ارجع الرتب"));
-
+        
         // مسح البيانات
         await JailData.deleteOne({ _id: data._id });
-
+        
         if (channel) {
             channel.send(`🔓 ${member}، انتهت مدة سجنك! تم استرجاع رتبك بالكامل.`);
         }
@@ -1820,118 +1930,6 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 
     logCh.send({ embeds: [embed] }).catch(e => console.log("Log Error:", e));
 });
-
- client.on('interactionCreate', async (interaction) => {
-                    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
-
-                    // جلب الإعدادات
-                    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-                    if (!config) return;
-
-                    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
-                    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
-                        let ticketType = "عامة";
-                        if (interaction.isButton()) {
-                            const btnIndex = interaction.customId.replace('ticket_btn_', '');
-                            ticketType = config.buttons[btnIndex]?.label || "دعم";
-                        } else {
-                            const optIndex = interaction.values[0].replace('ticket_opt_', '');
-                            ticketType = config.menuOptions[optIndex]?.label || "دعم";
-                        }
-
-                        try {
-                            const channel = await interaction.guild.channels.create({
-                                name: `ticket-${interaction.user.username}`,
-                                type: ChannelType.GuildText,
-                                permissionOverwrites: [
-                                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
-                                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                                ],
-                            });
-
-                            const embed = new EmbedBuilder()
-                                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
-                                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
-                                .setColor(config.color || "#5865F2");
-
-                            // الأزرار: استدعاء (لأدمن فقط)
-                            const adminButtons = new ActionRowBuilder().addComponents(
-                                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
-                                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
-                                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
-                            );
-
-                            // منيو الإدارة: إضافة/إزالة أعضاء
-                            const adminMenu = new ActionRowBuilder().addComponents(
-                                new UserSelectMenuBuilder()
-                                    .setCustomId('manage_members')
-                                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
-                                    .setMinValues(1)
-                                    .setMaxValues(1)
-                            );
-
-                            await channel.send({
-                                content: `<@&${config.adminRole}> | ${interaction.user}`,
-                                embeds: [embed],
-                                components: [adminButtons, adminMenu]
-                            });
-
-                            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
-                        } catch (e) { console.error(e); }
-                    }
-
-                    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
-                    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-
-                    // منع غير الإداريين من استخدام أدوات الإدارة
-                    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
-                    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
-                        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
-                    }
-
-                    // تنفيذ عمليات الأزرار
-                    if (interaction.customId === 'call_owner') {
-                        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
-                    }
-
-                    if (interaction.customId === 'call_admin') {
-                        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
-                    }
-
-                    if (interaction.customId === 'call_user') {
-                        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
-                        const ticketOwnerName = interaction.channel.name.split('-')[1];
-                        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
-                    }
-
-                    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
-                    if (interaction.customId === 'manage_members') {
-                        const targetUser = interaction.users.first();
-                        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
-
-                        if (hasAccess) {
-                            // إذا كان عنده صلاحية، نقوم بإزالتها
-                            await interaction.channel.permissionOverwrites.delete(targetUser.id);
-                            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
-                        } else {
-                            // إذا ما عنده، نقوم بإضافتها
-                            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
-                                ViewChannel: true,
-                                SendMessages: true,
-                                AttachFiles: true
-                            });
-                            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
-                        }
-                    }
-
-                    // إغلاق التذكرة
-                    if (interaction.customId === 'close_ticket') {
-                        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
-                        setTimeout(() => interaction.channel.delete().catch(() => { }), 5000);
-                    }
-                });
 
 
 app.listen(3000, () => {
