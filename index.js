@@ -1313,83 +1313,77 @@ client.on('messageCreate', async (msg) => {
         const args = msg.content.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        // 🛑 [1] أمر السجن (للأدمن فقط)
-if (command === (modConfig.jail.commandName || 'jail').toLowerCase()) {            // فحص صارم: فقط من لديه صلاحية Administrator يمكنه السجن
+        // 🛑 [1] أمر السجن (مصلح مع السبب والرتب)
+        if (command === (modConfig.jail.commandName || 'jail').toLowerCase()) {
             if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
                 return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
             }
 
             const target = msg.mentions.members.first();
             const timeInput = args.find(arg => /[smhdw]/.test(arg));
+            
+            // استخراج السبب (تجاهل المنشن والوقت وما تبقى هو السبب)
+            const reason = args.filter(arg => arg !== timeInput && !arg.includes(target?.id)).join(' ') || "لا يوجد سبب محدد";
 
-            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h\``);
+            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h [السبب]\``);
             if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
 
             const durationMs = ms(timeInput);
             if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 1h, 30m).");
 
             const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
-
             if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
 
             try {
-                // حفظ الرتب القديمة قبل سحبها
-               const currentRoles = target.roles.cache
-    .filter(r => r.id !== msg.guild.id && r.id !== modConfig.jail.roleId)
-    .map(r => r.id);
-
-
-                // 📩 إرسال رسالة خاصة (DM) للعضو المسجون
-                const dmEmbed = new EmbedBuilder()
-                    .setTitle('⚖️ لقد تم سجنك!')
-                    .setThumbnail(msg.guild.iconURL())
-                    .setDescription(`مرحباً ${target.user.username}، تم سجنك في سيرفر **${msg.guild.name}**.`)
-                    .addFields(
-                        { name: '⏳ المدة:', value: timeInput, inline: true },
-                        { name: '📍 الروم المخصص:', value: `<#${modConfig.jail.channelId}>`, inline: true },
-                        { name: '🛡️ المسؤول:', value: `${msg.author.tag}`, inline: true }
-                    )
-                    .setColor('Red').setTimestamp();
-
-                await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
+                // حفظ الرتب القديمة في الذاكرة (Map)
+                const currentRoles = target.roles.cache
+                    .filter(r => r.id !== msg.guild.id && r.id !== jailRole.id)
+                    .map(r => r.id);
+                
+                jailStorage.set(target.id, currentRoles);
 
                 // سحب الرتب وإعطاء رتبة السجن
-               await target.roles.set([jailRole]);
-                msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
-const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
+                await target.roles.set([jailRole.id]);
 
-if (logChannel) {
-    const logEmbed = new EmbedBuilder()
-        .setTitle('🔒 سجن عضو')
-        .setColor('Red')
-        .addFields(
-            { name: '👤 العضو:', value: `${target.user.tag} (${target.id})`, inline: true },
-            { name: '🛡️ بواسطة:', value: `${msg.author.tag}`, inline: true },
-            { name: '⏳ المدة:', value: timeInput, inline: true }
-        )
-        .setTimestamp();
+                // إرسال اللوق المطور
+                const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
+                if (logChannel) {
+                    const logEmbed = new EmbedBuilder()
+                        .setTitle('🔒 سجن عضو')
+                        .setColor('Red')
+                        .addFields(
+                            { name: '👤 العضو:', value: `${target.user.tag}`, inline: true },
+                            { name: '🛡️ بواسطة:', value: `${msg.author.tag}`, inline: true },
+                            { name: '⏳ المدة:', value: timeInput, inline: true },
+                            { name: '📝 السبب:', value: reason }
+                        ).setTimestamp();
+                    logChannel.send({ embeds: [logEmbed] }).catch(() => {});
+                }
 
-    logChannel.send({ embeds: [logEmbed] }).catch(() => {});
-}
+                msg.channel.send(`🔒 تم سجن ${target} لمدة **${timeInput}** بسبب: **${reason}**`);
 
-                // فك السجن تلقائياً بعد انتهاء الوقت
-                setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
-            } catch (e) { console.error(e); }
+                // فك السجن تلقائياً
+                setTimeout(async () => { 
+                    await handleUnjail(target, msg.guild.id); 
+                }, durationMs);
+
+            } catch (e) { 
+                console.error(e);
+                msg.reply("❌ خطأ: تأكد أن رتبة البوت أعلى من رتبة العضو.");
+            }
         }
 
-        // 🔓 [2] أمر فك السجن (تحته مباشرة - للأدمن فقط)
+        // 🔓 [2] أمر فك السجن (مصلح)
         if (command === (modConfig.jail.unjailCommand || 'unjail').toLowerCase()) {
             if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return msg.reply("❌ عذراً، لا تملك صلاحيات الأدمن لفك السجن!");
+                return msg.reply("❌ عذراً، لا تملك صلاحيات الإدارة لفك السجن!");
             }
 
             const target = msg.mentions.members.first();
             if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
-const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
-            if (!jailChannel) return msg.reply("❌ روم السجن غير موجود");
-            await handleUnjail(target, msg.guild.id, jailChannel);
-            msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
+
+            await handleUnjail(target, msg.guild.id);
+            msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه.`);
         }
     }
 
@@ -1699,8 +1693,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-
-
 // --- 📂 لوق تعديل الرومات (اسم، وصف، نوع) ---
 client.on('channelUpdate', async (oldChannel, newChannel) => {
     // 1. التحقق من السيرفر والإعدادات
@@ -1862,38 +1854,40 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
                     }
                 });
 
-     async function handleUnjail(member, guildId, jailChannel) {
+    // استبدل الدالة القديمة بهذا الكود في أسفل الملف
+async function handleUnjail(member, guildId) {
     try {
+        const guild = client.guilds.cache.get(guildId);
+        if (!guild) return;
+
         const modConfig = await ModConfig.findOne({ guildId });
         if (!modConfig) return;
 
-  // حفظ الرتب القديمة
-const oldRoles = target.roles.cache
-    .filter(r => r.id !== msg.guild.id && r.id !== jailRole.id)
-    .map(r => r.id);
+        const jailRoleId = modConfig.jail?.roleId;
+        
+        // جلب الرتب القديمة من الذاكرة
+        const oldRoles = jailStorage.get(member.id);
 
-// تخزينها
-jailStorage.set(target.id, oldRoles);
-
-// حذف كل الرتب + إعطاء رتبة السجن
-await target.roles.set([jailRole]);
-        // ✅ ترجيع الرتب
         if (oldRoles && oldRoles.length > 0) {
-            await member.roles.add(oldRoles).catch(() => {});
+            // إرجاع الرتب القديمة (هذا السطر يسحب السجن ويرجع القديم تلقائياً)
+            await member.roles.set(oldRoles).catch(() => {});
+        } else {
+            // إذا ما في رتب مخزنة بس بنشيل رتبة السجن
+            if (jailRoleId) await member.roles.remove(jailRoleId).catch(() => {});
         }
 
-        // 🧹 حذف من التخزين
+        // تنظيف الذاكرة
         jailStorage.delete(member.id);
 
-        // 📢 رسالة
+        const jailChannel = guild.channels.cache.get(modConfig.jail.channelId);
         if (jailChannel) {
-            jailChannel.send(`🔓 تم فك سجن ${member}`);
+            jailChannel.send(`🔓 تم فك سجن <@${member.id}> واستعادة رتبه.`);
         }
-
     } catch (err) {
         console.error("❌ Unjail Error:", err);
     }
 }
+
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
