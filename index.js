@@ -1340,11 +1340,7 @@ client.on('messageCreate', async (msg) => {
                const currentRoles = target.roles.cache
     .filter(r => r.id !== msg.guild.id && r.id !== modConfig.jail.roleId)
     .map(r => r.id);
-                await JailData.findOneAndUpdate(
-                    { guildId: msg.guild.id, userId: target.id },
-                    { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
-                    { upsert: true }
-                );
+
 
                 // 📩 إرسال رسالة خاصة (DM) للعضو المسجون
                 const dmEmbed = new EmbedBuilder()
@@ -1361,7 +1357,7 @@ client.on('messageCreate', async (msg) => {
                 await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
 
                 // سحب الرتب وإعطاء رتبة السجن
-                await target.roles.set([jailRole.id]);
+               await target.roles.add(jailRole);
                 msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
 const logChannel = msg.guild.channels.cache.get(modConfig.jail.logChannelId);
 
@@ -1393,44 +1389,15 @@ if (logChannel) {
             const target = msg.mentions.members.first();
             if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
 
-            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
+            if (!jailChannel) return msg.reply("❌ روم السجن غير موجود");
             await handleUnjail(target, msg.guild.id, jailChannel);
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
-const logChannel = member.guild.channels.cache.get(modConfig.jail.logChannelId);
 
-if (logChannel) {
-    logChannel.send(`🔓 تم فك سجن ${member.user.tag}`);
-}
 
 }); // إغلاق حدث messageCreate بشكل صحيح
 
-async function handleUnjail(member, guildId, channel) {
-    const data = await JailData.findOne({ guildId, userId: member.id });
-    if (!data) return;
-
-    try {
-        // 1. نشيل كل الرتب الحالية
-        await member.roles.set([]);
-
-        // 2. نرجع الرتب القديمة
-        if (data.oldRoles && data.oldRoles.length > 0) {
-            await member.roles.add(data.oldRoles);
-        }
-
-        // 3. حذف بيانات السجن
-        await JailData.deleteOne({ _id: data._id });
-
-        // 4. رسالة
-        if (channel) {
-            channel.send(`🔓 ${member} تم فك السجن ورجعت كل رتبك 👌`);
-        }
-
-    } catch (err) {
-        console.log("Unjail Error:", err);
-    }
-}
 
 
 app.post('/save/:guildId/security', checkAuth, async (req, res) => {
@@ -1624,7 +1591,6 @@ client.on('guildMemberAdd', async (member) => {
                         return `${entry.executor.tag}`;
                     } catch (e) { return "صلاحيات ناقصة"; }
                 }
-
                 // --- [ 1. لوق حذف الرسائل ] ---
                 client.on('messageDelete', async (message) => {
                     if (!message.guild || message.author?.bot) return;
@@ -1648,6 +1614,7 @@ client.on('guildMemberAdd', async (member) => {
                 logCh.send({ embeds: [logEmbed] }).catch(() => { });
             }
         }
+
 
         // --- ---
         // --- [ داخل نظام الترحيب بالصورة ] ---
@@ -1696,6 +1663,7 @@ client.on('guildMemberAdd', async (member) => {
         console.error("❌ خطأ في حدث دخول العضو:", error);
     }
 });
+
 
 // --- [ 4. لوق خروج الأعضاء ] ---
 client.on('guildMemberRemove', async (member) => {
@@ -1766,25 +1734,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         if (logCh) logCh.send({ embeds: [embed] }).catch(e => console.log("Error sending log:", e));
     }
 });
-
-async function handleUnjail(member, guildId, channel) {
-    try {
-        const data = await JailData.findOne({ guildId: guildId, userId: member.id });
-        if (!data) return;
-
-        // إرجاع الرتب القديمة (هذا السطر بمسح رتبة السجن وبرجع القديم تلقائياً)
-        await member.roles.set(data.oldRoles).catch(e => console.log("رتبة البوت نازلة ما قدرت ارجع الرتب"));
-
-        // مسح البيانات
-        await JailData.deleteOne({ _id: data._id });
-
-        if (channel) {
-            channel.send(`🔓 ${member}، انتهت مدة سجنك! تم استرجاع رتبك بالكامل.`);
-        }
-    } catch (e) {
-        console.log("خطأ في فك السجن:", e);
-    }
-}
 
 
 
