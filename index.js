@@ -1344,7 +1344,10 @@ client.on('messageCreate', async (msg) => {
                 await target.roles.set([jailRole.id]);
                 msg.channel.send(`🔒 تم سجن ${target} واستخراج رتبه بنجاح.`);
 
-                setTimeout(async () => { await handleUnjail(target, msg.guild.id); }, ms(timeInput));
+                setTimeout(async () => { 
+    await handleUnjail(target, msg.guild.id); 
+}, ms(timeInput)); // استخدمنا ms(timeInput) بدل المتغير الناقص
+
             } catch (e) { console.error(e); }
         
 
