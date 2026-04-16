@@ -74,6 +74,12 @@ mongoose.connect(process.env.MONGO_URI)
 // ==========================================
 // 4️⃣ تعريف الـ Schemas (قاعدة البيانات)
 // ==========================================
+// 1️⃣ أضف هذا التعريف في بداية الملف مع باقي الـ Schemas
+const JailedUser = mongoose.model('JailedUser', new mongoose.Schema({
+    guildId: String,
+    userId: String,
+    oldRoles: [String]
+}));
 
 // 4.1 إعدادات السيرفر العامة
 const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
@@ -90,6 +96,8 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         xpPerMessage: { type: Number, default: 10 },
         levelUpChannel: String
     },
+    // 1️⃣ أضف هذا التعريف في بداية الملف مع باقي الـ Schemas
+
     logs: {
         messages: { channel: String, enabled: Boolean },
         moderation: { channel: String, enabled: Boolean },
