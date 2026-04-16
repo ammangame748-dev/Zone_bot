@@ -14,6 +14,7 @@ const passport = require('passport');
 const { Strategy } = require('passport-discord');
 const mongoose = require('mongoose');
 const { createCanvas, loadImage } = require('canvas');
+const jailStorage = new Map();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -1866,15 +1867,16 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
         const modConfig = await ModConfig.findOne({ guildId });
         if (!modConfig) return;
 
-        const jailRole = member.guild.roles.cache.get(modConfig.jail.roleId);
-        if (!jailRole) return;
+  // حفظ الرتب القديمة
+const oldRoles = target.roles.cache
+    .filter(r => r.id !== msg.guild.id && r.id !== jailRole.id)
+    .map(r => r.id);
 
-        // 🔓 جلب الرتب القديمة
-        const oldRoles = jailStorage.get(member.id);
+// تخزينها
+jailStorage.set(target.id, oldRoles);
 
-        // ❌ إزالة رتبة السجن
-        await member.roles.remove(jailRole).catch(() => {});
-await target.roles.add(jailRole);
+// حذف كل الرتب + إعطاء رتبة السجن
+await target.roles.set([jailRole]);
         // ✅ ترجيع الرتب
         if (oldRoles && oldRoles.length > 0) {
             await member.roles.add(oldRoles).catch(() => {});
