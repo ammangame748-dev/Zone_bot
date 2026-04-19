@@ -1417,7 +1417,6 @@ client.on('messageCreate', async (msg) => {
         },
         { upsert: true }
     ).catch(e => console.log("Stats Save Error:", e));
-
 const prefix = "!";
 const args = msg.content.slice(prefix.length).trim().split(/ +/);
 const command = args.shift()?.toLowerCase();
@@ -1436,11 +1435,13 @@ if (command === 'ستريكي' || command === 'streak') {
         return msg.reply(`❌ ما في بيانات لهذا المستخدم!`);
     }
 
-    const embed = new EmbedBuilder()
-    .setColor('#ffbb00')
-    .setDescription(`🔥 ستريك ${target} هو: \`${streak}\``);
+    const streak = userData.streakCount || 0; // 🔥 حطيناه فوق
 
-msg.reply({ embeds: [embed] });
+    const embed = new EmbedBuilder()
+        .setColor('#ffbb00')
+        .setDescription(`🔥 ستريك ${target} هو: \`${streak}\``);
+
+    msg.reply({ embeds: [embed] });
 }
     // 2. جلب إعدادات السيرفر من الداتابيز
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
