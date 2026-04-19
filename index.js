@@ -1533,9 +1533,10 @@ if (strkConf) {
             // 🔥 لازم يكون هنا
             const targetCh = msg.guild.channels.cache.get(strkConf.streakChannel);
 
-            if (!targetCh) {
-                return msg.channel.send("❌ روم الستريك مش محدد من الداشبورد!");
-            }
+           if (!targetCh) {
+    console.log("Streak channel not set or invalid");
+    return;
+}
 
             const streakEmbed = new EmbedBuilder()
                 .setDescription(`🔥 كفو **${msg.author.username}**! صار ستريكك: \`${u.streakCount}\``)
