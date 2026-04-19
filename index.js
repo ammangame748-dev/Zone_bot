@@ -1398,12 +1398,12 @@ for (let i = 0; i < 4; i++) {
         res.status(500).send("Internal Error"); 
     }
 });
+
 client.on('messageCreate', async (msg) => {
+    // 1. التحقق الأساسي (تجاهل البوتات والرسائل الخاصة)
     if (!msg.guild || msg.author.bot) return;
 
-    // =========================
-    // 📊 Stats System
-    // =========================
+    // --- [ تسجيل إحصائيات الرسائل والقنوات ] ---
     await Stats.findOneAndUpdate(
         { guildId: msg.guild.id },
         { 
@@ -1416,272 +1416,265 @@ client.on('messageCreate', async (msg) => {
             } 
         },
         { upsert: true }
-    ).catch(() => {});
+    ).catch(e => console.log("Stats Save Error:", e));
 
-    const prefix = "!";
 
-    const parts = msg.content.startsWith(prefix)
-        ? msg.content.slice(prefix.length).trim().split(/ +/)
-        : [];
-
-    const command = parts.shift()?.toLowerCase();
-
-    // =========================
-    // 🏆 STREAK COMMAND ONLY
-    // =========================
-    if (command === 'ستريكي' || command === 'streak') {
-
-        const target = msg.mentions.users.first() || msg.author;
-
-        const userData = await UserLevel.findOne({
-            guildId: msg.guild.id,
-            userId: target.id
-        });
-
-        const streak = userData?.streakCount || 0;
-
-        return msg.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor('#ffbb00')
-                    .setDescription(`🔥 ستريك ${target} هو: \`${streak}\``)
-            ]
-        });
-    }
-
-    // =========================
-    // ⚙️ CONFIG
-    // =========================
+    // 2. جلب إعدادات السيرفر من الداتابيز
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
     if (!s) return;
 
-    const hasBypass = msg.member.roles.cache.some(r =>
-        s.security?.bypassRoles?.includes(r.id)
-    );
+    // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
+    const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
 
-    // =========================
-    // 🛡️ SECURITY
-    // =========================
     if (!hasBypass) {
-
-        if (s.security?.badWords?.length) {
-            const bad = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
-            if (bad.some(w => msg.content.toLowerCase().includes(w))) {
+        // --- [ نظام الكلمات الممنوعة ] ---
+        if (s.security?.badWords && s.security.badWords.trim().length > 0) {
+            const forbidden = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
+            const hasBadWord = forbidden.some(word => word !== "" && msg.content.toLowerCase().includes(word));
+            
+            if (hasBadWord) {
                 await msg.delete().catch(() => {});
-                msg.member.timeout?.(5 * 60 * 1000).catch(() => {});
-                return msg.channel.send(`⚠️ ${msg.author} ممنوع الكلمات`);
+                try {
+                    await msg.member.timeout(5 * 60 * 1000, 'استخدام كلمات ممنوعة');
+                    return msg.channel.send(`⚠️ ${msg.author}، ممنوع استخدام الكلمات الممنوعة!`);
+                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
+                return;
             }
         }
 
-        if (s.security?.badEmojis?.length) {
-            const badE = s.security.badEmojis.split(',').map(e => e.trim());
-            if (badE.some(e => msg.content.includes(e))) {
+        // --- [ نظام الإيموجي الممنوع ] ---
+        if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
+            const forbiddenEmojis = s.security.badEmojis.split(',').map(e => e.trim());
+            const hasBadEmoji = forbiddenEmojis.some(emoji => emoji !== "" && msg.content.includes(emoji));
+
+            if (hasBadEmoji) {
                 await msg.delete().catch(() => {});
-                msg.member.timeout?.(5 * 60 * 1000).catch(() => {});
-                return msg.channel.send(`⚠️ ${msg.author} إيموجي ممنوع`);
+                try {
+                    await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
+                    return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
+                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
+                return;
             }
         }
 
+        // --- [ نظام منع الروابط ] ---
         if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
             await msg.delete().catch(() => {});
-            return msg.channel.send(`⚠️ الروابط ممنوعة`);
+            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
         }
     }
 
-    // =========================
-    // 🤖 AUTO REPLY
-    // =========================
-    const r = s.autoReply?.find(x =>
-        x.trigger?.toLowerCase() === msg.content.toLowerCase()
-    );
+    // 4. 🤖 الرد الآلي (Auto Reply)
+    const r = s.autoReply?.find(x => x.trigger && msg.content.toLowerCase() === x.trigger.toLowerCase());
     if (r) return msg.reply(r.reply).catch(() => {});
 
-    // =========================
-    // 🏆 LEVELS
-    // =========================
+    // 5. 🏆 نظام المستويات (Levels)
     if (s.levels?.enabled) {
-
-        let u = await UserLevel.findOne({
-            guildId: msg.guild.id,
-            userId: msg.author.id
-        });
-
+        let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
         if (!u) {
-            u = new UserLevel({
-                guildId: msg.guild.id,
-                userId: msg.author.id,
-                xp: 0,
-                level: 1,
-                msgCount: 0
-            });
+            u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id, xp: 0, level: 1, msgCount: 0 });
         }
-
         u.xp += s.levels.xpPerMessage || 10;
         u.msgCount++;
-
         if (u.xp >= u.level * u.level * 100) {
             u.level++;
-
-            const ch = msg.guild.channels.cache.get(s.levels.levelUpChannel);
-            if (ch) ch.send(`🎉 ${msg.author} صار لفل ${u.level}`).catch(() => {});
+            const lvChannel = msg.guild.channels.cache.get(s.levels.levelUpChannel) || msg.channel;
+            lvChannel.send(`🎉 مبروك ${msg.author}! صرت لفل **${u.level}**`).catch(() => {});
         }
-
         await u.save();
     }
+const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
+if (strkConf) {
 
-    // =========================
-    // 🏆 STREAK SYSTEM (FIXED)
-    // =========================
-    const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
-    if (strkConf) {
-
-        let u = await UserLevel.findOne({
-            guildId: msg.guild.id,
-            userId: msg.author.id
-        });
-
-        if (!u) {
-            u = new UserLevel({
-                guildId: msg.guild.id,
-                userId: msg.author.id,
-                streakCount: 0,
-                currentStreakMsgs: 0,
-                lastActive: new Date(),
-                warned: false
-            });
-        }
-
-        u.currentStreakMsgs = (u.currentStreakMsgs || 0) + 1;
-        u.lastActive = new Date();
-
-        const required = Number(strkConf.requiredMessages || 50);
-
-        if (u.currentStreakMsgs >= required) {
-
-            u.streakCount = (u.streakCount || 0) + 1;
-            u.currentStreakMsgs = 0;
-
-            if (strkConf.streakRole) {
-                msg.member.roles.add(strkConf.streakRole).catch(() => {});
-            }
-
-            const channel = msg.guild.channels.cache.get(strkConf.streakChannel);
-
-            if (channel?.isTextBased()) {
-                channel.send({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor('#ffbb00')
-                            .setDescription(`🔥 كفو ${msg.author}! صار ستريكك: **${u.streakCount}**`)
-                    ]
-                }).catch(() => {});
-            }
-        }
-
-        await u.save();
-    }
-
-   // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
-if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-
-    const tConfig = await TicketConfig.findOne({ guildId: msg.guild.id });
-    if (!tConfig) return msg.reply("⚠️ اضبط الإعدادات من الداشبورد أولاً!");
-
-    const embed = new EmbedBuilder()
-        .setTitle(tConfig.title || "الدعم الفني")
-        .setDescription(tConfig.description || "اضغط أدناه لفتح تذكرة")
-        .setColor(tConfig.color || "#5865F2");
-
-    const files = [];
-
-    if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
-        const topName = path.basename(tConfig.topImagePath);
-        files.push(new AttachmentBuilder(tConfig.topImagePath, { name: topName }));
-        embed.setThumbnail(`attachment://${topName}`);
-    }
-
-    if (tConfig.bottomImagePath && fs.existsSync(tConfig.bottomImagePath)) {
-        const bottomName = path.basename(tConfig.bottomImagePath);
-        files.push(new AttachmentBuilder(tConfig.bottomImagePath, { name: bottomName }));
-        embed.setImage(`attachment://${bottomName}`);
-    }
-
-    const components = [];
-
-    // بناء الأزرار
-    if (Array.isArray(tConfig.buttons) && tConfig.buttons.length > 0) {
-        const btnRow = new ActionRowBuilder();
-
-        tConfig.buttons.forEach((btn, i) => {
-            if (!btn.label) return;
-
-            const button = new ButtonBuilder()
-                .setCustomId(`ticket_btn_${i}`)
-                .setLabel(btn.label)
-                .setStyle(ButtonStyle.Primary);
-
-            if (btn.emoji) {
-                const em = btn.emoji.trim();
-                try {
-                    button.setEmoji(/^\d+$/.test(em) ? { id: em } : em);
-                } catch (e) {}
-            }
-
-            btnRow.addComponents(button);
-        });
-
-        if (btnRow.components.length > 0) components.push(btnRow);
-    }
-
-    // بناء المنيو
-    if (Array.isArray(tConfig.menuOptions) && tConfig.menuOptions.length > 0) {
-        const select = new StringSelectMenuBuilder()
-            .setCustomId('ticket_menu')
-            .setPlaceholder('🔽 اختر من القائمة...');
-
-        tConfig.menuOptions.forEach((opt, i) => {
-            if (!opt.label) return;
-
-            const option = {
-                label: opt.label,
-                value: `ticket_opt_${i}`
-            };
-
-            if (opt.emoji) {
-                const em = opt.emoji.trim();
-                try {
-                    option.emoji = /^\d+$/.test(em) ? { id: em } : em;
-                } catch (e) {}
-            }
-
-            select.addOptions(option);
-        });
-
-        if (select.options.length > 0) {
-            components.push(new ActionRowBuilder().addComponents(select));
-        }
-    }
-
-    // زر افتراضي
-    if (components.length === 0) {
-        components.push(
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('open_ticket')
-                    .setLabel('فتح تذكرة 🎫')
-                    .setStyle(ButtonStyle.Primary)
-            )
-        );
-    }
-
-    return msg.channel.send({
-        embeds: [embed],
-        components: components,
-        files: files
+    let u = await UserLevel.findOne({
+        guildId: msg.guild.id,
+        userId: msg.author.id
     });
+
+    if (!u) {
+        u = new UserLevel({
+            guildId: msg.guild.id,
+            userId: msg.author.id,
+            streakCount: 0,
+            currentStreakMsgs: 0,
+            lastActive: new Date(),
+            warned: false
+        });
+    }
+
+    u.currentStreakMsgs = (u.currentStreakMsgs || 0) + 1;
+    u.lastActive = new Date();
+
+    const required = strkConf.requiredMessages || 50;
+
+    if (u.currentStreakMsgs >= required) {
+
+        u.streakCount = (u.streakCount || 0) + 1;
+        u.currentStreakMsgs = 0;
+
+        if (strkConf.streakRole) {
+            msg.member.roles.add(strkConf.streakRole).catch(() => {});
+        }
+
+        const channel = msg.guild.channels.resolve(strkConf.streakChannel);
+
+        if (channel) {
+            channel.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setDescription(`🔥 كفو ${msg.author}! صار ستريكك: **${u.streakCount}**`)
+                        .setColor('#ffbb00')
+                ]
+            }).catch(() => {});
+        }
+
+        await u.save();
+    }
 }
 
-});
+
+
+    // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
+    if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        const tConfig = await TicketConfig.findOne({ guildId: msg.guild.id });
+        if (!tConfig) return msg.reply("⚠️ اضبط الإعدادات من الداشبورد أولاً!");
+
+        const embed = new EmbedBuilder()
+            .setTitle(tConfig.title || "الدعم الفني")
+            .setDescription(tConfig.description || "اضغط أدناه لفتح تذكرة")
+            .setColor(tConfig.color || "#5865F2");
+
+        const files = [];
+        if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
+            const topName = path.basename(tConfig.topImagePath);
+            files.push(new AttachmentBuilder(tConfig.topImagePath, { name: topName }));
+            embed.setThumbnail(`attachment://${topName}`);
+        }
+        if (tConfig.bottomImagePath && fs.existsSync(tConfig.bottomImagePath)) {
+            const bottomName = path.basename(tConfig.bottomImagePath);
+            files.push(new AttachmentBuilder(tConfig.bottomImagePath, { name: bottomName }));
+            embed.setImage(`attachment://${bottomName}`);
+        }
+
+        const components = [];
+        // بناء الأزرار
+        if (Array.isArray(tConfig.buttons) && tConfig.buttons.length > 0) {
+            const btnRow = new ActionRowBuilder();
+            tConfig.buttons.forEach((btn, i) => {
+                if (!btn.label) return;
+                const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
+                if (btn.emoji) {
+                    const em = btn.emoji.trim();
+                    try { button.setEmoji(/^\d+$/.test(em) ? { id: em } : em); } catch (e) {}
+                }
+                btnRow.addComponents(button);
+            });
+            if (btnRow.components.length > 0) components.push(btnRow);
+        }
+
+        // بناء المنيو
+        if (Array.isArray(tConfig.menuOptions) && tConfig.menuOptions.length > 0) {
+            const select = new StringSelectMenuBuilder().setCustomId('ticket_menu').setPlaceholder('🔽 اختر من القائمة...');
+            tConfig.menuOptions.forEach((opt, i) => {
+                if (!opt.label) return;
+                const option = { label: opt.label, value: `ticket_opt_${i}` };
+                if (opt.emoji) {
+                    const em = opt.emoji.trim();
+                    try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) {}
+                }
+                select.addOptions(option);
+            });
+            if (select.options.length > 0) components.push(new ActionRowBuilder().addComponents(select));
+        }
+
+        // زر افتراضي
+        if (components.length === 0) {
+            components.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة 🎫').setStyle(ButtonStyle.Primary)));
+        }
+
+        return msg.channel.send({ embeds: [embed], components: components, files: files });
+    }
+    // ==========================================
+    // 🛡️ نظام السجن المطور (للأدمن فقط)
+    // ==========================================
+    const modConfig = await ModConfig.findOne({ guildId: msg.guild.id });
+    
+    if (modConfig && modConfig.jail) {
+        const prefix = "!"; 
+        const args = msg.content.slice(prefix.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
+
+        // 🛑 [1] أمر السجن (للأدمن فقط)
+        if (command === modConfig.jail.commandName.toLowerCase()) {
+            // فحص صارم: فقط من لديه صلاحية Administrator يمكنه السجن
+            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
+            }
+
+            const target = msg.mentions.members.first();
+            const timeInput = args.find(arg => /[smhdw]/.test(arg));
+
+            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h\``);
+            if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
+
+            const durationMs = ms(timeInput);
+            if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 1h, 30m).");
+
+            const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
+            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
+
+            if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
+
+            try {
+                // حفظ الرتب القديمة قبل سحبها
+                const currentRoles = target.roles.cache.filter(r => r.name !== '@everyone').map(r => r.id);
+                await JailData.findOneAndUpdate(
+                    { guildId: msg.guild.id, userId: target.id },
+                    { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
+                    { upsert: true }
+                );
+
+                // 📩 إرسال رسالة خاصة (DM) للعضو المسجون
+                const dmEmbed = new EmbedBuilder()
+                    .setTitle('⚖️ لقد تم سجنك!')
+                    .setThumbnail(msg.guild.iconURL())
+                    .setDescription(`مرحباً ${target.user.username}، تم سجنك في سيرفر **${msg.guild.name}**.`)
+                    .addFields(
+                        { name: '⏳ المدة:', value: timeInput, inline: true },
+                        { name: '📍 الروم المخصص:', value: `<#${modConfig.jail.channelId}>`, inline: true },
+                        { name: '🛡️ المسؤول:', value: `${msg.author.tag}`, inline: true }
+                    )
+                    .setColor('Red').setTimestamp();
+                
+                await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
+
+                // سحب الرتب وإعطاء رتبة السجن
+                await target.roles.set([jailRole.id]);
+                msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
+
+                // فك السجن تلقائياً بعد انتهاء الوقت
+                setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
+            } catch (e) { console.error(e); }
+        }
+
+        // 🔓 [2] أمر فك السجن (تحته مباشرة - للأدمن فقط)
+        if (command === (modConfig.jail.unjailCommand || 'unjail').toLowerCase()) {
+            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return msg.reply("❌ عذراً، لا تملك صلاحيات الأدمن لفك السجن!");
+            }
+
+            const target = msg.mentions.members.first();
+            if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
+
+            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
+            await handleUnjail(target, msg.guild.id, jailChannel);
+            msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
+        }
+    }
+
+}); // إغلاق حدث messageCreate بشكل صحيح
+
+
 
 app.post('/save/:guildId/security', checkAuth, async (req, res) => {
     const b = req.body;
