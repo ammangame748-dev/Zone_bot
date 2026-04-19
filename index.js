@@ -18,7 +18,15 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const ms = require('ms');
-
+const TicketData = mongoose.model('TicketData', new mongoose.Schema({
+    guildId: String,
+    channelId: String,
+    ownerId: String,
+    claimedBy: String,
+    openedAt: Date,
+    closedAt: Date,
+    closedBy: String
+}));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -1930,8 +1938,100 @@ client.on('interactionCreate', async (interaction) => {
                     }
                 ]
             });
+// =====================
+// 🎛️ Ticket Buttons
+// =====================
+if (interaction.isButton()) {
 
-            channel.send(`🎫 مرحباً ${interaction.user}، تم فتح التكت الخاص بك.`);
+    const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+    if (!ticket) return;
+
+    // 📌 استلام التكت
+    if (interaction.customId === 'claim_ticket') {
+        ticket.claimedBy = interaction.user.id;
+        await ticket.save();
+
+        return interaction.reply({
+            content: `📌 تم استلام التكت بواسطة ${interaction.user}`,
+            ephemeral: false
+        });
+    }
+
+    // 🔒 إغلاق التكت
+    if (interaction.customId === 'close_ticket') {
+        await interaction.reply({ content: "🔒 جاري إغلاق التكت...", ephemeral: true });
+
+        ticket.closedAt = new Date();
+        ticket.closedBy = interaction.user.id;
+        await ticket.save();
+
+        // ===== transcript =====
+        const messages = await interaction.channel.messages.fetch({ limit: 100 });
+        const sorted = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+        let transcript = "";
+        sorted.forEach(m => {
+            transcript += `[${m.author.tag}]: ${m.content}\n`;
+        });
+
+        // ===== DM =====
+        const user = await interaction.guild.members.fetch(ticket.ownerId).catch(() => null);
+
+        if (user) {
+            user.send({
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("📁 تم إغلاق التكت")
+                        .setColor("Red")
+                        .addFields(
+                            { name: "👤 صاحب التكت", value: `<@${ticket.ownerId}>` },
+                            { name: "📌 المستلم", value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : "لم يتم الاستلام" },
+                            { name: "🔒 أغلق بواسطة", value: `<@${interaction.user.id}>` },
+                            { name: "🕒 وقت الفتح", value: `<t:${Math.floor(ticket.openedAt / 1000)}:F>` },
+                            { name: "🕒 وقت الإغلاق", value: `<t:${Math.floor(Date.now() / 1000)}:F>` }
+                        )
+                ]
+            }).catch(() => {});
+        }
+
+        // إرسال transcript كملف
+        const fs = require('fs');
+        const filePath = `./transcript-${interaction.channel.id}.txt`;
+        fs.writeFileSync(filePath, transcript);
+
+        if (user) {
+            await user.send({
+                files: [filePath]
+            }).catch(() => {});
+        }
+
+        setTimeout(() => {
+            interaction.channel.delete().catch(() => {});
+            fs.unlinkSync(filePath);
+        }, 5000);
+    }
+}
+          await channel.send({
+    content: `🎫 مرحباً ${interaction.user}`,
+    embeds: [
+        new EmbedBuilder()
+            .setTitle("📩 Ticket Opened")
+            .setDescription("يرجى شرح مشكلتك، وسيتم الرد عليك قريباً.")
+            .setColor("Green")
+    ],
+    components: [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('claim_ticket')
+                .setLabel('📌 استلام')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('close_ticket')
+                .setLabel('🔒 إغلاق')
+                .setStyle(ButtonStyle.Danger)
+        )
+    ]
+});
         }
 
         // ====== اختيار من المنيو ======
@@ -1965,6 +2065,12 @@ client.on('interactionCreate', async (interaction) => {
     } catch (err) {
         console.error("Ticket Error:", err);
     }
+    await TicketData.create({
+    guildId: interaction.guild.id,
+    channelId: channel.id,
+    ownerId: interaction.user.id,
+    openedAt: new Date()
+});
 });
 
 app.listen(3000, () => {
