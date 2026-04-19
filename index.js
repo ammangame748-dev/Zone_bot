@@ -1636,125 +1636,6 @@ client.on('guildMemberAdd', async (member) => {
                     .setDescription(`**العضو:** ${member.user.tag}\n**الأيدي:** ${member.id}`)
                     .setTimestamp();
        
-client.on('interactionCreate', async (interaction) => {
-    // التحقق من أن التفاعل هو زر أو قائمة منسدلة
-    if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
-
-    // جلب إعدادات التذاكر للسيرفر
-    const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-    if (!config) return;
-
-    // 1️⃣ --- [ منطق فتح التذكرة ] ---
-    // نتحقق من الكلمات المفتاحية في customId التي أرسلناها في أزرار الداشبورد والمنيو
-    if (interaction.customId.includes('ticket_btn') || interaction.customId === 'ticket_menu') {
-        
-        // أهم خطوة لمنع "Interaction Failed"
-        await interaction.deferReply({ ephemeral: true });
-
-        let type = "Support";
-        
-        // استخراج النوع من المنيو
-        if (interaction.isStringSelectMenu()) {
-            const selectedValue = interaction.values[0]; // ticket_opt_0
-            const index = selectedValue.split('_').pop();
-            type = config.menuOptions[index]?.label || "Support";
-        } 
-        // استخراج النوع من الأزرار
-        else {
-            const index = interaction.customId.split('_').pop();
-            type = config.buttons[index]?.label || "Support";
-        }
-
-        const channelName = `ticket-${interaction.user.id}`;
-        const existing = interaction.guild.channels.cache.find(c => c.name === channelName);
-        
-        if (existing) {
-            return interaction.editReply({ content: `❌ لديك تذكرة مفتوحة بالفعل: ${existing}` });
-        }
-
-        try {
-            const channel = await interaction.guild.channels.create({
-                name: channelName,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-                    { id: config.adminRole || interaction.guild.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
-                ]
-            });
-
-            const embed = new EmbedBuilder()
-                .setTitle("🎫 تذكرة جديدة")
-                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${type}**\nيرجى انتظار الإدارة للرد عليك.`)
-                .setColor("Blue")
-                .setFooter({ text: "ZONE SYSTEM - Ticket Management" });
-
-            // الأزرار الداخلية الجديدة
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام 🙋‍♂️').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('call_member').setLabel('استدعاء العضو 🔊').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('delete_ticket').setLabel('حذف التذكرة 🗑️').setStyle(ButtonStyle.Danger)
-            );
-
-            await channel.send({
-                content: `${interaction.user} | <@&${config.adminRole}>`,
-                embeds: [embed],
-                components: [row]
-            });
-
-            await interaction.editReply({ content: `✅ تم فتح تذكرتك بنجاح: ${channel}` });
-
-        } catch (error) {
-            console.error(error);
-            await interaction.editReply({ content: "❌ فشل إنشاء التذكرة. تأكد من أن البوت لديه صلاحية Manage Channels." });
-        }
-    }
-
-    // 2️⃣ --- [ أزرار التحكم داخل التذكرة ] ---
-
-    // زر الاستلام
-    if (interaction.customId === 'claim_ticket') {
-        if (!interaction.member.roles.cache.has(config.adminRole) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return interaction.reply({ content: "❌ للإدارة فقط!", ephemeral: true });
-        }
-
-        // استخراج أيدي صاحب التذكرة من اسم القناة (ticket-1234567)
-        const ownerId = interaction.channel.name.split('-')[1];
-
-        // تعطيل زر الاستلام فقط لضمان عدم تكرار الاستلام
-        const newRows = interaction.message.components.map(row => {
-            const updatedRow = ActionRowBuilder.from(row);
-            updatedRow.components.forEach(btn => {
-                if (btn.data.custom_id === 'claim_ticket') btn.setDisabled(true);
-            });
-            return updatedRow;
-        });
-
-        await interaction.update({ components: newRows });
-        await interaction.channel.send({ 
-            content: `👋 <@${ownerId}>، تذكرتك الآن تحت معالجة ${interaction.user}`,
-            embeds: [new EmbedBuilder().setColor("Green").setDescription(`✅ تم استلام التذكرة بواسطة الإداري: ${interaction.user}`)]
-        });
-    }
-
-    // زر الاستدعاء
-    if (interaction.customId === 'call_member') {
-        const ownerId = interaction.channel.name.split('-')[1];
-        if (!ownerId) return interaction.reply({ content: "❌ تعذر تحديد صاحب التذكرة.", ephemeral: true });
-
-        await interaction.reply({ content: "🔔 تم إرسال تنبيه للعضو.", ephemeral: true });
-        await interaction.channel.send({ content: `🔊 <@${ownerId}>، الإدارة بانتظارك، يرجى التجاوب.` });
-    }
-
-    // زر الحذف
-    if (interaction.customId === 'delete_ticket') {
-        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) && !interaction.member.roles.cache.has(config.adminRole)) {
-            return interaction.reply({ content: "❌ لا تملك صلاحية حذف التذكرة!", ephemeral: true });
-        }
-        await interaction.reply("⚠️ سيتم إغلاق وحذف التذكرة خلال 3 ثوانٍ...");
-        setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
-    }
-});
 
 
 
@@ -2018,6 +1899,73 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     logCh.send({ embeds: [embed] }).catch(e => console.log("Log Error:", e));
 });
 
+client.on('interactionCreate', async (interaction) => {
+    try {
+        if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+        const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
+        if (!config) return;
+
+        // ====== ضغط زر ======
+        if (interaction.isButton()) {
+            if (!interaction.customId.startsWith('ticket_btn_')) return;
+
+            await interaction.reply({ content: "⏳ جاري فتح التكت...", ephemeral: true });
+
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${interaction.user.username}`,
+                type: ChannelType.GuildText,
+                permissionOverwrites: [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionFlagsBits.ViewChannel],
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                    },
+                    {
+                        id: config.adminRole,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                    }
+                ]
+            });
+
+            channel.send(`🎫 مرحباً ${interaction.user}، تم فتح التكت الخاص بك.`);
+        }
+
+        // ====== اختيار من المنيو ======
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId !== 'ticket_menu') return;
+
+            await interaction.reply({ content: "⏳ جاري فتح التكت...", ephemeral: true });
+
+            const channel = await interaction.guild.channels.create({
+                name: `ticket-${interaction.user.username}`,
+                type: ChannelType.GuildText,
+                permissionOverwrites: [
+                    {
+                        id: interaction.guild.id,
+                        deny: [PermissionFlagsBits.ViewChannel],
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                    },
+                    {
+                        id: config.adminRole,
+                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                    }
+                ]
+            });
+
+            channel.send(`📩 نوع التكت: ${interaction.values[0]}\n👤 ${interaction.user}`);
+        }
+
+    } catch (err) {
+        console.error("Ticket Error:", err);
+    }
+});
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
