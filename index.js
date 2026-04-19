@@ -1638,118 +1638,98 @@ client.on('guildMemberAdd', async (member) => {
        
 
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton() && !interaction.isStringSelectMenu() && !interaction.isUserSelectMenu()) return;
+    if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
-    // جلب الإعدادات
     const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
     if (!config) return;
 
-    // --- 1. جزء إنشاء التذكرة (عند الضغط على البانل الرئيسي) ---
-    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
-        let ticketType = "عامة";
+    // 🎫 فتح تكت من زر أو منيو
+    if (interaction.customId === 'open_ticket_btn' || interaction.customId === 'ticket_menu') {
+
+        let type = "Support";
+
         if (interaction.isButton()) {
-            const btnIndex = interaction.customId.replace('ticket_btn_', '');
-            ticketType = config.buttons[btnIndex]?.label || "دعم";
-        } else {
-            const optIndex = interaction.values[0].replace('ticket_opt_', '');
-            ticketType = config.menuOptions[optIndex]?.label || "دعم";
+            type = "Support";
         }
 
-        try {
-            const channel = await interaction.guild.channels.create({
-                name: `ticket-${interaction.user.username}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles] },
-                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                ],
-            });
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🎫 إدارة التذكرة | ${ticketType}`)
-                .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${ticketType}**\n\n**أدوات الإدارة:** استخدم الأزرار والمنيو أدناه للتحكم.`)
-                .setColor(config.color || "#5865F2");
-
-            // الأزرار: استدعاء (لأدمن فقط)
-            const adminButtons = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('call_owner').setLabel('استدعاء أونر 👑').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('call_admin').setLabel('استدعاء أدمن 🛡️').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('call_user').setLabel('استدعاء العضو 👤').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق 🔒').setStyle(ButtonStyle.Danger)
-            );
-
-            // منيو الإدارة: إضافة/إزالة أعضاء
-            const adminMenu = new ActionRowBuilder().addComponents(
-                new UserSelectMenuBuilder()
-                    .setCustomId('manage_members')
-                    .setPlaceholder('➕ إضافة أو إزالة عضو من التذكرة...')
-                    .setMinValues(1)
-                    .setMaxValues(1)
-            );
-
-            await channel.send({ 
-                content: `<@&${config.adminRole}> | ${interaction.user}`, 
-                embeds: [embed], 
-                components: [adminButtons, adminMenu] 
-            });
-
-            return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
-        } catch (e) { console.error(e); }
-    }
-
-    // --- 2. جزء أدوات الإدارة (داخل التذكرة المفتوحة) ---
-    const isAdmin = interaction.member.roles.cache.has(config.adminRole) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
-
-    // منع غير الإداريين من استخدام أدوات الإدارة
-    const adminToolsIds = ['call_owner', 'call_admin', 'call_user', 'manage_members'];
-    if (adminToolsIds.includes(interaction.customId) && !isAdmin) {
-        return interaction.reply({ content: "⚠️ هذه الأدوات مخصصة للإدارة فقط!", ephemeral: true });
-    }
-
-    // تنفيذ عمليات الأزرار
-    if (interaction.customId === 'call_owner') {
-        return interaction.reply({ content: `📢 تم إرسال نداء لـ **صاحب السيرفر** 👑` });
-    }
-    
-    if (interaction.customId === 'call_admin') {
-        return interaction.reply({ content: `📢 نداء للإدارة: <@&${config.adminRole}> مطلوب حضوركم فوراً.` });
-    }
-
-    if (interaction.customId === 'call_user') {
-        // البحث عن صاحب التذكرة من اسم الروم (تقريبي) أو المنشن الأول
-        const ticketOwnerName = interaction.channel.name.split('-')[1];
-        return interaction.reply({ content: `📢 يا صاحب التذكرة، الإدارة بانتظارك! 👤` });
-    }
-
-    // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
-    if (interaction.customId === 'manage_members') {
-       const targetUser = interaction.values[0];
-const member = await interaction.guild.members.fetch(targetUser);
-        const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
-
-        if (hasAccess) {
-            // إذا كان عنده صلاحية، نقوم بإزالتها
-            await interaction.channel.permissionOverwrites.delete(targetUser.id);
-            return interaction.reply({ content: `❌ تم إزالة ${targetUser} من التذكرة.`, ephemeral: true });
-        } else {
-            // إذا ما عنده، نقوم بإضافتها
-            await interaction.channel.permissionOverwrites.edit(targetUser.id, {
-                ViewChannel: true,
-                SendMessages: true,
-                AttachFiles: true
-            });
-            return interaction.reply({ content: `✅ تم إضافة ${targetUser} للتذكرة.`, ephemeral: true });
+        if (interaction.isStringSelectMenu()) {
+            type = interaction.values[0];
         }
+
+        // منع تكت مفتوح مسبقاً
+        const existing = interaction.guild.channels.cache.find(c =>
+            c.name === `ticket-${interaction.user.id}`
+        );
+
+        if (existing) {
+            return interaction.reply({ content: "❌ عندك تكت مفتوح بالفعل!", ephemeral: true });
+        }
+
+        // إنشاء روم التكت
+        const channel = await interaction.guild.channels.create({
+            name: `ticket-${interaction.user.id}`,
+            type: 0,
+            permissionOverwrites: [
+                {
+                    id: interaction.guild.id,
+                    deny: ['ViewChannel']
+                },
+                {
+                    id: interaction.user.id,
+                    allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory']
+                },
+                {
+                    id: config.adminRole,
+                    allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory']
+                }
+            ]
+        });
+
+        // رسالة داخل التكت
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 Ticket Opened")
+            .setDescription(`مرحباً ${interaction.user}\nنوع التكت: **${type}**`)
+            .setColor("Blue");
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('close_ticket')
+                .setLabel('إغلاق 🔒')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        await channel.send({
+            content: `<@${interaction.user.id}> | <@&${config.adminRole}>`,
+            embeds: [embed],
+            components: [row]
+        });
+
+        return interaction.reply({
+            content: `✅ تم فتح التكت: ${channel}`,
+            ephemeral: true
+        });
     }
 
-    // إغلاق التذكرة
+    // 🔒 إغلاق التكت
     if (interaction.customId === 'close_ticket') {
-        await interaction.reply("🔒 سيتم حذف التذكرة خلال 5 ثوانٍ...");
-        setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+        if (!interaction.member.permissions.has('Administrator')) {
+            return interaction.reply({ content: "❌ فقط الإدارة!", ephemeral: true });
+        }
+
+        await interaction.reply("🔒 سيتم إغلاق التكت...");
+        setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
     }
 });
-
+const menu = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+        .setCustomId('ticket_menu')
+        .setPlaceholder('اختر نوع التكت')
+        .addOptions([
+            { label: 'Support', value: 'support' },
+            { label: 'Report', value: 'report' },
+            { label: 'Other', value: 'other' }
+        ])
+);
 // --- [ دالة كشف المسؤول عن الفعل ] ---
 async function getExecutor(guild, eventType) {
     try {
