@@ -442,6 +442,9 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
     }
 });
 
+app.get('/ping', (req, res) => {
+  res.send('I am alive!');
+});
 
 
 // حفظ الستريك
