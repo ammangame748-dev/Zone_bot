@@ -331,43 +331,70 @@ const cards = adminGuilds.map(g => {
     </div>`;
 }).join('');
 
-
 const content = `
-<div class="guild-sidebar">
-    ${cards}
+<div class="main-wrapper">
+
+    <div class="title">ZONE SYSTEM</div>
+
+    <div class="guild-grid">
+        ${cards}
+    </div>
+
 </div>
 
 <style>
-.guild-sidebar{
+.main-wrapper{
+    width:100%;
+    min-height:100vh;
     display:flex;
     flex-direction:column;
-    gap:15px;
-    padding:20px;
-    width:280px;
-    height:100vh;
-    overflow-y:auto;
-    background:#111;
+    align-items:center;
+    padding-top:40px;
 }
 
-.guild-card{
+/* العنوان */
+.title{
+    font-size:40px;
+    font-weight:bold;
+    background: linear-gradient(45deg, #ff4d6d, #7b2ff7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom:30px;
+}
+
+/* السيرفرات */
+.guild-grid{
     display:flex;
-    align-items:center;
-    gap:12px;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:20px;
+    width:100%;
+    padding:20px;
+}
+
+/* كرت السيرفر */
+.guild-card{
+    width:200px;
     background:#1e1e2e;
-    padding:10px;
-    border-radius:15px;
+    padding:15px;
+    border-radius:20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
     transition:0.2s;
 }
 
 .guild-card:hover{
-    transform:scale(1.03);
+    transform:scale(1.05);
 }
 
 .guild-icon{
-    width:50px;
-    height:50px;
+    width:70px;
+    height:70px;
     border-radius:50%;
     object-fit:cover;
+    border:2px solid #7b2ff7;
 }
 </style>
 `;
