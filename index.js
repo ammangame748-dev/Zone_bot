@@ -2298,89 +2298,46 @@ client.on('interactionCreate', async (interaction) => {
         }
 
     } catch (err) { console.error(err); }
-        const config = await GuildConfig.findOne({ guildId: msg.guild.id });
-    if (!config?.streak?.enabled) return;
+const u = await UserLevel.findOneAndUpdate(
+    { guildId: msg.guild.id, userId: msg.author.id },
+    { $inc: { todayMessages: 1 } },
+    { new: true, upsert: true }
+);
 
-    // التحقق من الرتب المسموحة
-    const hasRole = msg.member.roles.cache.some(r =>
-        config.streak.allowedRoles.includes(r.id)
-    );
-    if (!hasRole) return;
+const required = strkConf.requiredMessages || 50;
 
-    const user = await UserLevel.findOneAndUpdate(
+if (!u.dayCompleted && u.todayMessages >= required) {
+
+    await UserLevel.updateOne(
         { guildId: msg.guild.id, userId: msg.author.id },
         {
-            $inc: { messages: 1, currentStreakMsgs: 1 },
-            $set: { lastActive: new Date() }
-        },
-        { upsert: true, new: true }
+            $inc: { streakCount: 1 },
+            $set: {
+                dayCompleted: true,
+                lastActive: new Date()
+            }
+        }
     );
 
-    const target = config.streak.messageTarget;
+    u.dayCompleted = true;
 
-    // 🔥 إذا وصل العدد المحدد
-    if (user.currentStreakMsgs >= target) {
+    const channel = msg.guild.channels.cache.get(strkConf.streakChannel);
 
-        user.streakCount += 1;
-        user.currentStreakMsgs = 0;
-
-        await user.save();
-
-        const channel = msg.guild.channels.cache.get(config.streak.logChannel);
-        if (channel) {
-            const embed = new EmbedBuilder()
-                .setTitle("🔥 زيادة الستريك!")
+    channel?.send({
+        embeds: [
+            new EmbedBuilder()
+                .setTitle("🔥 ستريك جديد!")
+                .setDescription(`<@${msg.author.id}> كمل يوم الستريك`)
+                .addFields(
+                    { name: "📅 الستريك", value: `${u.streakCount + 1}`, inline: true },
+                    { name: "💬 الرسائل", value: `${u.todayMessages}`, inline: true }
+                )
                 .setColor("Gold")
-                .setDescription(`
-👤 المستخدم: <@${msg.author.id}>
-📈 الستريك الحالي: **${user.streakCount} يوم**
-💬 الرسائل: **${target} رسالة مكتملة**
-                `)
-                .setTimestamp();
-
-            channel.send({ embeds: [embed] });
-        }
-    }
+        ]
+    });
+}
 });
-setInterval(async () => {
-    const users = await UserLevel.find({ streakCount: { $gt: 0 } });
-    const now = new Date();
 
-    for (const u of users) {
-        const hours = (now - new Date(u.lastActive)) / (1000 * 60 * 60);
-
-        // ⛔ تحذير قبل 19 ساعة (يعني باقي 5 ساعات)
-        if (hours >= 19 && hours < 24 && !u.warned) {
-
-            const user = await client.users.fetch(u.userId).catch(() => null);
-
-            if (user) {
-                const embed = new EmbedBuilder()
-                    .setTitle("⚠️ تحذير الستريك")
-                    .setColor("Red")
-                    .setDescription(`
-🔥 ستريكك: **${u.streakCount} يوم**
-⏳ باقي 5 ساعات وينتهي الستريك!
-
-تفاعل الآن داخل السيرفر حتى لا تفقده.
-                    `);
-
-                user.send({ embeds: [embed] }).catch(() => {});
-            }
-
-            u.warned = true;
-            await u.save();
-        }
-
-        // ❌ انتهاء الستريك
-        if (hours >= 24) {
-            u.streakCount = 0;
-            u.currentStreakMsgs = 0;
-            u.warned = false;
-            await u.save();
-        }
-    }
-}, 60 * 60 * 1000);
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
