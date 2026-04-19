@@ -1492,80 +1492,102 @@ client.on('messageCreate', async (msg) => {
         }
         await u.save();
     }
-    const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
-    if (strkConf) {
-        let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
-        if (!u) u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id });
+   // ==========================================
+// 🔥 نظام الستريك الفولاذي (القوة القصوى)
+// ==========================================
+const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
+if (strkConf) {
+    // 1️⃣ تحديث بيانات المستخدم (تصفير إذا غاب 24 ساعة + زيادة العداد + تحديث آخر نشاط)
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const now = new Date();
-        const diffInHours = (now - new Date(u.lastActive)) / (1000 * 60 * 60);
-    // --- [ أمر عرض الستريك ] ---
-    if (msg.content.startsWith('!ستريكي') || msg.content.startsWith('!ستريك ')) {
-        // تحديد الشخص المستهدف (إما المنشن أو صاحب الرسالة)
-        const target = msg.mentions.users.first() || msg.author;
-        
-        const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
+    // البحث عن العضو أو إنشاؤه
+    let u = await UserLevel.findOneAndUpdate(
+        { guildId: msg.guild.id, userId: msg.author.id },
+        { $setOnInsert: { streakCount: 0, currentStreakMsgs: 0, warned: false } },
+        { upsert: true, new: true }
+    );
 
-        if (!userData || userData.streakCount === 0) {
-            return msg.reply(target.id === msg.author.id ? 
-                "❄️ ما عندك ستريك حالياً، ابدأ بالتفاعل لتبني ستريك جديد!" : 
-                "❄️ هذا العضو ما عنده ستريك نشط حالياً.");
-        }
+    // 🛑 فحص التصفير: إذا آخر نشاط أقدم من 24 ساعة، نصفر العداد فوراً
+    if (u.lastActive < twentyFourHoursAgo) {
+        await UserLevel.updateOne(
+            { guildId: msg.guild.id, userId: msg.author.id },
+            { $set: { streakCount: 0, currentStreakMsgs: 0, warned: false } }
+        );
+        u.currentStreakMsgs = 0; // تحديث الكائن المحلي
+    }
 
-        // حساب الوقت المتبقي قبل تصفير الستريك
-        const nextReset = new Date(userData.lastActive.getTime() + 24 * 60 * 60 * 1000);
-        
+    // 2️⃣ زيادة عداد الرسائل وتحديث وقت النشاط
+    u = await UserLevel.findOneAndUpdate(
+        { guildId: msg.guild.id, userId: msg.author.id },
+        { $inc: { currentStreakMsgs: 1 }, $set: { lastActive: now, warned: false } },
+        { new: true }
+    );
+
+    // 3️⃣ منطق زيادة الستريك اليومي (فحص صارم)
+    const required = strkConf.requiredMessages || 50;
+    const todayStr = now.toDateString();
+    const lastUpdateStr = u.lastStreakUpdate ? u.lastStreakUpdate.toDateString() : "";
+
+    // الشرط: وصل للرسائل المطلوبة + لم يأخذ الستريك اليوم بعد
+    if (u.currentStreakMsgs >= required && lastUpdateStr !== todayStr) {
+        // تحديث الستريك في الداتابيز (زيادة الستريك وتصفير العداد ووضع تاريخ اليوم)
+        await UserLevel.updateOne(
+            { guildId: msg.guild.id, userId: msg.author.id },
+            { 
+                $inc: { streakCount: 1 }, 
+                $set: { currentStreakMsgs: 0, lastStreakUpdate: now } 
+            }
+        );
+
+        // جلب البيانات الجديدة لعرضها
+        const finalData = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
+
+        // إرسال الإيمباد الفخم
+        const channel = msg.guild.channels.resolve(strkConf.streakChannel) || msg.channel;
         const embed = new EmbedBuilder()
-            .setAuthor({ name: `إحصائيات الستريك لـ ${target.username}`, iconURL: target.displayAvatarURL() })
-            .setColor('#ffbb00')
-            .setThumbnail(target.displayAvatarURL())
+            .setAuthor({ name: msg.author.username, iconURL: msg.author.displayAvatarURL() })
+            .setTitle('🔥 تم تسجيل الستريك اليومي!')
+            .setDescription(`كفو يا وحش! استمريت لليوم **${finalData.streakCount}** على التوالي.`)
             .addFields(
-                { name: '🔥 عدد الأيام', value: `\`${userData.streakCount}\` يوم`, inline: true },
-                { name: '💬 رسائل اليوم', value: `\`${userData.currentStreakMsgs}\` رسالة`, inline: true },
-                { name: '⌛ ينتهي خلال', value: `<t:${Math.floor(nextReset.getTime() / 1000)}:R>`, inline: false }
+                { name: '📅 أيام الستريك', value: `\`${finalData.streakCount}\` يوم`, inline: true },
+                { name: '✅ حالة اليوم', value: ` مكتمل بنجاح`, inline: true }
             )
-            .setFooter({ text: 'Zone System • استمر ولا تقطع!' })
+            .setColor('#ffbb00')
+            .setFooter({ text: 'Zone System • استمر ولا تقطع' })
             .setTimestamp();
 
-        msg.reply({ embeds: [embed] });
+        channel.send({ content: `${msg.author}`, embeds: [embed] }).catch(() => {});
+
+        // إضافة الرتبة إذا موجودة
+        if (strkConf.streakRole) {
+            msg.member.roles.add(strkConf.streakRole).catch(() => {});
+        }
+    }
+}
+
+// --- [ أمر عرض الستريك - ضعه بشكل منفصل تحت ] ---
+if (msg.content.startsWith('!ستريكي') || msg.content.startsWith('!ستريك ')) {
+    const target = msg.mentions.users.first() || msg.author;
+    const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
+
+    if (!userData || userData.streakCount === 0) {
+        return msg.reply(target.id === msg.author.id ? "❄️ ما عندك ستريك حالياً، بلش تفاعل!" : "❄️ هالعضو ما عنده ستريك.");
     }
 
-        // 1. إذا غاب أكتر من 24 ساعة، يصفر الستريك فوراً
-        if (diffInHours > 24) {
-            u.streakCount = 0;
-            u.currentStreakMsgs = 0;
-        }
+    const nextReset = new Date(userData.lastActive.getTime() + 24 * 60 * 60 * 1000);
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: `إحصائيات ${target.username}`, iconURL: target.displayAvatarURL() })
+        .setColor('#ffbb00')
+        .addFields(
+            { name: '🔥 الستريك', value: `\`${userData.streakCount}\` يوم`, inline: true },
+            { name: '💬 رسائل اليوم', value: `\`${userData.currentStreakMsgs}\` رسالة`, inline: true },
+            { name: '⌛ ينتهي خلال', value: `<t:${Math.floor(nextReset.getTime() / 1000)}:R>`, inline: false }
+        )
+        .setThumbnail(target.displayAvatarURL());
 
-        u.currentStreakMsgs += 1;
-        u.lastActive = now;
-        u.warned = false; 
-
-        const required = strkConf.requiredMessages || 50;
-        const today = now.toDateString();
-        const lastUpdate = u.lastStreakUpdate ? u.lastStreakUpdate.toDateString() : "";
-
-        // 2. فحص: إذا وصل للعدد المطلوب + ما زاد ستريكه "اليوم"
-        if (u.currentStreakMsgs >= required && lastUpdate !== today) {
-            u.streakCount += 1;
-            u.currentStreakMsgs = 0;
-            u.lastStreakUpdate = now;
-
-            // إرسال الإيمباد في القناة المحددة من الداشبورد
-            const channel = msg.guild.channels.resolve(strkConf.streakChannel) || msg.channel;
-            const embed = new EmbedBuilder()
-                .setAuthor({ name: msg.author.username, iconURL: msg.author.displayAvatarURL() })
-                .setTitle('🔥 ستريك جديد!')
-                .setDescription(`كفو يا بطل! صار ستريكك اليومي: **${u.streakCount}**`)
-                .setColor('#ffbb00')
-                .setTimestamp();
-
-            channel.send({ content: `${msg.author}`, embeds: [embed] }).catch(() => {});
-            if (strkConf.streakRole) msg.member.roles.add(strkConf.streakRole).catch(() => {});
-        }
-        await u.save();
-    }
-
-
+    msg.reply({ embeds: [embed] });
+}
 
 
     // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
