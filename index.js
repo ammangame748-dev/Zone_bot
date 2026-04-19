@@ -1909,51 +1909,117 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 
 client.on('interactionCreate', async (interaction) => {
     try {
-        if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
-
         const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
         if (!config) return;
 
         // =========================
-        // 🎫 فتح التكت (زر أو منيو)
+        // 🎫 فتح التكت
         // =========================
-        const openTicket = async (type = "عام") => {
+        if (interaction.isButton() && interaction.customId === 'open_ticket' || (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu')) {
+            const type = interaction.values ? interaction.values[0] : "عام";
+            return openTicket(interaction, config, type);
+        }
 
-            // ❌ منع فتح أكثر من تكت
-            const existing = interaction.guild.channels.cache.find(c =>
-                c.name === `ticket-${interaction.user.id}`
-            );
-            if (existing) {
+        // =========================
+        // 🎛️ أزرار التحكم (داخل التكت)
+        // =========================
+        if (interaction.isButton()) {
+            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+            if (!ticket) return;
+
+            const isAdmin = interaction.member.roles.cache.has(config.adminRole);
+
+            // 📌 زر الاستلام (إداري فقط)
+            if (interaction.customId === 'claim_ticket') {
+                if (!isAdmin) return interaction.reply({ content: "❌ هذا الزر للإدارة فقط", ephemeral: true });
+                
+                ticket.claimedBy = interaction.user.id;
+                await ticket.save();
+
                 return interaction.reply({
-                    content: `❌ عندك تكت مفتوح بالفعل: ${existing}`,
-                    ephemeral: true
+                    content: `✅ تم استلام التكت بواسطة ${interaction.user}\n🔔 يا <@${ticket.ownerId}>، الإداري المسؤول معك الآن.`
                 });
             }
+
+            // 📣 زر الاستدعاء (إداري فقط)
+            if (interaction.customId === 'summon_member') {
+                if (!isAdmin) return interaction.reply({ content: "❌ هذا الزر للإدارة فقط", ephemeral: true });
+                return interaction.channel.send({ content: `🔔 يا <@${ticket.ownerId}>، الإداري ${interaction.user} يستدعيك، يرجى الحضور!` });
+            }
+
+            // 🔒 إغلاق وحذف التكت (إداري فقط)
+            if (interaction.customId === 'close_ticket') {
+                if (!isAdmin) return interaction.reply({ content: "❌ هذا الزر للإدارة فقط", ephemeral: true });
+
+                const owner = await client.users.fetch(ticket.ownerId).catch(() => null);
+                if (owner) {
+                    const embedDM = new EmbedBuilder()
+                        .setTitle("📂 تفاصيل إغلاق التذكرة")
+                        .setColor("Red")
+                        .addFields(
+                            { name: "👤 صاحب التكت:", value: `<@${ticket.ownerId}>`, inline: true },
+                            { name: "🛠️ استلمها:", value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : "لم تستلم", inline: true },
+                            { name: "🗑️ حذفها:", value: `${interaction.user}`, inline: true },
+                            { name: "⏰ وقت الفتح:", value: `<t:${Math.floor(ticket.openedAt.getTime() / 1000)}:F>`, inline: false },
+                            { name: "📅 وقت الحذف:", value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: false }
+                        )
+                        .setTimestamp();
+                    
+                    await owner.send({ embeds: [embedDM] }).catch(() => console.log("Can't DM user"));
+                }
+
+                await interaction.reply({ content: "🔒 جارٍ أرشفة البيانات وحذف الروم خلال 5 ثوانٍ..." });
+                await TicketData.deleteOne({ channelId: interaction.channel.id });
+                setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+            }
+
+            // ➕ إضافة/إزالة شخص
+            if (interaction.customId === 'add_member' || interaction.customId === 'remove_member') {
+                if (!isAdmin) return interaction.reply({ content: "❌ للادارة فقط", ephemeral: true });
+                // هنا نفتح Modal عشان نطلب الـ ID
+                const modal = new ModalBuilder()
+                    .setCustomId(interaction.customId === 'add_member' ? 'modal_add' : 'modal_remove')
+                    .setTitle('إدارة الأعضاء');
+                const idInput = new TextInputBuilder()
+                    .setCustomId('user_id')
+                    .setLabel('أدخل ID العضو')
+                    .setStyle(TextInputStyle.Short);
+                modal.addComponents(new ActionRowBuilder().addComponents(idInput));
+                return interaction.showModal(modal);
+            }
+        }
+
+        // =========================
+        // ⌨️ التعامل مع المودال (Add/Remove)
+        // =========================
+        if (interaction.isModalSubmit()) {
+            const userId = interaction.fields.getTextInputValue('user_id');
+            const member = await interaction.guild.members.fetch(userId).catch(() => null);
+            if (!member) return interaction.reply({ content: "❌ ID غير صحيح", ephemeral: true });
+
+            if (interaction.customId === 'modal_add') {
+                await interaction.channel.permissionOverwrites.edit(member, { ViewChannel: true, SendMessages: true });
+                return interaction.reply({ content: `✅ تم إضافة ${member} للتكت` });
+            } else {
+                await interaction.channel.permissionOverwrites.edit(member, { ViewChannel: false });
+                return interaction.reply({ content: `❌ تم إزالة ${member} من التكت` });
+            }
+        }
+
+        // =========================
+        // 🎫 دالة فتح التكت الأساسية
+        // =========================
+        async function openTicket(interaction, config, type) {
+            const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.id}`);
+            if (existing) return interaction.reply({ content: `❌ عندك تكت مفتوح: ${existing}`, ephemeral: true });
 
             const channel = await interaction.guild.channels.create({
                 name: `ticket-${interaction.user.id}`,
                 type: ChannelType.GuildText,
                 permissionOverwrites: [
-                    {
-                        id: interaction.guild.id,
-                        deny: [PermissionFlagsBits.ViewChannel],
-                    },
-                    {
-                        id: interaction.user.id,
-                        allow: [
-                            PermissionFlagsBits.ViewChannel,
-                            PermissionFlagsBits.SendMessages,
-                            PermissionFlagsBits.ReadMessageHistory
-                        ],
-                    },
-                    {
-                        id: config.adminRole,
-                        allow: [
-                            PermissionFlagsBits.ViewChannel,
-                            PermissionFlagsBits.SendMessages,
-                            PermissionFlagsBits.ReadMessageHistory
-                        ],
-                    }
+                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
                 ]
             });
 
@@ -1964,88 +2030,26 @@ client.on('interactionCreate', async (interaction) => {
                 openedAt: new Date()
             });
 
-            // 💬 رسالة داخل التكت
-            await channel.send({
-                content: `🎫 أهلاً ${interaction.user} هذا هو تذكرتك\n📌 النوع: **${type}**`,
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("🎫 Ticket System")
-                        .setDescription("اكتب مشكلتك هنا وسيتم الرد عليك.")
-                        .setColor("Green")
-                ],
-                components: [
-                    new ActionRowBuilder().addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('claim_ticket')
-                            .setLabel('📌 استلام')
-                            .setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder()
-                            .setCustomId('close_ticket')
-                            .setLabel('🔒 إغلاق')
-                            .setStyle(ButtonStyle.Danger)
-                    )
-                ]
-            });
+            const embed = new EmbedBuilder()
+                .setTitle("🎫 تذكرة جديدة")
+                .setDescription(`أهلاً بك ${interaction.user}\nالرجاء كتابة مشكلتك هنا بانتظار الإدارة.\n\n**النوع:** ${type}`)
+                .setColor("Blue");
 
-            return interaction.reply({
-                content: `✅ تم فتح تذكرتك: ${channel}`,
-                ephemeral: true
-            });
-        };
+            const buttons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('claim_ticket').setLabel('📌 استلام').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('summon_member').setLabel('📣 استدعاء').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('add_member').setLabel('➕ إضافة').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('remove_member').setLabel('➖ إزالة').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 إغلاق').setStyle(ButtonStyle.Danger)
+            );
 
-        // =========================
-        // 🔘 زر فتح التكت
-        // =========================
-        if (interaction.isButton()) {
-            if (interaction.customId === 'open_ticket') {
-                return openTicket("عام");
-            }
+            await channel.send({ content: `${interaction.user} | <@&${config.adminRole}>`, embeds: [embed], components: [buttons] });
+            return interaction.reply({ content: `✅ تم فتح تذكرتك بنجاح: ${channel}`, ephemeral: true });
         }
 
-        // =========================
-        // 📋 منيو التكت
-        // =========================
-        if (interaction.isStringSelectMenu()) {
-            if (interaction.customId === 'ticket_menu') {
-                return openTicket(interaction.values[0]);
-            }
-        }
-
-        // =========================
-        // 🎛️ أزرار داخل التكت
-        // =========================
-        if (interaction.isButton()) {
-
-            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
-            if (!ticket) return;
-
-            // 📌 استلام
-            if (interaction.customId === 'claim_ticket') {
-                ticket.claimedBy = interaction.user.id;
-                await ticket.save();
-
-                return interaction.reply({
-                    content: `📌 تم استلام التكت بواسطة ${interaction.user}`
-                });
-            }
-
-            // 🔒 إغلاق
-            if (interaction.customId === 'close_ticket') {
-
-                await interaction.reply({ content: "🔒 يتم الإغلاق..." });
-
-                await TicketData.deleteOne({ channelId: interaction.channel.id });
-
-                setTimeout(() => {
-                    interaction.channel.delete().catch(() => {});
-                }, 3000);
-            }
-        }
-
-    } catch (err) {
-        console.error("Ticket Error:", err);
-    }
+    } catch (err) { console.error(err); }
 });
+
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
