@@ -1525,7 +1525,6 @@ if (command === 'ستريكي' || command === 'streak') {
                 }
 
                 // إرسال رسالة المباركة في الروم المحدد أو نفس الروم
-const targetCh = msg.guild.channels.cache.get(strkConf.streakChannel);
                 const streakEmbed = new EmbedBuilder()
                     .setDescription(`🔥 كفو **${msg.author.username}**! زاد الستريك تبعك وصار: \`${u.streakCount}\``)
                     .setColor('#ffbb00');
