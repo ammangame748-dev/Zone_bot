@@ -383,11 +383,10 @@ app.get('/', (req, res) => {
 app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
     try {
         const g = client.guilds.cache.get(req.params.guildId);
-        if (!g) return res.redirect('/dashboard'); // حماية إذا السيرفر مش موجود
+        if (!g) return res.redirect('/dashboard'); 
 
         let s = await StreakConfig.findOne({ guildId: g.id }) || {};
         
-        // جلب الرتب والرومات مع التأكد أنها موجودة
         const roles = g.roles.cache.filter(r => r.name !== "@everyone");
         const channels = g.channels.cache.filter(c => c.type === 0);
 
@@ -426,6 +425,14 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
                 <label>اللون:</label><input type="color" name="color" value="#5865F2">
                 <button class="btn-save" style="background:var(--accent)">🚀 إرسال الآن</button>
             </form>
+        </div>
+
+        <div class="card" style="border: 1px solid var(--s); margin-top: 20px;">
+            <h3 style="color: var(--s);">⚠️ منطقة الخطر</h3>
+            <p style="font-size: 13px; color: #aaa;">تنبيه: سيتم تصفير ستريك الجميع نهائياً.</p>
+            <form method="POST" action="/reset-all-streaks/${g.id}" onsubmit="return confirm('متأكد؟ ما رح تقدر ترجعهم!')">
+                <button class="btn-save" style="background: var(--s); width: auto; padding: 10px 25px;">🔥 تصفير ستريك الكل</button>
+            </form>
         </div>`;
 
         res.send(ui(g, 'streaks', content));
@@ -436,10 +443,22 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
 });
 
 
+
 // حفظ الستريك
 app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
     await StreakConfig.findOneAndUpdate({ guildId: req.params.guildId }, { requiredMessages: req.body.reqMsgs, streakRole: req.body.roleId }, { upsert: true });
     res.redirect(`/manage/${req.params.guildId}/streaks`);
+});
+app.post('/reset-all-streaks/:guildId', checkAuth, async (req, res) => {
+    try {
+        await UserLevel.updateMany(
+            { guildId: req.params.guildId },
+            { $set: { streakCount: 0, currentStreakMsgs: 0 } }
+        );
+        res.redirect(`/manage/${req.params.guildId}/streaks`);
+    } catch (err) {
+        res.status(500).send("خطأ في التصفير");
+    }
 });
 
 // إرسال الايمباد
