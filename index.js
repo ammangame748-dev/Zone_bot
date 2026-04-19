@@ -310,34 +310,69 @@ app.get('/', (req, res) => {
 app.get('/dashboard', checkAuth, (req, res) => {
     // 1. فلترة السيرفرات التي يمتلك فيها المستخدم صلاحية Administrator (0x8)
     const adminGuilds = req.user.guilds.filter(g => (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8));
+const cards = adminGuilds.map(g => {
+    const hasBot = client.guilds.cache.has(g.id);
 
-    // 2. تحويل السيرفرات لبطاقات (Cards)
-    const cards = adminGuilds.map(g => {
-        const hasBot = client.guilds.cache.has(g.id);
-        
-        // --- ضع هذه السطور هنا بالظبط ---
-        const iconURL = g.icon 
-            ? `https://discordapp.com{g.id}/${g.icon}.png?size=256` 
-            : 'https://placeholder.com';
+    const iconURL = g.icon
+        ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
+        : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
-        const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20bot%20applications.commands`;
-        // ------------------------------
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
-        return `
-        <div class="guild-card">
-            <img src="${iconURL}" class="guild-icon">
-            <h3 style="color:white; margin:10px 0;">${g.name}</h3>
-            ${hasBot 
-                ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none;">⚙️ دخول الإعدادات</a>` 
-                : `<a href="${inviteLink}" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
-            }
-        </div>`;
-    }).join('');
+    return `
+    <div class="guild-card">
+        <img src="${iconURL}" class="guild-icon">
+        <h3>${g.name}</h3>
+
+        ${hasBot
+            ? `<a href="/manage/${g.id}/home">⚙️ الإعدادات</a>`
+            : `<a href="${inviteLink}">➕ إضافة البوت</a>`
+        }
+    </div>`;
+}).join('');
 
 
-    const content = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 25px; padding:20px;">${cards}</div>`;
-    
-    res.send(ui({id:null, name:'قائمة السيرفرات'}, 'home', content));
+const content = `
+<div class="guild-sidebar">
+    ${cards}
+</div>
+
+<style>
+.guild-sidebar{
+    display:flex;
+    flex-direction:column;
+    gap:15px;
+    padding:20px;
+    width:280px;
+    height:100vh;
+    overflow-y:auto;
+    background:#111;
+}
+
+.guild-card{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:#1e1e2e;
+    padding:10px;
+    border-radius:15px;
+    transition:0.2s;
+}
+
+.guild-card:hover{
+    transform:scale(1.03);
+}
+
+.guild-icon{
+    width:50px;
+    height:50px;
+    border-radius:50%;
+    object-fit:cover;
+}
+</style>
+`;
+
+res.send(ui({id:null, name:'قائمة السيرفرات'}, 'home', content));
 });
 
 
@@ -1543,32 +1578,6 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
     if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
 });
 
-// --- [ 3. لوق إعطاء/إزالة رتبة ] ---
-client.on('guildMemberUpdate', async (oldM, newM) => {
-    const s = await GuildConfig.findOne({ guildId: newM.guild.id });
-    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
-    const logCh = newM.guild.channels.cache.get(s.logs.roles.channel);
-
-    const addedRoles = newM.roles.cache.filter(r => !oldM.roles.cache.has(r.id));
-    const removedRoles = oldM.roles.cache.filter(r => !newM.roles.cache.has(r.id));
-
-    if (addedRoles.size > 0 || removedRoles.size > 0) {
-        const executor = await getExecutor(newM.guild, AuditLogEvent.MemberRoleUpdate);
-        const embed = new EmbedBuilder().setAuthor({ name: '🎭 تحديث رتب' }).setTimestamp();
-        
-        if (addedRoles.size > 0) {
-            embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        } else if (removedRoles.size > 0) {
-            embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        }
-        
-        embed.addFields(
-            { name: '👤 المستلم:', value: `<@${newM.id}>` },
-            { name: '🛡️ المسؤول:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor }
-        );
-        if (logCh) logCh.send({ embeds: [embed] });
-    }
-});
 
 // --- [ 4. لوق دخول الأعضاء ] ---
 client.on('guildMemberAdd', async (member) => {
