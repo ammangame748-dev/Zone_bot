@@ -49,6 +49,12 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
 });
+const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
+    guildId: String,
+    requiredMessages: { type: Number, default: 50 },
+    streakRole: String
+}));
+
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     guildId: String,
     jail: {
@@ -149,14 +155,19 @@ const Stats = mongoose.model('Stats', new mongoose.Schema({
     }
 }));
 
-// 4.3 مستويات المستخدمين
 const UserLevel = mongoose.model('UserLevel', new mongoose.Schema({
     guildId: String,
     userId: String,
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
-    msgCount: { type: Number, default: 0 }
+    msgCount: { type: Number, default: 0 },
+    // --- هدول الإضافات الجديدة اللي لازم تزيدهم هون ---
+    streakCount: { type: Number, default: 0 },
+    currentStreakMsgs: { type: Number, default: 0 },
+    lastActive: { type: Date, default: Date.now },
+    warned: { type: Boolean, default: false }
 }));
+
 
 // 4.4 إعدادات القيف اواي
 const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
@@ -293,6 +304,8 @@ function ui(guild, active, content) {
             <div class="nav">
                 <a class="${active=='home'?'active':''}" href="/dashboard">📊 الإحصائيات</a>
                 <a class="${active=='security'?'active':''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
+                <a class="${active=='streaks'?'active':''}" href="/manage/${guild.id}/streaks">🔥 الستريك والايمباد</a>
+
                 <a class="${active=='logs'?'active':''}" href="/manage/${guild.id}/logs">📜 اللوج</a>
                 <a class="${active=='tickets'?'active':''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
                 <a class="${active=='autoreply'?'active':''}" href="/manage/${guild.id}/autoreply">💬 الرد الآلي</a>
@@ -315,6 +328,53 @@ function ui(guild, active, content) {
 // تحويل أي شخص يدخل الرابط الرئيسي للداشبورد فوراً
 app.get('/', (req, res) => {
     res.redirect('/dashboard');
+});
+app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    let s = await StreakConfig.findOne({ guildId: g.id }) || {};
+    let content = `
+    <div class="card">
+        <h3>🔥 إعدادات الستريك</h3>
+        <form method="POST" action="/save/${g.id}/streaks">
+            <label>كم رسالة تزيد الستريك؟</label>
+            <input type="number" name="reqMsgs" value="${s.requiredMessages || 50}">
+            <label>رتبة الستريك:</label>
+            <select name="roleId">
+                <option value="">-- اختر رتبة --</option>
+                ${g.roles.cache.filter(r=>r.name!=='@everyone').map(r=>`<option value="${r.id}" ${s.streakRole==r.id?'selected':''}>${r.name}</option>`).join('')}
+            </select>
+            <button class="btn-save">حفظ</button>
+        </form>
+    </div>
+    <div class="card" style="margin-top:20px;">
+        <h3>🖼️ مرسل الايمباد</h3>
+        <form method="POST" action="/send-embed/${g.id}">
+            <label>الروم:</label>
+            <select name="chId">${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}">#${c.name}</option>`)}</select>
+            <label>العنوان:</label><input type="text" name="title">
+            <label>المحتوى:</label><textarea name="desc" rows="4"></textarea>
+            <label>اللون:</label><input type="color" name="color" value="#5865F2">
+            <button class="btn-save" style="background:var(--accent)">إرسال</button>
+        </form>
+    </div>`;
+    res.send(ui(g, 'streaks', content));
+});
+
+// حفظ الستريك
+app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
+    await StreakConfig.findOneAndUpdate({ guildId: req.params.guildId }, { requiredMessages: req.body.reqMsgs, streakRole: req.body.roleId }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/streaks`);
+});
+
+// إرسال الايمباد
+app.post('/send-embed/:guildId', checkAuth, async (req, res) => {
+    const { chId, title, desc, color } = req.body;
+    const channel = client.channels.cache.get(chId);
+    if(channel) {
+        const embed = new EmbedBuilder().setTitle(title).setDescription(desc).setColor(color || '#5865F2');
+        channel.send({ embeds: [embed] }).catch(()=>{});
+    }
+    res.redirect(`/manage/${req.params.guildId}/streaks`);
 });
 
 app.get('/dashboard', checkAuth, (req, res) => {
@@ -412,23 +472,7 @@ const content = `
 res.send(ui({id:null, name:'قائمة السيرفرات'}, 'home', content));
 });
 
-app.post('/save/:guildId/streak', checkAuth, async (req, res) => {
-    const { roleId, messagesPerStreak, alertEmbedText } = req.body;
 
-    await StreakConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        {
-            $set: {
-                roleId,
-                messagesPerStreak,
-                alertEmbedText
-            }
-        },
-        { upsert: true }
-    );
-
-    res.redirect(`/manage/${req.params.guildId}/streak`);
-});
 
 app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
     const { prize, description, duration, winners, channel } = req.body;
@@ -1341,6 +1385,22 @@ client.on('messageCreate', async (msg) => {
         }
         await u.save();
     }
+const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
+if (strkConf) {
+    let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
+    if (u) {
+        u.currentStreakMsgs += 1;
+        u.lastActive = new Date();
+        u.warned = false;
+        if (u.currentStreakMsgs >= (strkConf.requiredMessages || 50)) {
+            u.streakCount += 1;
+            u.currentStreakMsgs = 0;
+            if(strkConf.streakRole) msg.member.roles.add(strkConf.streakRole).catch(()=>{});
+        }
+        await u.save();
+    }
+}
+
 
     // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
     if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -2067,81 +2127,29 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (err) { console.error(err); }
 });
-client.on('messageCreate', async (message) => {
-    if (!message.guild || message.author.bot) return;
 
-    const config = await StreakConfig.findOne({ guildId: message.guild.id });
-    if (!config) return;
-
-    let user = await UserStreak.findOne({
-        guildId: message.guild.id,
-        userId: message.author.id
-    });
-
-   user = await UserStreak.create({
-    guildId: message.guild.id,
-    userId: message.author.id,
-    messageCount: 0,
-    streak: 0,
-    lastMessage: new Date(),
-    warned: false
-});
-    
-
-   user.messageCount = (user.messageCount || 0) + 1;
-user.lastMessage = new Date();
-
-    if (user.messageCount >= (config.messagesPerStreak || 10)) {
-      user.streak = (user.streak || 0) + 1;
-user.messageCount = 0;
-user.warned = false;
-
-        const role = message.guild.roles.cache.get(config.roleId);
-        if (role) {
-            message.member.roles.add(role).catch(() => {});
-        }
-    }
-
-    user.lastMessage = new Date();
-    await user.save();
-});
 setInterval(async () => {
-    const users = await UserStreak.find({});
-
-    for (const user of users) {
-        if (!user.lastMessage) continue;
-
-        const diff = Date.now() - new Date(user.lastMessage).getTime();
-
-const ONE_DAY = 24 * 60 * 60 * 1000;
-
-if (diff >= ONE_DAY) {
-    user.streak = 0;
-    user.messageCount = 0;
-    user.warned = false;
-    await user.save();
-    continue;
-}
-
-        // ⚠️ تحذير قبل 4 ساعات
-        if (diff >= 20 * 60 * 60 * 1000 && !user.warned) {
-            const guild = client.guilds.cache.get(user.guildId);
-            const member = guild?.members.cache.get(user.userId);
-
-            if (member) {
-                const embed = new EmbedBuilder()
-                    .setTitle("⚠️ تحذير الستريك")
-                    .setDescription("ستريكك رح ينكسر خلال 4 ساعات! لازم تتفاعل 🔥")
-                    .setColor("Orange");
-
-                member.send({ embeds: [embed] }).catch(() => {});
+    const servers = await StreakConfig.find();
+    for (const conf of servers) {
+        const users = await UserLevel.find({ guildId: conf.guildId, streakCount: { $gt: 0 } });
+        for (const user of users) {
+            const hours = (Date.now() - user.lastActive.getTime()) / (1000 * 60 * 60);
+            if (hours >= 20 && hours < 24 && !user.warned) {
+                const dUser = await client.users.fetch(user.userId).catch(()=>null);
+                if(dUser) {
+                    const embed = new EmbedBuilder().setTitle('⚠️ تنبيه ستريك').setDescription('باقي 4 ساعات ويروح الستريك! تفاعل الآن!').setColor('Red');
+                    dUser.send({ embeds: [embed] }).catch(()=>{});
+                    user.warned = true; await user.save();
+                }
             }
-
-            user.warned = true;
-            await user.save();
+            if (hours >= 24) {
+                user.streakCount = 0; await user.save();
+                const member = await client.guilds.cache.get(conf.guildId)?.members.fetch(user.userId).catch(()=>null);
+                if(member && conf.streakRole) member.roles.remove(conf.streakRole).catch(()=>{});
+            }
         }
     }
-}, 60 * 60 * 1000);
+}, 1000 * 60 * 60);
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
