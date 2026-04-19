@@ -1505,36 +1505,48 @@ if (command === 'ستريكي' || command === 'streak') {
         }
         await u.save();
     }
-    // --- [ 5.1 نظام الستريك المطور ] ---
+
     const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
-    if (strkConf) {
-        let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
-        if (u) {
-            u.currentStreakMsgs = (u.currentStreakMsgs || 0) + 1;
-            u.lastActive = new Date();
-            u.warned = false;
 
-            // التشييك إذا وصل للعدد المطلوب
-            if (u.currentStreakMsgs >= (strkConf.requiredMessages || 50)) {
-                u.streakCount = (u.streakCount || 0) + 1;
-                u.currentStreakMsgs = 0; // تصفير العداد للستريك القادم
+if (strkConf) {
 
-                // إعطاء الرتبة
-                if (strkConf.streakRole) {
-                    msg.member.roles.add(strkConf.streakRole).catch(() => {});
-                }
+    let u = await UserLevel.findOne({
+        guildId: msg.guild.id,
+        userId: msg.author.id
+    });
 
-                // إرسال رسالة المباركة في الروم المحدد أو نفس الروم
-                const streakEmbed = new EmbedBuilder()
-                    .setDescription(`🔥 كفو **${msg.author.username}**! زاد الستريك تبعك وصار: \`${u.streakCount}\``)
-                    .setColor('#ffbb00');
+    if (u) {
 
-                targetCh.send({ embeds: [streakEmbed] }).catch(() => {});
+        u.currentStreakMsgs = (u.currentStreakMsgs || 0) + 1;
+        u.lastActive = new Date();
+        u.warned = false;
+
+        if (u.currentStreakMsgs >= (strkConf.requiredMessages || 50)) {
+
+            u.streakCount = (u.streakCount || 0) + 1;
+            u.currentStreakMsgs = 0;
+
+            if (strkConf.streakRole) {
+                msg.member.roles.add(strkConf.streakRole).catch(() => {});
             }
-            await u.save();
-        }
-    }
 
+            // 🔥 لازم يكون هنا
+            const targetCh = msg.guild.channels.cache.get(strkConf.streakChannel);
+
+            if (!targetCh) {
+                return msg.channel.send("❌ روم الستريك مش محدد من الداشبورد!");
+            }
+
+            const streakEmbed = new EmbedBuilder()
+                .setDescription(`🔥 كفو **${msg.author.username}**! صار ستريكك: \`${u.streakCount}\``)
+                .setColor('#ffbb00');
+
+            targetCh.send({ embeds: [streakEmbed] }).catch(() => {});
+        }
+
+        await u.save();
+    }
+}
 
     // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
     if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
