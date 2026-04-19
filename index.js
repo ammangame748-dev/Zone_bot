@@ -311,28 +311,29 @@ app.get('/dashboard', checkAuth, (req, res) => {
     // 1. فلترة السيرفرات التي يمتلك فيها المستخدم صلاحية Administrator (0x8)
     const adminGuilds = req.user.guilds.filter(g => (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8));
 
-    // 2. تحويل السيرفرات إلى بطاقات (Cards)
+    // 2. تحويل السيرفرات لبطاقات (Cards)
     const cards = adminGuilds.map(g => {
         const hasBot = client.guilds.cache.has(g.id);
         
-        // تصحيح رابط الأيقونة
+        // --- ضع هذه السطور هنا بالظبط ---
         const iconURL = g.icon 
             ? `https://discordapp.com{g.id}/${g.icon}.png?size=256` 
             : 'https://placeholder.com';
 
-        // رابط دعوة البوت مع تحديد السيرفر تلقائياً عبر guild_id
         const inviteLink = `https://discord.com{process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${g.id}`;
+        // ------------------------------
 
         return `
-        <div class="guild-card" style="background:#2f3136; padding:20px; border-radius:10px; text-align:center;">
-            <img src="${iconURL}" class="guild-icon" style="width:80px; height:80px; border-radius:50%;">
-            <h3 style="color:white; margin:15px 0;">${g.name}</h3>
+        <div class="guild-card">
+            <img src="${iconURL}" class="guild-icon">
+            <h3 style="color:white; margin:10px 0;">${g.name}</h3>
             ${hasBot 
-                ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none; display:inline-block; padding:10px 20px; background:#5865f2; color:white; border-radius:5px;">⚙️ دخول الإعدادات</a>` 
-                : `<a href="${inviteLink}" class="btn-save" style="text-decoration:none; display:inline-block; padding:10px 20px; background:linear-gradient(45deg, #2ecc71, #27ae60); color:white; border-radius:5px;">➕ إضافة البوت</a>`
+                ? `<a href="/manage/${g.id}/home" class="btn-save" style="text-decoration:none;">⚙️ دخول الإعدادات</a>` 
+                : `<a href="${inviteLink}" class="btn-save" style="text-decoration:none; background:linear-gradient(45deg, #2ecc71, #27ae60);">➕ إضافة البوت</a>`
             }
         </div>`;
     }).join('');
+
 
     const content = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 25px; padding:20px;">${cards}</div>`;
     
