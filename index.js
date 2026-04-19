@@ -49,6 +49,16 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
 });
+const Streak = mongoose.model('Streak', new mongoose.Schema({
+    guildId: String,
+    userId: String,
+
+    messagesCount: { type: Number, default: 0 }, // عداد الرسائل
+    streak: { type: Number, default: 0 },        // الستريك
+    lastActive: { type: Date, default: Date.now },
+
+    warningSent: { type: Boolean, default: false } // هل انبعت تحذير DM
+}));
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     guildId: String,
     jail: {
@@ -184,6 +194,7 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     menuOptions: [{ label: String, emoji: String }]
 }));
 
+
 // ==========================================
 // 5️⃣ الدوال المساعدة (Helper Functions)
 // ==========================================
@@ -308,6 +319,7 @@ function ui(guild, active, content) {
         </div>
     </body>
     </html>`;
+   
 }
 
 // تحويل أي شخص يدخل الرابط الرئيسي للداشبورد فوراً
@@ -1261,6 +1273,54 @@ client.on('messageCreate', async (msg) => {
 
     // 2. جلب إعدادات السيرفر من الداتابيز
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
+    // 🔥 نظام الستريك
+if (msg.author.bot || !msg.guild) return;
+
+const settings = await GuildConfig.findOne({ guildId: msg.guild.id });
+if (!settings?.streak?.enabled) return;
+
+let user = await Streak.findOne({
+    guildId: msg.guild.id,
+    userId: msg.author.id
+});
+
+if (!user) {
+    user = new Streak({
+        guildId: msg.guild.id,
+        userId: msg.author.id
+    });
+}
+user.messagesCount += 1;
+const diff = Date.now() - new Date(user.lastActive).getTime();
+
+// ⛔ إذا مر 24 ساعة بدون تفاعل
+if (diff > 24 * 60 * 60 * 1000) {
+    user.streak = 0;
+    user.messagesCount = 0;
+    user.warningSent = false;
+}
+if (
+    diff > 20 * 60 * 60 * 1000 && // 20 ساعة
+    !user.warningSent &&
+    user.streak > 0
+) {
+    const embed = new EmbedBuilder()
+        .setTitle("⚠️ تنبيه الستريك")
+        .setDescription(
+            settings.streak?.warningDM?.description ||
+            "ستريكك رح ينكسر خلال 4 ساعات إذا ما تفاعلت!"
+        )
+        .setColor("Orange");
+
+    msg.author.send({ embeds: [embed] }).catch(() => {});
+    user.warningSent = true;
+}
+const required = settings.streak?.messagesPerStreak || 50;
+
+if (user.messagesCount >= required) {
+    user.streak += 1;
+    user.messagesCount = 0;
+}
     if (!s) return;
 
     // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
@@ -1461,7 +1521,28 @@ client.on('messageCreate', async (msg) => {
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
+user.lastActive = Date.now();
+const logChannel = settings.streak?.logChannelId;
 
+if (logChannel) {
+    const ch = msg.guild.channels.cache.get(logChannel);
+
+    if (ch) {
+        ch.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setTitle("🔥 نشاط ستريك")
+                    .setDescription(`${msg.author} تفاعل بالسيرفر`)
+                    .setColor("Blue")
+            ]
+        }).catch(() => {});
+    }
+}
+await Streak.findOneAndUpdate(
+    { guildId: msg.guild.id, userId: msg.author.id },
+    user,
+    { upsert: true }
+);
 }); // إغلاق حدث messageCreate بشكل صحيح
 
 
