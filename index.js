@@ -320,7 +320,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
             ? `https://discordapp.com{g.id}/${g.icon}.png?size=256` 
             : 'https://placeholder.com';
 
-        const inviteLink = `https://discord.com{process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands&guild_id=${g.id}`;
+        const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20bot%20applications.commands`;
         // ------------------------------
 
         return `
