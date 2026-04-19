@@ -49,16 +49,6 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
 });
-const Streak = mongoose.model('Streak', new mongoose.Schema({
-    guildId: String,
-    userId: String,
-
-    messagesCount: { type: Number, default: 0 }, // عداد الرسائل
-    streak: { type: Number, default: 0 },        // الستريك
-    lastActive: { type: Date, default: Date.now },
-
-    warningSent: { type: Boolean, default: false } // هل انبعت تحذير DM
-}));
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     guildId: String,
     jail: {
@@ -422,7 +412,23 @@ const content = `
 res.send(ui({id:null, name:'قائمة السيرفرات'}, 'home', content));
 });
 
+app.post('/save/:guildId/streak', checkAuth, async (req, res) => {
+    const { roleId, messagesPerStreak, alertEmbedText } = req.body;
 
+    await StreakConfig.findOneAndUpdate(
+        { guildId: req.params.guildId },
+        {
+            $set: {
+                roleId,
+                messagesPerStreak,
+                alertEmbedText
+            }
+        },
+        { upsert: true }
+    );
+
+    res.redirect(`/manage/${req.params.guildId}/streak`);
+});
 
 app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
     const { prize, description, duration, winners, channel } = req.body;
@@ -1273,54 +1279,6 @@ client.on('messageCreate', async (msg) => {
 
     // 2. جلب إعدادات السيرفر من الداتابيز
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
-    // 🔥 نظام الستريك
-if (msg.author.bot || !msg.guild) return;
-
-const settings = await GuildConfig.findOne({ guildId: msg.guild.id });
-if (!settings?.streak?.enabled) return;
-
-let user = await Streak.findOne({
-    guildId: msg.guild.id,
-    userId: msg.author.id
-});
-
-if (!user) {
-    user = new Streak({
-        guildId: msg.guild.id,
-        userId: msg.author.id
-    });
-}
-user.messagesCount += 1;
-const diff = Date.now() - new Date(user.lastActive).getTime();
-
-// ⛔ إذا مر 24 ساعة بدون تفاعل
-if (diff > 24 * 60 * 60 * 1000) {
-    user.streak = 0;
-    user.messagesCount = 0;
-    user.warningSent = false;
-}
-if (
-    diff > 20 * 60 * 60 * 1000 && // 20 ساعة
-    !user.warningSent &&
-    user.streak > 0
-) {
-    const embed = new EmbedBuilder()
-        .setTitle("⚠️ تنبيه الستريك")
-        .setDescription(
-            settings.streak?.warningDM?.description ||
-            "ستريكك رح ينكسر خلال 4 ساعات إذا ما تفاعلت!"
-        )
-        .setColor("Orange");
-
-    msg.author.send({ embeds: [embed] }).catch(() => {});
-    user.warningSent = true;
-}
-const required = settings.streak?.messagesPerStreak || 50;
-
-if (user.messagesCount >= required) {
-    user.streak += 1;
-    user.messagesCount = 0;
-}
     if (!s) return;
 
     // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
@@ -1521,28 +1479,7 @@ if (user.messagesCount >= required) {
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
-user.lastActive = Date.now();
-const logChannel = settings.streak?.logChannelId;
 
-if (logChannel) {
-    const ch = msg.guild.channels.cache.get(logChannel);
-
-    if (ch) {
-        ch.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setTitle("🔥 نشاط ستريك")
-                    .setDescription(`${msg.author} تفاعل بالسيرفر`)
-                    .setColor("Blue")
-            ]
-        }).catch(() => {});
-    }
-}
-await Streak.findOneAndUpdate(
-    { guildId: msg.guild.id, userId: msg.author.id },
-    user,
-    { upsert: true }
-);
 }); // إغلاق حدث messageCreate بشكل صحيح
 
 
@@ -2130,7 +2067,81 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (err) { console.error(err); }
 });
+client.on('messageCreate', async (message) => {
+    if (!message.guild || message.author.bot) return;
 
+    const config = await StreakConfig.findOne({ guildId: message.guild.id });
+    if (!config) return;
+
+    let user = await UserStreak.findOne({
+        guildId: message.guild.id,
+        userId: message.author.id
+    });
+
+   user = await UserStreak.create({
+    guildId: message.guild.id,
+    userId: message.author.id,
+    messageCount: 0,
+    streak: 0,
+    lastMessage: new Date(),
+    warned: false
+});
+    
+
+   user.messageCount = (user.messageCount || 0) + 1;
+user.lastMessage = new Date();
+
+    if (user.messageCount >= (config.messagesPerStreak || 10)) {
+      user.streak = (user.streak || 0) + 1;
+user.messageCount = 0;
+user.warned = false;
+
+        const role = message.guild.roles.cache.get(config.roleId);
+        if (role) {
+            message.member.roles.add(role).catch(() => {});
+        }
+    }
+
+    user.lastMessage = new Date();
+    await user.save();
+});
+setInterval(async () => {
+    const users = await UserStreak.find({});
+
+    for (const user of users) {
+        if (!user.lastMessage) continue;
+
+        const diff = Date.now() - new Date(user.lastMessage).getTime();
+
+const ONE_DAY = 24 * 60 * 60 * 1000;
+
+if (diff >= ONE_DAY) {
+    user.streak = 0;
+    user.messageCount = 0;
+    user.warned = false;
+    await user.save();
+    continue;
+}
+
+        // ⚠️ تحذير قبل 4 ساعات
+        if (diff >= 20 * 60 * 60 * 1000 && !user.warned) {
+            const guild = client.guilds.cache.get(user.guildId);
+            const member = guild?.members.cache.get(user.userId);
+
+            if (member) {
+                const embed = new EmbedBuilder()
+                    .setTitle("⚠️ تحذير الستريك")
+                    .setDescription("ستريكك رح ينكسر خلال 4 ساعات! لازم تتفاعل 🔥")
+                    .setColor("Orange");
+
+                member.send({ embeds: [embed] }).catch(() => {});
+            }
+
+            user.warned = true;
+            await user.save();
+        }
+    }
+}, 60 * 60 * 1000);
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
