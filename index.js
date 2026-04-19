@@ -1506,48 +1506,60 @@ if (command === 'ستريكي' || command === 'streak') {
         await u.save();
     }
 
-    const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
+const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
 
-if (strkConf) {
+if (!strkConf) return;
 
-    let u = await UserLevel.findOne({
+// جلب المستخدم أو إنشاؤه لو مش موجود
+let u = await UserLevel.findOne({
+    guildId: msg.guild.id,
+    userId: msg.author.id
+});
+
+if (!u) {
+    u = new UserLevel({
         guildId: msg.guild.id,
-        userId: msg.author.id
+        userId: msg.author.id,
+        streakCount: 0,
+        currentStreakMsgs: 0,
+        lastActive: new Date(),
+        warned: false
     });
-
-    if (u) {
-
-        u.currentStreakMsgs = (u.currentStreakMsgs || 0) + 1;
-        u.lastActive = new Date();
-        u.warned = false;
-
-        if (u.currentStreakMsgs >= (strkConf.requiredMessages || 50)) {
-
-            u.streakCount = (u.streakCount || 0) + 1;
-            u.currentStreakMsgs = 0;
-
-            if (strkConf.streakRole) {
-                msg.member.roles.add(strkConf.streakRole).catch(() => {});
-            }
-
-            // 🔥 لازم يكون هنا
-            const targetCh = msg.guild.channels.cache.get(strkConf.streakChannel);
-
-           if (!targetCh) {
-    console.log("Streak channel not set or invalid");
-    return;
 }
 
-            const streakEmbed = new EmbedBuilder()
-                .setDescription(`🔥 كفو **${msg.author.username}**! صار ستريكك: \`${u.streakCount}\``)
-                .setColor('#ffbb00');
+// زيادة الرسائل
+u.currentStreakMsgs = (u.currentStreakMsgs || 0) + 1;
+u.lastActive = new Date();
+u.warned = false;
 
-            targetCh.send({ embeds: [streakEmbed] }).catch(() => {});
-        }
+// العدد من الداشبورد
+const required = strkConf.requiredMessages || 50;
 
-        await u.save();
+// إذا وصل للحد
+if (u.currentStreakMsgs >= required) {
+
+    u.streakCount = (u.streakCount || 0) + 1;
+    u.currentStreakMsgs = 0;
+
+    // 👑 الرتبة من الداشبورد
+    if (strkConf.streakRole) {
+        msg.member.roles.add(strkConf.streakRole).catch(() => {});
+    }
+
+    // 📢 الروم من الداشبورد
+    const channel = msg.guild.channels.cache.get(strkConf.streakChannel);
+
+    if (channel) {
+        const streakEmbed = new EmbedBuilder()
+            .setDescription(`🔥 كفو ${msg.author}! صار ستريكك: **${u.streakCount}**`)
+            .setColor('#ffbb00');
+
+        channel.send({ embeds: [streakEmbed] }).catch(() => {});
     }
 }
+
+await u.save();
+
 
     // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
     if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
