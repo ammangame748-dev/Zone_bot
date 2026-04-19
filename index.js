@@ -1918,26 +1918,55 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton()) {
             if (!interaction.customId.startsWith('ticket_btn_')) return;
 
-            await interaction.reply({ content: "⏳ جاري فتح التكت...", ephemeral: true });
-
             const channel = await interaction.guild.channels.create({
-                name: `ticket-${interaction.user.username}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    {
-                        id: interaction.guild.id,
-                        deny: [PermissionFlagsBits.ViewChannel],
-                    },
-                    {
-                        id: interaction.user.id,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
-                    },
-                    {
-                        id: config.adminRole,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
-                    }
-                ]
-            });
+    name: `ticket-${interaction.user.username}`,
+    type: ChannelType.GuildText,
+    permissionOverwrites: [
+        {
+            id: interaction.guild.id,
+            deny: [PermissionFlagsBits.ViewChannel],
+        },
+        {
+            id: interaction.user.id,
+            allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory
+            ],
+        },
+        {
+            id: config.adminRole,
+            allow: [
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.ReadMessageHistory
+            ],
+        }
+    ]
+});
+
+    await channel.send({
+    content: `🎫 هذا هو تذكرتك ${interaction.user}، اشرح مشكلتك هنا 👇`,
+    embeds: [
+        new EmbedBuilder()
+            .setTitle("🎫 Ticket System")
+            .setDescription("اكتب مشكلتك وسيتم الرد عليك قريباً")
+            .setColor("Green")
+    ],
+    components: [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('claim_ticket')
+                .setLabel('📌 استلام')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId('close_ticket')
+                .setLabel('🔒 إغلاق')
+                .setStyle(ButtonStyle.Danger)
+        )
+    ]
+});
 // =====================
 // 🎛️ Ticket Buttons
 // =====================
