@@ -1608,7 +1608,9 @@ client.on('messageCreate', async (msg) => {
 
             try {
                 // حفظ الرتب القديمة قبل سحبها
-                const currentRoles = target.roles.cache.filter(r => r.name !== '@everyone').map(r => r.id);
+  const currentRoles = target.roles.cache
+    .filter(r => r.id !== msg.guild.id) // أفضل من الاسم
+    .map(r => r.id);
                 await JailData.findOneAndUpdate(
                     { guildId: msg.guild.id, userId: target.id },
                     { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
@@ -1634,7 +1636,7 @@ client.on('messageCreate', async (msg) => {
                 msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
 
                 // فك السجن تلقائياً بعد انتهاء الوقت
-                setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
+                setTimeout(async () => { await handleUnjail(target, msg.guild.id); }, durationMs);
             } catch (e) { console.error(e); }
         }
 
@@ -1648,7 +1650,7 @@ client.on('messageCreate', async (msg) => {
             if (!target) return msg.reply("⚠️ يرجى منشن العضو لفك سجنه!");
 
             const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
-            await handleUnjail(target, msg.guild.id, jailChannel);
+            await handleUnjail(target, msg.guild.id);
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
@@ -2023,7 +2025,6 @@ async function handleUnjail(member, guildId) {
             await member.roles.set(rolesToRestore).catch(async (err) => {
                 console.error("فشل في استرجاع الرتب، بحاول طريقة بديلة...");
                 // طريقة بديلة لو فشل الـ set
-                if (modConfig?.jail?.roleId) await member.roles.remove(modConfig.jail.roleId);
                 await member.roles.add(rolesToRestore);
             });
 
