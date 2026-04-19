@@ -271,31 +271,84 @@ function ui(guild, active, content) {
                 --p: #5865F2; --s: #ff4757; --bg: radial-gradient(circle at center, #1a1a2e 0%, #05051a 100%); 
                 --card-bg: rgba(0, 0, 0, 0.6); --accent: #00d2ff; 
             }
-            body { margin: 0; font-family: 'Changa', sans-serif; background: var(--bg); background-attachment: fixed; color: white; display: flex; min-height: 100vh; direction: rtl; }
-            .sidebar { width: 280px; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(20px); position: fixed; right: 0; height: 100vh; padding: 30px 15px; border-left: 1px solid rgba(255, 255, 255, 0.1); z-index: 1000; display: flex; flex-direction: column; }
-            .sidebar h2 { background: linear-gradient(to left, var(--p), var(--s)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; font-size: 30px; margin-bottom: 40px; font-weight: 700; }
-            .nav { display: ${showNav}; flex-direction: column; gap: 10px; }
-            .nav a { display: flex; align-items: center; padding: 14px 20px; border-radius: 15px; color: #adb5bd; text-decoration: none; transition: 0.3s; gap: 15px; }
-            .nav a:hover, .nav a.active { background: rgba(88, 101, 242, 0.15); color: white; border-right: 5px solid var(--p); transform: translateX(-5px); }
-            .main { margin-right: ${guild.id ? '280px' : '0'}; padding: 50px; width: 100%; }
-            
-            /* --- [ تنسيق كروت السيرفرات الجديد ] --- */
-            .guild-card {
-                background: var(--card-bg); border-radius: 20px; padding: 25px; text-align: center;
-                border: 1px solid rgba(255, 255, 255, 0.1); transition: 0.4s; position: relative;
-                overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 15px;
+            body { 
+                margin: 0; font-family: 'Changa', sans-serif; background: var(--bg); 
+                background-attachment: fixed; color: white; display: flex; min-height: 100vh; direction: rtl; 
             }
-            .guild-card:hover { transform: translateY(-10px); border-color: var(--p); box-shadow: 0 10px 30px rgba(88, 101, 242, 0.3); }
-            .guild-icon { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--p); box-shadow: 0 0 15px var(--p); object-fit: cover; }
 
-            .card { position: relative; background: var(--card-bg); backdrop-filter: blur(15px); padding: 30px; border-radius: 20px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.05); overflow: hidden; }
-            .card::after { content: ''; position: absolute; inset: 0; border-radius: 20px; padding: 2px; background: linear-gradient(90deg, transparent, var(--p), var(--accent), var(--s), transparent); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: moveBorder 4s linear infinite; pointer-events: none; }
+            /* --- [ القائمة الجانبية مع خاصية التمرير ] --- */
+            .sidebar { 
+                width: 280px; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(20px); 
+                position: fixed; right: 0; height: 100vh; padding: 30px 15px; 
+                border-left: 1px solid rgba(255, 255, 255, 0.1); z-index: 1000; 
+                display: flex; flex-direction: column;
+                
+                /* تفعيل التمرير */
+                overflow-y: auto;
+                scrollbar-width: thin;
+                scrollbar-color: var(--p) transparent;
+            }
+
+            /* تخصيص شكل السكرول بار للمتصفحات */
+            .sidebar::-webkit-scrollbar { width: 6px; }
+            .sidebar::-webkit-scrollbar-thumb { background: var(--p); border-radius: 10px; }
+            .sidebar::-webkit-scrollbar-track { background: transparent; }
+
+            .sidebar h2 { 
+                background: linear-gradient(to left, var(--p), var(--s)); 
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+                text-align: center; font-size: 30px; margin-bottom: 40px; font-weight: 700; 
+                flex-shrink: 0; /* منع العنوان من الاختفاء عند التمرير */
+            }
+
+            .nav { display: ${showNav}; flex-direction: column; gap: 10px; padding-bottom: 50px; }
+            .nav a { 
+                display: flex; align-items: center; padding: 14px 20px; border-radius: 15px; 
+                color: #adb5bd; text-decoration: none; transition: 0.3s; gap: 15px; font-weight: 500;
+            }
+            .nav a:hover, .nav a.active { 
+                background: rgba(88, 101, 242, 0.15); color: white; 
+                border-right: 5px solid var(--p); transform: translateX(-5px); 
+            }
+
+            .main { margin-right: ${guild.id ? '280px' : '0'}; padding: 50px; width: 100%; transition: 0.3s; }
+            
+            /* --- [ كروت المحتوى ] --- */
+            .card { 
+                position: relative; background: var(--card-bg); backdrop-filter: blur(15px); 
+                padding: 30px; border-radius: 20px; margin-bottom: 30px; 
+                border: 1px solid rgba(255, 255, 255, 0.05); 
+            }
+            .card::after { 
+                content: ''; position: absolute; inset: 0; border-radius: 20px; padding: 2px; 
+                background: linear-gradient(90deg, transparent, var(--p), var(--accent), var(--s), transparent); 
+                -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); 
+                -webkit-mask-composite: xor; mask-composite: exclude; animation: moveBorder 4s linear infinite; 
+                pointer-events: none; 
+            }
             @keyframes moveBorder { 0% { filter: hue-rotate(0deg); opacity: 0.6; } 100% { filter: hue-rotate(360deg); opacity: 1; } }
 
-            .btn-save { background: linear-gradient(45deg, var(--p), var(--s)); color: white; border: none; padding: 15px; border-radius: 15px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.4s; text-align: center; text-decoration: none; display: block; }
-            .btn-save:hover { filter: brightness(1.2); transform: scale(1.02); }
-            input, select, textarea { width: 100%; padding: 14px; border-radius: 12px; background: rgba(0, 0, 0, 0.4); color: white; border: 1px solid #333; margin: 10px 0; font-family: 'Changa'; }
-            h3 { color: var(--accent); margin: 0; }
+            .btn-save { 
+                background: linear-gradient(45deg, var(--p), var(--s)); color: white; border: none; 
+                padding: 15px; border-radius: 15px; cursor: pointer; width: 100%; 
+                font-weight: bold; transition: 0.4s; text-align: center; text-decoration: none; display: block; 
+            }
+            .btn-save:hover { filter: brightness(1.2); transform: scale(1.01); }
+
+            input, select, textarea { 
+                width: 100%; padding: 14px; border-radius: 12px; background: rgba(0, 0, 0, 0.4); 
+                color: white; border: 1px solid #333; margin: 10px 0; font-family: 'Changa'; 
+            }
+            h3 { color: var(--accent); margin: 0; margin-bottom: 15px; }
+
+            /* كروت السيرفرات في الصفحة الرئيسية */
+            .guild-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+            .guild-card {
+                background: var(--card-bg); border-radius: 20px; padding: 25px; text-align: center;
+                border: 1px solid rgba(255, 255, 255, 0.1); transition: 0.4s; width: 220px;
+            }
+            .guild-card:hover { transform: translateY(-10px); border-color: var(--p); }
+            .guild-icon { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--p); margin-bottom: 15px; }
         </style>
     </head>
     <body>
@@ -305,7 +358,6 @@ function ui(guild, active, content) {
                 <a class="${active=='home'?'active':''}" href="/dashboard">📊 الإحصائيات</a>
                 <a class="${active=='security'?'active':''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
                 <a class="${active=='streaks'?'active':''}" href="/manage/${guild.id}/streaks">🔥 الستريك والايمباد</a>
-
                 <a class="${active=='logs'?'active':''}" href="/manage/${guild.id}/logs">📜 اللوج</a>
                 <a class="${active=='tickets'?'active':''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
                 <a class="${active=='autoreply'?'active':''}" href="/manage/${guild.id}/autoreply">💬 الرد الآلي</a>
@@ -313,17 +365,16 @@ function ui(guild, active, content) {
                 <a class="${active=='welcome'?'active':''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
                 <a class="${active=='giveaway'?'active':''}" href="/manage/${guild.id}/giveaway">🎉 القيف اواي</a>
                 <a class="${active=='mod'?'active':''}" href="/manage/${guild.id}/mod">🛡️ أوامر الإشراف</a>
-
             </div>
         </div>
         <div class="main">
-            <h2 style="margin-bottom:30px">📍 ${guildName}</h2>
+            <h1 style="margin-bottom:30px; font-size: 28px;">📍 ${guildName}</h1>
             ${content}
         </div>
     </body>
     </html>`;
-   
 }
+
 
 // تحويل أي شخص يدخل الرابط الرئيسي للداشبورد فوراً
 app.get('/', (req, res) => {
