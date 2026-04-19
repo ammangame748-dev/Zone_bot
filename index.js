@@ -409,6 +409,13 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
         </form>
     </div>`;
     res.send(ui(g, 'streaks', content));
+    const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
+    guildId: String,
+    requiredMessages: { type: Number, default: 50 },
+    streakRole: String,
+    streakChannel: String // إضافة الروم هون
+}));
+
 });
 
 // حفظ الستريك
