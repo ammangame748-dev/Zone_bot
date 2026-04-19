@@ -381,42 +381,60 @@ app.get('/', (req, res) => {
     res.redirect('/dashboard');
 });
 app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    let s = await StreakConfig.findOne({ guildId: g.id }) || {};
-    let content = `
-    <div class="card">
-        <h3>🔥 إعدادات الستريك</h3>
-        <form method="POST" action="/save/${g.id}/streaks">
-            <label>كم رسالة تزيد الستريك؟</label>
-            <input type="number" name="reqMsgs" value="${s.requiredMessages || 50}">
-            <label>رتبة الستريك:</label>
-            <select name="roleId">
-                <option value="">-- اختر رتبة --</option>
-                ${g.roles.cache.filter(r=>r.name!=='@everyone').map(r=>`<option value="${r.id}" ${s.streakRole==r.id?'selected':''}>${r.name}</option>`).join('')}
-            </select>
-            <button class="btn-save">حفظ</button>
-        </form>
-    </div>
-    <div class="card" style="margin-top:20px;">
-        <h3>🖼️ مرسل الايمباد</h3>
-        <form method="POST" action="/send-embed/${g.id}">
-            <label>الروم:</label>
-            <select name="chId">${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}">#${c.name}</option>`)}</select>
-            <label>العنوان:</label><input type="text" name="title">
-            <label>المحتوى:</label><textarea name="desc" rows="4"></textarea>
-            <label>اللون:</label><input type="color" name="color" value="#5865F2">
-            <button class="btn-save" style="background:var(--accent)">إرسال</button>
-        </form>
-    </div>`;
-    res.send(ui(g, 'streaks', content));
-    const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
-    guildId: String,
-    requiredMessages: { type: Number, default: 50 },
-    streakRole: String,
-    streakChannel: String // إضافة الروم هون
-}));
+    try {
+        const g = client.guilds.cache.get(req.params.guildId);
+        if (!g) return res.redirect('/dashboard'); // حماية إذا السيرفر مش موجود
 
+        let s = await StreakConfig.findOne({ guildId: g.id }) || {};
+        
+        // جلب الرتب والرومات مع التأكد أنها موجودة
+        const roles = g.roles.cache.filter(r => r.name !== "@everyone");
+        const channels = g.channels.cache.filter(c => c.type === 0);
+
+        let content = `
+        <div class="card">
+            <h3>🔥 إعدادات الستريك</h3>
+            <form method="POST" action="/save/${g.id}/streaks">
+                <label>كم رسالة تزيد الستريك؟</label>
+                <input type="number" name="reqMsgs" value="${s.requiredMessages || 50}">
+                
+                <label>رتبة الستريك:</label>
+                <select name="roleId">
+                    <option value="">-- بدون رتبة --</option>
+                    ${roles.map(r => `<option value="${r.id}" ${s.streakRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+                </select>
+
+                <label>📍 روم إشعارات الستريك:</label>
+                <select name="streakChannel">
+                    <option value="">-- ارسل في نفس الروم --</option>
+                    ${channels.map(c => `<option value="${c.id}" ${s.streakChannel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
+                </select>
+
+                <button class="btn-save">💾 حفظ الإعدادات</button>
+            </form>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+            <h3>🖼️ مرسل الايمباد</h3>
+            <form method="POST" action="/send-embed/${g.id}">
+                <label>الروم:</label>
+                <select name="chId">
+                    ${channels.map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+                </select>
+                <label>العنوان:</label><input type="text" name="title">
+                <label>المحتوى:</label><textarea name="desc" rows="4"></textarea>
+                <label>اللون:</label><input type="color" name="color" value="#5865F2">
+                <button class="btn-save" style="background:var(--accent)">🚀 إرسال الآن</button>
+            </form>
+        </div>`;
+
+        res.send(ui(g, 'streaks', content));
+    } catch (err) {
+        console.error("Streak Page Error:", err);
+        res.status(500).send("حدث خطأ داخلي: " + err.message);
+    }
 });
+
 
 // حفظ الستريك
 app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
