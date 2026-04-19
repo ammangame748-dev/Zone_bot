@@ -1525,7 +1525,8 @@ if (command === 'ستريكي' || command === 'streak') {
                 }
 
                 // إرسال رسالة المباركة في الروم المحدد أو نفس الروم
-                const targetCh = msg.guild.channels.cache.get(strkConf.streakChannel) || msg.channel;
+const targetCh = msg.guild.channels.cache.get(strkConf.streakChannel);
+if (!targetCh) return msg.channel.send("❌ روم الستريك مش محدد من الداشبورد!");
                 const streakEmbed = new EmbedBuilder()
                     .setDescription(`🔥 كفو **${msg.author.username}**! زاد الستريك تبعك وصار: \`${u.streakCount}\``)
                     .setColor('#ffbb00');
