@@ -1492,7 +1492,7 @@ client.on('messageCreate', async (msg) => {
         }
         await u.save();
     }
-  const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
+ const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
 if (!strkConf) return;
 
 const now = new Date();
@@ -1507,7 +1507,7 @@ let u = await UserLevel.findOneAndUpdate(
             streakCount: 0,
             todayMessages: 0,
             lastDay: today,
-            warned: false
+            dayCompleted: false
         }
     },
     { upsert: true, new: true }
@@ -1515,25 +1515,16 @@ let u = await UserLevel.findOneAndUpdate(
 
 // 🔥 إذا يوم جديد
 if (!u.lastDay || new Date(u.lastDay).getTime() !== today.getTime()) {
+    u.todayMessages = 0;
+    u.dayCompleted = false;
 
-    // إذا ما حقق عدد الرسائل → ينقطع الستريك
-    if (u.todayMessages < required) {
-        u.streakCount = 0;
-    } else {
-        u.streakCount += 1;
-    }
-
-    // نبدأ يوم جديد
     await UserLevel.updateOne(
         { guildId: msg.guild.id, userId: msg.author.id },
         {
             $set: {
                 todayMessages: 0,
                 lastDay: today,
-                warned: false
-            },
-            $set: {
-                streakCount: u.streakCount
+                dayCompleted: false
             }
         }
     );
@@ -1543,22 +1534,29 @@ if (!u.lastDay || new Date(u.lastDay).getTime() !== today.getTime()) {
 u = await UserLevel.findOneAndUpdate(
     { guildId: msg.guild.id, userId: msg.author.id },
     {
-        $inc: { todayMessages: 1 },
-        $set: { warned: false }
+        $inc: { todayMessages: 1 }
     },
     { new: true }
 );
 
-// 🎯 إذا حقق شرط اليوم (مرة واحدة فقط)
-if (u.todayMessages === required) {
+// 🚨 أهم شرط: إذا ما خلص اليوم بعد → خلصه مرة واحدة فقط
+if (!u.dayCompleted && u.todayMessages >= required) {
+
+    await UserLevel.updateOne(
+        { guildId: msg.guild.id, userId: msg.author.id },
+        {
+            $inc: { streakCount: 1 },
+            $set: { dayCompleted: true }
+        }
+    );
 
     const channel = msg.guild.channels.cache.get(strkConf.streakChannel) || msg.channel;
 
     const embed = new EmbedBuilder()
-        .setTitle("🔥 يوم ستريك مكتمل!")
-        .setDescription(`تم تسجيل يوم جديد في الستريك!`)
+        .setTitle("🔥 تم تسجيل يوم الستريك!")
+        .setDescription(`أكملت اليوم بنجاح 🔥`)
         .addFields(
-            { name: "🔥 عدد الأيام", value: `${u.streakCount + 1}`, inline: true },
+            { name: "📅 الستريك", value: `+1 يوم`, inline: true },
             { name: "💬 رسائل اليوم", value: `${u.todayMessages}`, inline: true }
         )
         .setColor("#ffaa00")
