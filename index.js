@@ -1492,14 +1492,14 @@ client.on('messageCreate', async (msg) => {
         }
         await u.save();
     }
-   const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
+  const strkConf = await StreakConfig.findOne({ guildId: msg.guild.id });
 if (!strkConf) return;
 
 const now = new Date();
-const today = new Date(now.toDateString()); // بداية اليوم
+const today = new Date(now.toDateString());
 const required = strkConf.requiredMessages || 50;
 
-// جلب أو إنشاء المستخدم
+// جلب المستخدم
 let u = await UserLevel.findOneAndUpdate(
     { guildId: msg.guild.id, userId: msg.author.id },
     {
@@ -1507,71 +1507,58 @@ let u = await UserLevel.findOneAndUpdate(
             streakCount: 0,
             todayMessages: 0,
             lastDay: today,
-            lastMessageAt: now,
             warned: false
         }
     },
     { upsert: true, new: true }
 );
 
-// 🔥 إذا دخل يوم جديد
+// 🔥 إذا يوم جديد
 if (!u.lastDay || new Date(u.lastDay).getTime() !== today.getTime()) {
 
-    // إذا ما حقق الهدف اليوم السابق → تصفير الستريك
+    // إذا ما حقق عدد الرسائل → ينقطع الستريك
     if (u.todayMessages < required) {
-        await UserLevel.updateOne(
-            { guildId: msg.guild.id, userId: msg.author.id },
-            {
-                $set: {
-                    streakCount: 0,
-                    todayMessages: 0,
-                    lastDay: today,
-                    warned: false
-                }
-            }
-        );
         u.streakCount = 0;
     } else {
-        // إذا حقق الهدف → يوم جديد من الستريك
-        await UserLevel.updateOne(
-            { guildId: msg.guild.id, userId: msg.author.id },
-            {
-                $inc: { streakCount: 1 },
-                $set: {
-                    todayMessages: 0,
-                    lastDay: today,
-                    warned: false
-                }
-            }
-        );
+        u.streakCount += 1;
     }
+
+    // نبدأ يوم جديد
+    await UserLevel.updateOne(
+        { guildId: msg.guild.id, userId: msg.author.id },
+        {
+            $set: {
+                todayMessages: 0,
+                lastDay: today,
+                warned: false
+            },
+            $set: {
+                streakCount: u.streakCount
+            }
+        }
+    );
 }
 
-// 🔥 زيادة رسائل اليوم
+// 🔥 زيادة رسائل اليوم فقط
 u = await UserLevel.findOneAndUpdate(
     { guildId: msg.guild.id, userId: msg.author.id },
     {
         $inc: { todayMessages: 1 },
-        $set: { lastMessageAt: now, warned: false }
+        $set: { warned: false }
     },
     { new: true }
 );
 
-// 🎯 تحقق من الإنجاز اليومي
-if (u.todayMessages >= required && !u._claimedToday) {
-
-    await UserLevel.updateOne(
-        { guildId: msg.guild.id, userId: msg.author.id },
-        { $set: { _claimedToday: true } }
-    );
+// 🎯 إذا حقق شرط اليوم (مرة واحدة فقط)
+if (u.todayMessages === required) {
 
     const channel = msg.guild.channels.cache.get(strkConf.streakChannel) || msg.channel;
 
     const embed = new EmbedBuilder()
-        .setTitle("🔥 ستريك اليوم مكتمل!")
+        .setTitle("🔥 يوم ستريك مكتمل!")
         .setDescription(`تم تسجيل يوم جديد في الستريك!`)
         .addFields(
-            { name: "🔥 الستريك الحالي", value: `${u.streakCount + 1}`, inline: true },
+            { name: "🔥 عدد الأيام", value: `${u.streakCount + 1}`, inline: true },
             { name: "💬 رسائل اليوم", value: `${u.todayMessages}`, inline: true }
         )
         .setColor("#ffaa00")
