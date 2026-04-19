@@ -448,22 +448,23 @@ app.get('/ping', (req, res) => {
   res.send('I am alive!');
 });
 
-app.post('/save/:guildId/streak', async (req, res) => {
-    const { messageTarget, logChannel, allowedRoles } = req.body;
+app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
+    const b = req.body;
 
     await GuildConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         {
             $set: {
-                "streak.messageTarget": Number(messageTarget),
-                "streak.logChannel": logChannel,
-                "streak.allowedRoles": allowedRoles
+                "streak.enabled": b.enabled === 'on',
+                "streak.channelId": b.channelId,
+                "streak.requiredMessages": Number(b.requiredMessages),
+                "streak.allowedRole": b.allowedRole || null
             }
         },
         { upsert: true }
     );
 
-    res.redirect(`/manage/${req.params.guildId}/streak`);
+    res.redirect(`/manage/${req.params.guildId}/streaks`);
 });
 
 app.post('/reset-all-streaks/:guildId', checkAuth, async (req, res) => {
