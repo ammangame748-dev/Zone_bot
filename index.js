@@ -1636,90 +1636,101 @@ client.on('guildMemberAdd', async (member) => {
                     .setDescription(`**العضو:** ${member.user.tag}\n**الأيدي:** ${member.id}`)
                     .setTimestamp();
        
-
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
     const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
     if (!config) return;
 
-    // 🎫 فتح تكت من زر أو منيو
-    if (interaction.customId === 'open_ticket_btn' || interaction.customId === 'ticket_menu') {
-
+    // 1️⃣ فتح التذكرة (من المنيو أو أزرار البانل الأساسي)
+    if (interaction.customId.startsWith('ticket_btn_') || interaction.customId === 'ticket_menu') {
         let type = "Support";
-
-        if (interaction.isButton()) {
-            type = "Support";
-        }
-
         if (interaction.isStringSelectMenu()) {
-            type = interaction.values[0];
+            const optIndex = interaction.values[0].split('_')[2];
+            type = config.menuOptions[optIndex]?.label || "Support";
+        } else {
+            const btnIndex = interaction.customId.split('_')[2];
+            type = config.buttons[btnIndex]?.label || "Support";
         }
 
-        // منع تكت مفتوح مسبقاً
-        const existing = interaction.guild.channels.cache.find(c =>
-            c.name === `ticket-${interaction.user.id}`
-        );
+        const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.id}`);
+        if (existing) return interaction.reply({ content: "❌ لديك تذكرة مفتوحة بالفعل!", ephemeral: true });
 
-        if (existing) {
-            return interaction.reply({ content: "❌ عندك تكت مفتوح بالفعل!", ephemeral: true });
-        }
-
-        // إنشاء روم التكت
         const channel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.id}`,
-            type: 0,
+            type: ChannelType.GuildText,
             permissionOverwrites: [
-                {
-                    id: interaction.guild.id,
-                    deny: ['ViewChannel']
-                },
-                {
-                    id: interaction.user.id,
-                    allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory']
-                },
-                {
-                    id: config.adminRole,
-                    allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory']
-                }
+                { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
+                { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
             ]
         });
 
-        // رسالة داخل التكت
         const embed = new EmbedBuilder()
-            .setTitle("🎫 Ticket Opened")
-            .setDescription(`مرحباً ${interaction.user}\nنوع التكت: **${type}**`)
+            .setTitle("🎫 تذكرة جديدة")
+            .setDescription(`مرحباً ${interaction.user}\nنوع التذكرة: **${type}**\nيرجى انتظار الإدارة.`)
             .setColor("Blue");
 
+        // الأزرار الجديدة داخل التذكرة
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('close_ticket')
-                .setLabel('إغلاق 🔒')
-                .setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام 🙋‍♂️').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('call_member').setLabel('استدعاء العضو 🔊').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('delete_ticket').setLabel('حذف التذكرة 🗑️').setStyle(ButtonStyle.Danger)
         );
 
         await channel.send({
-            content: `<@${interaction.user.id}> | <@&${config.adminRole}>`,
+            content: `${interaction.user} | <@&${config.adminRole}>`,
             embeds: [embed],
             components: [row]
         });
 
-        return interaction.reply({
-            content: `✅ تم فتح التكت: ${channel}`,
-            ephemeral: true
+        return interaction.reply({ content: `✅ تم فتح تذكرتك: ${channel}`, ephemeral: true });
+    }
+
+    // 2️⃣ زر استلام التذكرة (Claim)
+    if (interaction.customId === 'claim_ticket') {
+        if (!interaction.member.roles.cache.has(config.adminRole) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: "❌ هذا الزر مخصص للإدارة فقط!", ephemeral: true });
+        }
+
+        const userId = interaction.channel.name.split('-')[1];
+        const embed = new EmbedBuilder()
+            .setDescription(`✅ تم استلام التذكرة بواسطة: ${interaction.user}`)
+            .setColor("Green");
+
+        // تعطيل زر الاستلام بعد الضغط
+        const disabledRow = ActionRowBuilder.from(interaction.message.components[0]);
+        disabledRow.components[0].setDisabled(true);
+
+        await interaction.update({ components: [disabledRow] });
+        await interaction.channel.send({ 
+            content: `👤 صاحب التذكرة: <@${userId}>\n👮 الإداري المستلم: ${interaction.user}`,
+            embeds: [embed] 
         });
     }
 
-    // 🔒 إغلاق التكت
-    if (interaction.customId === 'close_ticket') {
-        if (!interaction.member.permissions.has('Administrator')) {
-            return interaction.reply({ content: "❌ فقط الإدارة!", ephemeral: true });
+    // 3️⃣ زر استدعاء العضو (Call Member)
+    if (interaction.customId === 'call_member') {
+        if (!interaction.member.roles.cache.has(config.adminRole) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: "❌ للإدارة فقط!", ephemeral: true });
         }
 
-        await interaction.reply("🔒 سيتم إغلاق التكت...");
-        setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
+        const userId = interaction.channel.name.split('-')[1];
+        await interaction.reply({ content: `🔔 تم إرسال تنبيه للعضو <@${userId}>`, ephemeral: true });
+        await interaction.channel.send({ content: `🔊 <@${userId}>، الإدارة تطلب تواجدك في التذكرة الآن.` });
+    }
+
+    // 4️⃣ زر حذف التذكرة (Delete)
+    if (interaction.customId === 'delete_ticket') {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) && !interaction.member.roles.cache.has(config.adminRole)) {
+            return interaction.reply({ content: "❌ لا تملك صلاحية حذف التذكرة!", ephemeral: true });
+        }
+
+        await interaction.reply("⚠️ سيتم حذف التذكرة خلال 5 ثوانٍ...");
+        setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
     }
 });
+
 const menu = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
         .setCustomId('ticket_menu')
