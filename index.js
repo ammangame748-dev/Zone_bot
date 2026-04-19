@@ -1724,7 +1724,8 @@ client.on('interactionCreate', async (interaction) => {
 
     // تنفيذ عمليات المنيو (إضافة/إزالة عضو)
     if (interaction.customId === 'manage_members') {
-        const targetUser = interaction.users.first();
+       const targetUser = interaction.values[0];
+const member = await interaction.guild.members.fetch(targetUser);
         const hasAccess = interaction.channel.permissionsFor(targetUser).has(PermissionFlagsBits.ViewChannel);
 
         if (hasAccess) {
