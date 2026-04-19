@@ -1914,163 +1914,24 @@ client.on('interactionCreate', async (interaction) => {
         const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
         if (!config) return;
 
-        // ====== ضغط زر ======
-        if (interaction.isButton()) {
-            if (!interaction.customId.startsWith('ticket_btn_')) return;
+        // =========================
+        // 🎫 فتح التكت (زر أو منيو)
+        // =========================
+        const openTicket = async (type = "عام") => {
+
+            // ❌ منع فتح أكثر من تكت
+            const existing = interaction.guild.channels.cache.find(c =>
+                c.name === `ticket-${interaction.user.id}`
+            );
+            if (existing) {
+                return interaction.reply({
+                    content: `❌ عندك تكت مفتوح بالفعل: ${existing}`,
+                    ephemeral: true
+                });
+            }
 
             const channel = await interaction.guild.channels.create({
-    name: `ticket-${interaction.user.username}`,
-    type: ChannelType.GuildText,
-    permissionOverwrites: [
-        {
-            id: interaction.guild.id,
-            deny: [PermissionFlagsBits.ViewChannel],
-        },
-        {
-            id: interaction.user.id,
-            allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ReadMessageHistory
-            ],
-        },
-        {
-            id: config.adminRole,
-            allow: [
-                PermissionFlagsBits.ViewChannel,
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.ReadMessageHistory
-            ],
-        }
-    ]
-});
-
-    await channel.send({
-    content: `🎫 هذا هو تذكرتك ${interaction.user}، اشرح مشكلتك هنا 👇`,
-    embeds: [
-        new EmbedBuilder()
-            .setTitle("🎫 Ticket System")
-            .setDescription("اكتب مشكلتك وسيتم الرد عليك قريباً")
-            .setColor("Green")
-    ],
-    components: [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('claim_ticket')
-                .setLabel('📌 استلام')
-                .setStyle(ButtonStyle.Secondary),
-
-            new ButtonBuilder()
-                .setCustomId('close_ticket')
-                .setLabel('🔒 إغلاق')
-                .setStyle(ButtonStyle.Danger)
-        )
-    ]
-});
-// =====================
-// 🎛️ Ticket Buttons
-// =====================
-if (interaction.isButton()) {
-
-    const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
-    if (!ticket) return;
-
-    // 📌 استلام التكت
-    if (interaction.customId === 'claim_ticket') {
-        ticket.claimedBy = interaction.user.id;
-        await ticket.save();
-
-        return interaction.reply({
-            content: `📌 تم استلام التكت بواسطة ${interaction.user}`,
-            ephemeral: false
-        });
-    }
-
-    // 🔒 إغلاق التكت
-    if (interaction.customId === 'close_ticket') {
-        await interaction.reply({ content: "🔒 جاري إغلاق التكت...", ephemeral: true });
-
-        ticket.closedAt = new Date();
-        ticket.closedBy = interaction.user.id;
-        await ticket.save();
-
-        // ===== transcript =====
-        const messages = await interaction.channel.messages.fetch({ limit: 100 });
-        const sorted = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-
-        let transcript = "";
-        sorted.forEach(m => {
-            transcript += `[${m.author.tag}]: ${m.content}\n`;
-        });
-
-        // ===== DM =====
-        const user = await interaction.guild.members.fetch(ticket.ownerId).catch(() => null);
-
-        if (user) {
-            user.send({
-                embeds: [
-                    new EmbedBuilder()
-                        .setTitle("📁 تم إغلاق التكت")
-                        .setColor("Red")
-                        .addFields(
-                            { name: "👤 صاحب التكت", value: `<@${ticket.ownerId}>` },
-                            { name: "📌 المستلم", value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : "لم يتم الاستلام" },
-                            { name: "🔒 أغلق بواسطة", value: `<@${interaction.user.id}>` },
-                            { name: "🕒 وقت الفتح", value: `<t:${Math.floor(ticket.openedAt / 1000)}:F>` },
-                            { name: "🕒 وقت الإغلاق", value: `<t:${Math.floor(Date.now() / 1000)}:F>` }
-                        )
-                ]
-            }).catch(() => {});
-        }
-
-        // إرسال transcript كملف
-        const fs = require('fs');
-        const filePath = `./transcript-${interaction.channel.id}.txt`;
-        fs.writeFileSync(filePath, transcript);
-
-        if (user) {
-            await user.send({
-                files: [filePath]
-            }).catch(() => {});
-        }
-
-        setTimeout(() => {
-            interaction.channel.delete().catch(() => {});
-            fs.unlinkSync(filePath);
-        }, 5000);
-    }
-}
-          await channel.send({
-    content: `🎫 مرحباً ${interaction.user}`,
-    embeds: [
-        new EmbedBuilder()
-            .setTitle("📩 Ticket Opened")
-            .setDescription("يرجى شرح مشكلتك، وسيتم الرد عليك قريباً.")
-            .setColor("Green")
-    ],
-    components: [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('claim_ticket')
-                .setLabel('📌 استلام')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId('close_ticket')
-                .setLabel('🔒 إغلاق')
-                .setStyle(ButtonStyle.Danger)
-        )
-    ]
-});
-        }
-
-        // ====== اختيار من المنيو ======
-        if (interaction.isStringSelectMenu()) {
-            if (interaction.customId !== 'ticket_menu') return;
-
-            await interaction.reply({ content: "⏳ جاري فتح التكت...", ephemeral: true });
-
-            const channel = await interaction.guild.channels.create({
-                name: `ticket-${interaction.user.username}`,
+                name: `ticket-${interaction.user.id}`,
                 type: ChannelType.GuildText,
                 permissionOverwrites: [
                     {
@@ -2079,27 +1940,111 @@ if (interaction.isButton()) {
                     },
                     {
                         id: interaction.user.id,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        allow: [
+                            PermissionFlagsBits.ViewChannel,
+                            PermissionFlagsBits.SendMessages,
+                            PermissionFlagsBits.ReadMessageHistory
+                        ],
                     },
                     {
                         id: config.adminRole,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+                        allow: [
+                            PermissionFlagsBits.ViewChannel,
+                            PermissionFlagsBits.SendMessages,
+                            PermissionFlagsBits.ReadMessageHistory
+                        ],
                     }
                 ]
             });
 
-            channel.send(`📩 نوع التكت: ${interaction.values[0]}\n👤 ${interaction.user}`);
+            await TicketData.create({
+                guildId: interaction.guild.id,
+                channelId: channel.id,
+                ownerId: interaction.user.id,
+                openedAt: new Date()
+            });
+
+            // 💬 رسالة داخل التكت
+            await channel.send({
+                content: `🎫 أهلاً ${interaction.user} هذا هو تذكرتك\n📌 النوع: **${type}**`,
+                embeds: [
+                    new EmbedBuilder()
+                        .setTitle("🎫 Ticket System")
+                        .setDescription("اكتب مشكلتك هنا وسيتم الرد عليك.")
+                        .setColor("Green")
+                ],
+                components: [
+                    new ActionRowBuilder().addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('claim_ticket')
+                            .setLabel('📌 استلام')
+                            .setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder()
+                            .setCustomId('close_ticket')
+                            .setLabel('🔒 إغلاق')
+                            .setStyle(ButtonStyle.Danger)
+                    )
+                ]
+            });
+
+            return interaction.reply({
+                content: `✅ تم فتح تذكرتك: ${channel}`,
+                ephemeral: true
+            });
+        };
+
+        // =========================
+        // 🔘 زر فتح التكت
+        // =========================
+        if (interaction.isButton()) {
+            if (interaction.customId === 'open_ticket') {
+                return openTicket("عام");
+            }
+        }
+
+        // =========================
+        // 📋 منيو التكت
+        // =========================
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'ticket_menu') {
+                return openTicket(interaction.values[0]);
+            }
+        }
+
+        // =========================
+        // 🎛️ أزرار داخل التكت
+        // =========================
+        if (interaction.isButton()) {
+
+            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+            if (!ticket) return;
+
+            // 📌 استلام
+            if (interaction.customId === 'claim_ticket') {
+                ticket.claimedBy = interaction.user.id;
+                await ticket.save();
+
+                return interaction.reply({
+                    content: `📌 تم استلام التكت بواسطة ${interaction.user}`
+                });
+            }
+
+            // 🔒 إغلاق
+            if (interaction.customId === 'close_ticket') {
+
+                await interaction.reply({ content: "🔒 يتم الإغلاق..." });
+
+                await TicketData.deleteOne({ channelId: interaction.channel.id });
+
+                setTimeout(() => {
+                    interaction.channel.delete().catch(() => {});
+                }, 3000);
+            }
         }
 
     } catch (err) {
         console.error("Ticket Error:", err);
     }
-    await TicketData.create({
-    guildId: interaction.guild.id,
-    channelId: channel.id,
-    ownerId: interaction.user.id,
-    openedAt: new Date()
-});
 });
 
 app.listen(3000, () => {
