@@ -1546,12 +1546,40 @@ logCh.send({ content: `${msg.author}`, embeds: [embed] });
         await u.save();
     }
 
-    // 7. أوامر الستريك
-    if (msg.content.startsWith('!ستريك')) {
-        const target = msg.mentions.members.first() || msg.member;
-        const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
-        msg.reply(`🔥 ستريك **${target.user.username}** الحالي هو: **${userData?.streakCount || 0}** يوم.`);
-    }
+ // --- [ أمر !ستريكي و !ستريك المطور بالإيمباد ] ---
+if (msg.content.startsWith('!ستريك')) {
+    const target = msg.mentions.members.first() || msg.member;
+    const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
+    
+    if (!userData) return msg.reply("❌ هذا العضو ليس لديه سجلات تفاعل بعد.");
+
+    const streakCount = userData.streakCount || 0;
+    const dailyMsgs = userData.dailyMsgs || 0;
+    const lastActive = userData.lastMessageDate || new Date();
+
+    // حساب الوقت المتبقي (24 ساعة من آخر رسالة)
+    const expiresAt = Math.floor((new Date(lastActive).getTime() + 86400000) / 1000);
+
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: `إحصائيات الستريك لـ ${target.user.username}`, iconURL: target.user.displayAvatarURL() })
+        .setDescription(`
+🔥 **عدد الأيام**
+${streakCount} يوم
+
+💬 **رسائل اليوم**
+${dailyMsgs} رسالة
+
+⌛ **ينتهي خلال**
+<t:${expiresAt}:R>
+        `)
+        .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
+        .setColor('#FFAC33') // لون برتقالي ناري
+        .setFooter({ text: 'Zone System • استمر ولا تقطع | !' })
+        .setTimestamp();
+
+    msg.reply({ embeds: [embed] });
+}
+
 
     // 8. 🤖 الرد الآلي
     const r = s.autoReply?.find(x => x.trigger && msg.content.toLowerCase() === x.trigger.toLowerCase());
