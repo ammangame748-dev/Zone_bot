@@ -329,34 +329,53 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
 app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
     try {
         const { targetChannel, embedTitle, embedDesc, embedColor } = req.body;
+        
+        // 1. جلب السيرفر والتأكد من وجوده في الكاش
         const guild = client.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).send("❌ السيرفر غير موجود في ذاكرة البوت حالياً.");
         
-        if (!guild) return res.status(404).send("السيرفر غير موجود");
-        
-        const channel = guild.channels.cache.get(targetChannel);
-        if (!channel) return res.send("⚠️ القناة غير موجودة أو البوت لا يملك صلاحية رؤيتها");
+        // 2. جلب القناة (محاولة الجلب من الكاش أو Fetch)
+        let channel = guild.channels.cache.get(targetChannel);
+        if (!channel) {
+            channel = await guild.channels.fetch(targetChannel).catch(() => null);
+        }
 
-        // بناء الإيمباد بشكل صحيح
+        if (!channel) return res.send("⚠️ لم يتم العثور على القناة، تأكد من اختيار قناة نصية.");
+
+        // 3. بناء الإيمباد مع حماية للـ Footer
         const customEmbed = new EmbedBuilder()
-            .setTitle(embedTitle || "بدون عنوان") // حماية في حال كان العنوان فارغ
-            .setDescription(embedDesc || "لا يوجد محتوى") // حماية في حال كان الوصف فارغ
+            .setTitle(embedTitle || "Zone System") 
+            .setDescription(embedDesc || "لم يتم تحديد محتوى")
             .setColor(embedColor || '#5865f2')
-            .setTimestamp()
-            .setFooter({ 
-                text: `Zone System • مرسل بواسطة: ${req.user.username}`, 
-                iconURL: `https://discordapp.com{req.user.id}/${req.user.avatar}.png` 
-            });
+            .setTimestamp();
 
+        // حماية: إذا كانت بيانات المستخدم موجودة نضعها في الفوتر، وإذا لا نضع نصاً فقط
+        if (req.user) {
+            const avatar = req.user.avatar 
+                ? `https://discordapp.com{req.user.id}/${req.user.avatar}.png`
+                : 'https://discordapp.com';
+                
+            customEmbed.setFooter({ 
+                text: `أُرسل بواسطة: ${req.user.username}`, 
+                iconURL: avatar 
+            });
+        } else {
+            customEmbed.setFooter({ text: `Zone System Embed Sender` });
+        }
+
+        // 4. الإرسال الفعلي
         await channel.send({ embeds: [customEmbed] });
         
-        // يرجعه لصفحة الستريك بعد الإرسال بنجاح
+        // النجاح: يرجعه لصفحة الستريك
         res.redirect(`/manage/${req.params.guildId}/streaks`);
 
     } catch (err) {
-        console.error("❌ Embed Send Error:", err);
-        res.status(500).send("خطأ في إرسال الإيمباد: تأكد من صلاحيات البوت في القناة");
+        console.error("❌ الخطأ الفعلي هو:", err);
+        // عرض الخطأ التقني للمستخدم لمعرفة السبب الحقيقي
+        res.status(500).send(`حدث خطأ تقني: ${err.message}`);
     }
 });
+
 
 
 // --- [ رابط حفظ الإعدادات ] ---
