@@ -1413,7 +1413,17 @@ client.on('messageCreate', async (msg) => {
     // 1. التحقق الأساسي
     if (!msg.guild || msg.author.bot) return;
 
-    // 2. تسجيل إحصائيات الرسائل
+    // 2. جلب إعدادات السيرفر (s)
+    const s = await GuildConfig.findOne({ guildId: msg.guild.id });
+    if (!s) return;
+
+    // 3. جلب بيانات العضو (u)
+    let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
+    if (!u) {
+        u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id });
+    }
+
+    // 4. تسجيل إحصائيات الرسائل
     await Stats.findOneAndUpdate(
         { guildId: msg.guild.id },
         { 
@@ -1426,24 +1436,42 @@ client.on('messageCreate', async (msg) => {
             } 
         },
         { upsert: true }
-    ).catch(e => console.log("Stats Save Error:", e));
+    ).catch(() => {});
 
-    // 3. جلب بيانات العضو (هنا التعديل المهم: تعريف u قبل استخدامه)
-    let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
-    if (!u) {
-        u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id });
-    }
+    // 5. فحص الحماية
+    const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
 
-    // 4. جلب إعدادات الستريك
+    if (!hasBypass) {
+        // --- [ نظام الإيموجي الممنوع ] ---
+        if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
+            const forbiddenEmojis = s.security.badEmojis.split(',').map(e => e.trim());
+            const hasBadEmoji = forbiddenEmojis.some(emoji => emoji !== "" && msg.content.includes(emoji));
+
+            if (hasBadEmoji) {
+                await msg.delete().catch(() => {});
+                try {
+                    await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
+                    return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
+                } catch (e) { console.log("خطأ في التايم آوت"); }
+                return;
+            }
+        }
+
+        // --- [ نظام منع الروابط ] ---
+        if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
+            await msg.delete().catch(() => {});
+            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
+        }
+    } // إغلاق شرط hasBypass
+
+    // 6. نظام الستريك المطور
     const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
-
-    // 5. منطق الستريك (الزيادة والعد)
     if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
         const now = new Date();
         const isSameDay = u.lastMessageDate && u.lastMessageDate.toDateString() === now.toDateString();
 
         if (!isSameDay) {
-            u.dailyMsgs = 0; // يوم جديد
+            u.dailyMsgs = 0;
             u.warned = false;
         }
 
@@ -1460,8 +1488,7 @@ client.on('messageCreate', async (msg) => {
                         .setDescription(`كفو يا بطل! أكملت هدفك اليومي بنجاح.`)
                         .addFields(
                             { name: '👤 العضو', value: `${msg.author}`, inline: true },
-                            { name: '📅 أيام الستريك', value: `${u.streakCount} يوم`, inline: true },
-                            { name: '💬 رسائل اليوم', value: `${u.dailyMsgs}`, inline: true }
+                            { name: '📅 أيام الستريك', value: `${u.streakCount} يوم`, inline: true }
                         )
                         .setColor('Orange').setTimestamp();
                     logCh.send({ embeds: [embed] });
@@ -1471,68 +1498,19 @@ client.on('messageCreate', async (msg) => {
         await u.save();
     }
 
-    // 6. أوامر الستريك
+    // 7. أوامر الستريك
     if (msg.content.startsWith('!ستريك')) {
         const target = msg.mentions.members.first() || msg.member;
         const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
-        const streak = userData ? userData.streakCount : 0;
-        const msgs = userData ? userData.dailyMsgs : 0;
-
-        msg.reply(`🔥 ستريك ${target.user.username} الحالي هو: **${streak}** يوم (رسائل اليوم: ${msgs})`);
+        msg.reply(`🔥 ستريك **${target.user.username}** الحالي هو: **${userData?.streakCount || 0}** يوم.`);
     }
 
-
-    // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
-const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
-
-    if (!hasBypass) {
-        // --- [ نظام الكلمات الممنوعة ] ---
-        if (s.security?.badWords && s.security.badWords.trim().length > 0) {
-            const forbidden = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
-            const hasBadWord = forbidden.some(word => word !== "" && msg.content.toLowerCase().includes(word));
-            
-            if (hasBadWord) {
-                await msg.delete().catch(() => {});
-                try {
-                    await msg.member.timeout(5 * 60 * 1000, 'استخدام كلمات ممنوعة');
-                    return msg.channel.send(`⚠️ ${msg.author}، ممنوع استخدام الكلمات الممنوعة!`);
-                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
-                return;
-            }
-        }
-
-        // --- [ نظام الإيموجي الممنوع ] ---
-        if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
-            const forbiddenEmojis = s.security.badEmojis.split(',').map(e => e.trim());
-            const hasBadEmoji = forbiddenEmojis.some(emoji => emoji !== "" && msg.content.includes(emoji));
-
-            if (hasBadEmoji) {
-                await msg.delete().catch(() => {});
-                try {
-                    await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
-                    return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
-                } catch (e) { console.log("خطأ في صلاحيات التايم آوت"); }
-                return;
-            }
-        }
-
-        // --- [ نظام منع الروابط ] ---
-        if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
-            await msg.delete().catch(() => {});
-            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
-        }
-    }
-
-    // 4. 🤖 الرد الآلي (Auto Reply)
+    // 8. 🤖 الرد الآلي
     const r = s.autoReply?.find(x => x.trigger && msg.content.toLowerCase() === x.trigger.toLowerCase());
     if (r) return msg.reply(r.reply).catch(() => {});
 
-    // 5. 🏆 نظام المستويات (Levels)
+    // 9. 🏆 نظام المستويات (Levels)
     if (s.levels?.enabled) {
-        let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
-        if (!u) {
-            u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id, xp: 0, level: 1, msgCount: 0 });
-        }
         u.xp += s.levels.xpPerMessage || 10;
         u.msgCount++;
         if (u.xp >= u.level * u.level * 100) {
@@ -1542,6 +1520,7 @@ const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.i
         }
         await u.save();
     }
+
  
     // 6. 🎫 أمر إرسال بانل التذاكر (!setup)
     if (msg.content === '!setup' && msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
