@@ -263,7 +263,6 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
         const g = client.guilds.cache.get(req.params.guildId);
         if (!g) return res.redirect('/dashboard'); 
 
-        // جلب الإعدادات من الموديل الجديد
         let s = await StreakConfig.findOne({ guildId: g.id }) || {};
         
         const roles = g.roles.cache.filter(r => r.name !== "@everyone");
@@ -276,13 +275,13 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
                 <label>🎯 عدد الرسائل المطلوبة يومياً:</label>
                 <input type="number" name="reqMsgs" value="${s.requiredMessages || 60}">
 
-                <label>🎭 الرتبة المسموح لها بالستريك (يعني بس الي معهم هاي الرتبة بحسبلهم):</label>
+                <label>🎭 الرتبة المسموح لها بالستريك:</label>
                 <select name="streakRole">
                     <option value="">-- اختر الرتبة --</option>
                     ${roles.map(r => `<option value="${r.id}" ${s.streakRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
                 </select>
 
-                <label>📍 روم إشعارات الستريك (الايمباد المرتب):</label>
+                <label>📍 روم إشعارات الستريك:</label>
                 <select name="streakChannel">
                     <option value="">-- اختر الروم --</option>
                     ${channels.map(c => `<option value="${c.id}" ${s.streakChannel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
@@ -292,9 +291,31 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
             </form>
         </div>
 
+        <!-- 🖼️ هاد هو مرسل الايمباد المخصص -->
+        <div class="card" style="margin-top: 30px; border-top: 2px solid var(--accent);">
+            <h3>🖼️ مرسل إيمباد (Embed Sender)</h3>
+            <form method="POST" action="/send-custom-embed/${g.id}">
+                <label>📍 اختر الروم:</label>
+                <select name="targetChannel" required>
+                    ${channels.map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+                </select>
+
+                <label>📝 عنوان الإيمباد (Title):</label>
+                <input type="text" name="embedTitle" placeholder="اكتب العنوان هنا..." required>
+
+                <label>📄 محتوى الإيمباد (Description):</label>
+                <textarea name="embedDesc" rows="4" placeholder="اكتب الوصف هنا..." required></textarea>
+
+                <label>🎨 لون الإيمباد:</label>
+                <input type="color" name="embedColor" value="#5865f2">
+
+                <button class="btn-save" style="background: var(--accent); margin-top: 15px;">🚀 إرسال الإيمباد الآن</button>
+            </form>
+        </div>
+
         <div class="card" style="border: 1px solid var(--s); margin-top: 20px;">
             <h3 style="color: var(--s);">⚠️ منطقة الخطر</h3>
-            <form method="POST" action="/reset-streaks/${g.id}" onsubmit="return confirm('متأكد؟ رح يصفر ستريك الكل بالسيرفر!')">
+            <form method="POST" action="/reset-streaks/${g.id}" onsubmit="return confirm('متأكد؟')">
                 <button class="btn-save" style="background: var(--s);">🔥 تصفير ستريك الجميع</button>
             </form>
         </div>`;
@@ -302,6 +323,31 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
         res.send(ui(g, 'streaks', content));
     } catch (err) {
         res.status(500).send("خطأ في تحميل صفحة الستريك");
+    }
+});
+
+app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
+    try {
+        const { targetChannel, embedTitle, embedDesc, embedColor } = req.body;
+        const guild = client.guilds.cache.get(req.params.guildId);
+        const channel = guild.channels.cache.get(targetChannel);
+
+        if (channel) {
+            const customEmbed = new EmbedBuilder()
+                .setTitle(embedTitle)
+                .setDescription(embedDesc)
+                .setColor(embedColor || '#5865f2')
+                .setTimestamp()
+                .setFooter({ text: `مرسل بواسطة: ${req.user.username}`, iconURL: `https://discordapp.com{req.user.id}/${req.user.avatar}.png` });
+
+            await channel.send({ embeds: [customEmbed] });
+            res.redirect(`/manage/${req.params.guildId}/streaks?success=true`);
+        } else {
+            res.send("القناة غير موجودة!");
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("خطأ في إرسال الإيمباد");
     }
 });
 
