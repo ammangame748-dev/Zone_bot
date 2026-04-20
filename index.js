@@ -1483,15 +1483,17 @@ client.on('messageCreate', async (msg) => {
                 u.streakCount++;
                 const logCh = msg.guild.channels.cache.get(sConf.streakChannel);
                 if (logCh) {
-                    const embed = new EmbedBuilder()
-                        .setTitle('🔥 ستريك جديد!')
-                        .setDescription(`كفو يا بطل! أكملت هدفك اليومي بنجاح.`)
-                        .addFields(
-                            { name: '👤 العضو', value: `${msg.author}`, inline: true },
-                            { name: '📅 أيام الستريك', value: `${u.streakCount} يوم`, inline: true }
-                        )
-                        .setColor('Orange').setTimestamp();
-                    logCh.send({ embeds: [embed] });
+                   // البحث عن السطر اللي بيبدأ بـ const embed = new EmbedBuilder() وتغييره لهذا:
+const embed = new EmbedBuilder()
+    .setAuthor({ name: `إحصائيات الستريك لـ ${msg.author.username}`, iconURL: msg.author.displayAvatarURL() })
+    .setDescription(`🔥 **عدد الأيام**\n${u.streakCount} يوم\n\n💬 **رسائل اليوم**\n${u.dailyMsgs} رسالة\n\n⌛ **ينتهي خلال**\n<t:${Math.floor((new Date(u.lastMessageDate).getTime() + 86400000) / 1000)}:R>`)
+    .setThumbnail(msg.author.displayAvatarURL({ dynamic: true }))
+    .setColor('#FFAC33') // لون برتقالي نار
+    .setFooter({ text: 'Zone System • استمر ولا تقطع | !' })
+    .setTimestamp();
+
+logCh.send({ content: `${msg.author}`, embeds: [embed] });
+
                 }
             }
         }
