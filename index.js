@@ -1399,6 +1399,7 @@ for (let i = 0; i < 4; i++) {
         };
 
         // تصحيح مسارات الصور المرفوعة
+        
         if (req.files?.topImage?.[0]) updateData.topImagePath = req.files.topImage[0].path;
         if (req.files?.bottomImage?.[0]) updateData.bottomImagePath = req.files.bottomImage[0].path;
 
@@ -1414,7 +1415,7 @@ for (let i = 0; i < 4; i++) {
                 const embed = new EmbedBuilder()
                     .setTitle(config.title || "TICKETS")
                     .setDescription(config.description || "اضغط للفتح")
-                    .setColor(config.color || "#5865F2");
+                    .setColor(parseInt((config.color || "#5865F2").replace("#", ""), 16))
 
                 // إرفاق الصور
                 if (config.topImagePath && fs.existsSync(config.topImagePath)) {
@@ -1439,13 +1440,18 @@ for (let i = 0; i < 4; i++) {
                             .setLabel(btn.label)
                             .setStyle(ButtonStyle.Primary);
                         
-                        if (btn.emoji && btn.emoji.trim() !== "") {
-                            const em = btn.emoji.trim();
-                            try {
-                                button.setEmoji(/^\d+$/.test(em) ? { id: em } : em);
-                            } catch (e) { console.log("Emoji Error on Button", i); }
-                        }
-                        btnRow.addComponents(button);
+                       if (btn.emoji && btn.emoji.trim() !== "") {
+    const em = btn.emoji.trim();
+    try {
+        if (/^\d+$/.test(em)) {
+            button.setEmoji({ id: em });
+        } else if (/^<a?:\w+:\d+>$/.test(em)) {
+            button.setEmoji(em);
+        }
+    } catch (e) {
+        console.log("Emoji Error:", e.message);
+    }
+}
                     });
                     if (btnRow.components.length > 0) components.push(btnRow);
                 }
@@ -2339,6 +2345,12 @@ client.on('interactionCreate', async (interaction) => {
         }
 
     } catch (err) { console.error(err); }
+    console.log("Sending embed...");
+await channel.send({ 
+    embeds: [embed], 
+    components, 
+    files 
+});
 
 });
 
