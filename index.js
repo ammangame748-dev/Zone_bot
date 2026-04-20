@@ -1502,7 +1502,8 @@ client.on('messageCreate', async (msg) => {
 if (!strkConf) return;
 
 const now = new Date();
-const today = new Date(now.toDateString());
+const today = new Date();
+today.setHours(0,0,0,0);
 const required = strkConf.requiredMessages || 50;
 
 // جلب المستخدم
@@ -2298,48 +2299,10 @@ client.on('interactionCreate', async (interaction) => {
         }
 
     } catch (err) { console.error(err); }
-const u = await UserLevel.findOneAndUpdate(
-    { guildId: msg.guild.id, userId: msg.author.id },
-    { $inc: { todayMessages: 1 } },
-    { new: true, upsert: true }
-);
 
-const required = strkConf.requiredMessages || 50;
-
-if (!u.dayCompleted && u.todayMessages >= required) {
-
-    await UserLevel.updateOne(
-        { guildId: msg.guild.id, userId: msg.author.id },
-        {
-            $inc: { streakCount: 1 },
-            $set: {
-                dayCompleted: true,
-                lastActive: new Date()
-            }
-        }
-    );
-
-    u.dayCompleted = true;
-
-    const channel = msg.guild.channels.cache.get(strkConf.streakChannel);
-
-    channel?.send({
-        embeds: [
-            new EmbedBuilder()
-                .setTitle("🔥 ستريك جديد!")
-                .setDescription(`<@${msg.author.id}> كمل يوم الستريك`)
-                .addFields(
-                    { name: "📅 الستريك", value: `${u.streakCount + 1}`, inline: true },
-                    { name: "💬 الرسائل", value: `${u.todayMessages}`, inline: true }
-                )
-                .setColor("Gold")
-        ]
-    });
-}
 });
 
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
 });
-client.login(process.env.TOKEN);
