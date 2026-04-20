@@ -1483,6 +1483,7 @@ client.on('messageCreate', async (msg) => {
 
 
     // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
+const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
 
     if (!hasBypass) {
         // --- [ نظام الكلمات الممنوعة ] ---
