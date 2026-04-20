@@ -330,26 +330,34 @@ app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
     try {
         const { targetChannel, embedTitle, embedDesc, embedColor } = req.body;
         const guild = client.guilds.cache.get(req.params.guildId);
+        
+        if (!guild) return res.status(404).send("السيرفر غير موجود");
+        
         const channel = guild.channels.cache.get(targetChannel);
+        if (!channel) return res.send("⚠️ القناة غير موجودة أو البوت لا يملك صلاحية رؤيتها");
 
-        if (channel) {
-            const customEmbed = new EmbedBuilder()
-                .setTitle(embedTitle)
-                .setDescription(embedDesc)
-                .setColor(embedColor || '#5865f2')
-                .setTimestamp()
-                .setFooter({ text: `مرسل بواسطة: ${req.user.username}`, iconURL: `https://discordapp.com{req.user.id}/${req.user.avatar}.png` });
+        // بناء الإيمباد بشكل صحيح
+        const customEmbed = new EmbedBuilder()
+            .setTitle(embedTitle || "بدون عنوان") // حماية في حال كان العنوان فارغ
+            .setDescription(embedDesc || "لا يوجد محتوى") // حماية في حال كان الوصف فارغ
+            .setColor(embedColor || '#5865f2')
+            .setTimestamp()
+            .setFooter({ 
+                text: `Zone System • مرسل بواسطة: ${req.user.username}`, 
+                iconURL: `https://discordapp.com{req.user.id}/${req.user.avatar}.png` 
+            });
 
-            await channel.send({ embeds: [customEmbed] });
-            res.redirect(`/manage/${req.params.guildId}/streaks?success=true`);
-        } else {
-            res.send("القناة غير موجودة!");
-        }
+        await channel.send({ embeds: [customEmbed] });
+        
+        // يرجعه لصفحة الستريك بعد الإرسال بنجاح
+        res.redirect(`/manage/${req.params.guildId}/streaks`);
+
     } catch (err) {
-        console.error(err);
-        res.status(500).send("خطأ في إرسال الإيمباد");
+        console.error("❌ Embed Send Error:", err);
+        res.status(500).send("خطأ في إرسال الإيمباد: تأكد من صلاحيات البوت في القناة");
     }
 });
+
 
 // --- [ رابط حفظ الإعدادات ] ---
 app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
