@@ -1423,7 +1423,7 @@ for (let i = 0; i < 4; i++) {
                 const embed = new EmbedBuilder()
                     .setTitle(config.title || "TICKETS")
                     .setDescription(config.description || "اضغط للفتح")
-                    .setColor(parseInt((config.color || "#5865F2").replace("#", ""), 16))
+                    .setColor(config.color || "#5865F2")
 
                 // إرفاق الصور
                 if (config.topImagePath && fs.existsSync(config.topImagePath)) {
@@ -1460,6 +1460,8 @@ for (let i = 0; i < 4; i++) {
         console.log("Emoji Error:", e.message);
     }
 }
+    btnRow.addComponents(button);
+
                     });
                     if (btnRow.components.length > 0) components.push(btnRow);
                 }
