@@ -2294,198 +2294,191 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
 
 client.on('interactionCreate', async (interaction) => {
     try {
+
+        if (!interaction.guild) return;
+
         const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
         if (!config) return;
 
         // =========================
         // 🎫 فتح التكت
         // =========================
-        if (interaction.isButton() && interaction.customId === 'open_ticket' || (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu')) {
-            const type = interaction.values ? interaction.values[0] : "عام";
+        if (
+            (interaction.isButton() && interaction.customId === 'open_ticket') ||
+            (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu')
+        ) {
+            const type = interaction.isStringSelectMenu()
+                ? interaction.values[0]
+                : "عام";
+
             return openTicket(interaction, config, type);
         }
-if (interaction.isButton() && interaction.customId.startsWith('role_')) {
 
-    const roleId = interaction.customId.split('_')[1];
-    const role = interaction.guild.roles.cache.get(roleId);
-
-    if (!role) return interaction.reply({ content: "❌ الرتبة غير موجودة", ephemeral: true });
-
-    if (interaction.member.roles.cache.has(roleId)) {
-        await interaction.member.roles.remove(roleId);
-        return interaction.reply({ content: "❌ تم سحب الرتبة", ephemeral: true });
-    } else {
-        await interaction.member.roles.add(roleId);
-        return interaction.reply({ content: "✅ تم إعطاء الرتبة", ephemeral: true });
-    }
-}
         // =========================
-        // 🎛️ أزرار التحكم (داخل التكت)
+        // 🎭 الرتب (roles panel)
+        // =========================
+        if (interaction.isButton() && interaction.customId.startsWith('role_')) {
+            const roleId = interaction.customId.split('_')[1];
+            const role = interaction.guild.roles.cache.get(roleId);
+
+            if (!role) {
+                return interaction.reply({
+                    content: "❌ الرتبة غير موجودة",
+                    ephemeral: true
+                });
+            }
+
+            if (interaction.member.roles.cache.has(roleId)) {
+                await interaction.member.roles.remove(roleId);
+                return interaction.reply({
+                    content: "❌ تم سحب الرتبة",
+                    ephemeral: true
+                });
+            } else {
+                await interaction.member.roles.add(roleId);
+                return interaction.reply({
+                    content: "✅ تم إعطاء الرتبة",
+                    ephemeral: true
+                });
+            }
+        }
+
+        // =========================
+        // 🎛️ أزرار التكت
         // =========================
         if (interaction.isButton()) {
-            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+
+            const ticket = await TicketData.findOne({
+                channelId: interaction.channel.id
+            });
+
             if (!ticket) return;
 
             const isAdmin = interaction.member.roles.cache.has(config.adminRole);
 
-            // 📌 زر الاستلام (إداري فقط)
+            // 📌 استلام
             if (interaction.customId === 'claim_ticket') {
-                if (!isAdmin) return interaction.reply({ content: "❌ هذا الزر للإدارة فقط", ephemeral: true });
-                
+                if (!isAdmin)
+                    return interaction.reply({
+                        content: "❌ للإدارة فقط",
+                        ephemeral: true
+                    });
+
                 ticket.claimedBy = interaction.user.id;
                 await ticket.save();
 
                 return interaction.reply({
-                    content: `✅ تم استلام التكت بواسطة ${interaction.user}\n🔔 يا <@${ticket.ownerId}>، الإداري المسؤول معك الآن.`
+                    content: `📌 تم الاستلام بواسطة ${interaction.user}`
                 });
             }
 
-            // 📣 زر الاستدعاء (إداري فقط)
+            // 📣 استدعاء
             if (interaction.customId === 'summon_member') {
-                if (!isAdmin) return interaction.reply({ content: "❌ هذا الزر للإدارة فقط", ephemeral: true });
-                return interaction.channel.send({ content: `🔔 يا <@${ticket.ownerId}>، الإداري ${interaction.user} يستدعيك، يرجى الحضور!` });
+                if (!isAdmin)
+                    return interaction.reply({
+                        content: "❌ للإدارة فقط",
+                        ephemeral: true
+                    });
+
+                return interaction.channel.send(
+                    `📣 <@${ticket.ownerId}> الإداري ${interaction.user} يستدعيك`
+                );
             }
 
-            // 🔒 إغلاق وحذف التكت (إداري فقط)
+            // 🔒 إغلاق
             if (interaction.customId === 'close_ticket') {
-                if (!isAdmin) return interaction.reply({ content: "❌ هذا الزر للإدارة فقط", ephemeral: true });
+                if (!isAdmin)
+                    return interaction.reply({
+                        content: "❌ للإدارة فقط",
+                        ephemeral: true
+                    });
 
-                const owner = await client.users.fetch(ticket.ownerId).catch(() => null);
-                if (owner) {
-                    const embedDM = new EmbedBuilder()
-                        .setTitle("📂 تفاصيل إغلاق التذكرة")
-                        .setColor("Red")
-                        .addFields(
-                            { name: "👤 صاحب التكت:", value: `<@${ticket.ownerId}>`, inline: true },
-                            { name: "🛠️ استلمها:", value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : "لم تستلم", inline: true },
-                            { name: "🗑️ حذفها:", value: `${interaction.user}`, inline: true },
-                            { name: "⏰ وقت الفتح:", value: `<t:${Math.floor(ticket.openedAt.getTime() / 1000)}:F>`, inline: false },
-                            { name: "📅 وقت الحذف:", value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: false }
-                        )
-                        .setTimestamp();
-                    
-                    await owner.send({ embeds: [embedDM] }).catch(() => console.log("Can't DM user"));
-                }
+                await TicketData.deleteOne({
+                    channelId: interaction.channel.id
+                });
 
-                await interaction.reply({ content: "🔒 جارٍ أرشفة البيانات وحذف الروم خلال 5 ثوانٍ..." });
-                await TicketData.deleteOne({ channelId: interaction.channel.id });
-                setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+                await interaction.reply({
+                    content: "🔒 سيتم إغلاق التكت..."
+                });
+
+                setTimeout(() => {
+                    interaction.channel.delete().catch(() => {});
+                }, 5000);
             }
 
-            // ➕ إضافة/إزالة شخص
-            if (interaction.customId === 'add_member' || interaction.customId === 'remove_member') {
-                if (!isAdmin) return interaction.reply({ content: "❌ للادارة فقط", ephemeral: true });
-                // هنا نفتح Modal عشان نطلب الـ ID
+            // ➕➖ إدارة الأعضاء
+            if (
+                interaction.customId === 'add_member' ||
+                interaction.customId === 'remove_member'
+            ) {
+                if (!isAdmin)
+                    return interaction.reply({
+                        content: "❌ للإدارة فقط",
+                        ephemeral: true
+                    });
+
                 const modal = new ModalBuilder()
-                    .setCustomId(interaction.customId === 'add_member' ? 'modal_add' : 'modal_remove')
+                    .setCustomId(
+                        interaction.customId === 'add_member'
+                            ? 'modal_add'
+                            : 'modal_remove'
+                    )
                     .setTitle('إدارة الأعضاء');
-                const idInput = new TextInputBuilder()
+
+                const input = new TextInputBuilder()
                     .setCustomId('user_id')
-                    .setLabel('أدخل ID العضو')
+                    .setLabel('ID العضو')
                     .setStyle(TextInputStyle.Short);
-                modal.addComponents(new ActionRowBuilder().addComponents(idInput));
+
+                modal.addComponents(
+                    new ActionRowBuilder().addComponents(input)
+                );
+
                 return interaction.showModal(modal);
             }
         }
 
         // =========================
-        // ⌨️ التعامل مع المودال (Add/Remove)
+        // 🧾 MODALS
         // =========================
         if (interaction.isModalSubmit()) {
             const userId = interaction.fields.getTextInputValue('user_id');
             const member = await interaction.guild.members.fetch(userId).catch(() => null);
-            if (!member) return interaction.reply({ content: "❌ ID غير صحيح", ephemeral: true });
+
+            if (!member) {
+                return interaction.reply({
+                    content: "❌ ID غير صحيح",
+                    ephemeral: true
+                });
+            }
 
             if (interaction.customId === 'modal_add') {
-                await interaction.channel.permissionOverwrites.edit(member, { ViewChannel: true, SendMessages: true });
-                return interaction.reply({ content: `✅ تم إضافة ${member} للتكت` });
-            } else {
-                await interaction.channel.permissionOverwrites.edit(member, { ViewChannel: false });
-                return interaction.reply({ content: `❌ تم إزالة ${member} من التكت` });
+                await interaction.channel.permissionOverwrites.edit(member, {
+                    ViewChannel: true,
+                    SendMessages: true
+                });
+
+                return interaction.reply({
+                    content: `✅ تم إضافة ${member}`
+                });
+            }
+
+            if (interaction.customId === 'modal_remove') {
+                await interaction.channel.permissionOverwrites.edit(member, {
+                    ViewChannel: false
+                });
+
+                return interaction.reply({
+                    content: `❌ تم إزالة ${member}`
+                });
             }
         }
 
-        // =========================
-        // 🎫 دالة فتح التكت الأساسية
-        // =========================
-        async function openTicket(interaction, config, type) {
-            const existing = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.id}`);
-            if (existing) return interaction.reply({ content: `❌ عندك تكت مفتوح: ${existing}`, ephemeral: true });
-
-            const channel = await interaction.guild.channels.create({
-                name: `ticket-${interaction.user.id}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                ]
-            });
-
-            await TicketData.create({
-                guildId: interaction.guild.id,
-                channelId: channel.id,
-                ownerId: interaction.user.id,
-                openedAt: new Date()
-            });
-
-            const embed = new EmbedBuilder()
-                .setTitle("🎫 تذكرة جديدة")
-                .setDescription(`أهلاً بك ${interaction.user}\nالرجاء كتابة مشكلتك هنا بانتظار الإدارة.\n\n**النوع:** ${type}`)
-                .setColor("Blue");
-
-            const buttons = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('claim_ticket').setLabel('📌 استلام').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('summon_member').setLabel('📣 استدعاء').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('add_member').setLabel('➕ إضافة').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('remove_member').setLabel('➖ إزالة').setStyle(ButtonStyle.Primary),
-                new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 إغلاق').setStyle(ButtonStyle.Danger)
-            );
-
-            await channel.send({ content: `${interaction.user} | <@&${config.adminRole}>`, embeds: [embed], components: [buttons] });
-            return interaction.reply({ content: `✅ تم فتح تذكرتك بنجاح: ${channel}`, ephemeral: true });
-        }
-
-    } catch (err) { console.error(err); }
-    console.log("Sending embed...");
-await channel.send({ 
-    embeds: [embed], 
-    components, 
-    files 
-});
-
-});
-
-setInterval(async () => {
-    const allUsers = await UserLevel.find({});
-    const now = new Date();
-
-    for (const u of allUsers) {
-        const timeDiff = now - u.lastMessageDate;
-        const hoursPassed = timeDiff / (1000 * 60 * 60);
-
-        // تنبيه قبل 5 ساعات من انتهاء الـ 24 ساعة (يعني بعد 19 ساعة خمول)
-        if (hoursPassed >= 19 && hoursPassed < 24 && !u.warned) {
-            const guild = client.guilds.cache.get(u.guildId);
-            const user = await client.users.fetch(u.userId).catch(() => null);
-            if (user) {
-                user.send(`⚠️ انتبه! باقي لك 5 ساعات ويضيع الستريك (**${u.streakCount} يوم**) في سيرفر ${guild.name}! اكتب أي رسالة الآن!`).catch(() => {});
-                u.warned = true;
-                await u.save();
-            }
-        }
-
-        // تصفير الستريك تماماً بعد 24 ساعة خمول
-        if (hoursPassed >= 24) {
-            if (u.streakCount > 0) {
-                u.streakCount = 0;
-                u.dailyMsgs = 0;
-                await u.save();
-                console.log(`❌ ضاع ستريك العضو ${u.userId} بسبب الخمول.`);
-            }
-        }
+    } catch (err) {
+        console.error("Interaction Error:", err);
     }
-}, 3600000); // يفحص كل ساعة
+});
+
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
