@@ -1409,12 +1409,11 @@ for (let i = 0; i < 4; i++) {
         res.status(500).send("Internal Error"); 
     }
 });
-
 client.on('messageCreate', async (msg) => {
-    // 1. التحقق الأساسي (تجاهل البوتات والرسائل الخاصة)
+    // 1. التحقق الأساسي
     if (!msg.guild || msg.author.bot) return;
 
-    // --- [ تسجيل إحصائيات الرسائل والقنوات ] ---
+    // 2. تسجيل إحصائيات الرسائل
     await Stats.findOneAndUpdate(
         { guildId: msg.guild.id },
         { 
@@ -1429,61 +1428,59 @@ client.on('messageCreate', async (msg) => {
         { upsert: true }
     ).catch(e => console.log("Stats Save Error:", e));
 
-
-    if (!u.dayCompleted && timePassed >= warnAfter && !u.warned) {
-        try {
-            await msg.author.send(`⚠️ انتبه! باقي وقت قليل ويضيع الستريك تبعك 😢\nحاول تكمل ${required} رسالة قبل ما ينتهي اليوم!`);
-        } catch {}
-
-        await UserLevel.updateOne(
-            { guildId: msg.guild.id, userId: msg.author.id },
-            { $set: { warned: true } }
-        );
-    }
-const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
-if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
+    // 3. جلب بيانات العضو (هنا التعديل المهم: تعريف u قبل استخدامه)
     let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
-    if (!u) u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id });
-
-    const now = new Date();
-    const isSameDay = u.lastMessageDate.toDateString() === now.toDateString();
-
-    if (!isSameDay) {
-        u.dailyMsgs = 0; // تصفير العداد اليومي إذا بدأ يوم جديد
-        u.warned = false;
+    if (!u) {
+        u = new UserLevel({ guildId: msg.guild.id, userId: msg.author.id });
     }
 
-    if (u.dailyMsgs < sConf.requiredMessages) {
-        u.dailyMsgs++;
-        u.lastMessageDate = now;
+    // 4. جلب إعدادات الستريك
+    const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
 
-        if (u.dailyMsgs === sConf.requiredMessages) {
-            u.streakCount++;
-            const logCh = msg.guild.channels.cache.get(sConf.streakChannel);
-            if (logCh) {
-                const embed = new EmbedBuilder()
-                    .setTitle('🔥 ستريك جديد!')
-                    .setDescription(`كفو يا بطل! أكملت هدفك اليومي بنجاح.`)
-                    .addFields(
-                        { name: '👤 العضو', value: `${msg.author}`, inline: true },
-                        { name: '📅 أيام الستريك', value: `${u.streakCount} يوم`, inline: true },
-                        { name: '💬 رسائل اليوم', value: `${u.dailyMsgs}`, inline: true }
-                    )
-                    .setColor('Orange').setTimestamp();
-                logCh.send({ embeds: [embed] });
+    // 5. منطق الستريك (الزيادة والعد)
+    if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
+        const now = new Date();
+        const isSameDay = u.lastMessageDate && u.lastMessageDate.toDateString() === now.toDateString();
+
+        if (!isSameDay) {
+            u.dailyMsgs = 0; // يوم جديد
+            u.warned = false;
+        }
+
+        if (u.dailyMsgs < sConf.requiredMessages) {
+            u.dailyMsgs++;
+            u.lastMessageDate = now;
+
+            if (u.dailyMsgs === sConf.requiredMessages) {
+                u.streakCount++;
+                const logCh = msg.guild.channels.cache.get(sConf.streakChannel);
+                if (logCh) {
+                    const embed = new EmbedBuilder()
+                        .setTitle('🔥 ستريك جديد!')
+                        .setDescription(`كفو يا بطل! أكملت هدفك اليومي بنجاح.`)
+                        .addFields(
+                            { name: '👤 العضو', value: `${msg.author}`, inline: true },
+                            { name: '📅 أيام الستريك', value: `${u.streakCount} يوم`, inline: true },
+                            { name: '💬 رسائل اليوم', value: `${u.dailyMsgs}`, inline: true }
+                        )
+                        .setColor('Orange').setTimestamp();
+                    logCh.send({ embeds: [embed] });
+                }
             }
         }
+        await u.save();
     }
-    await u.save();
-}
-if (msg.content.startsWith('!ستريك')) {
-    const target = msg.mentions.members.first() || msg.member;
-    const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
-    const streak = userData ? userData.streakCount : 0;
-    const msgs = userData ? userData.dailyMsgs : 0;
 
-    msg.reply(`🔥 ستريك ${target.user.username} الحالي هو: **${streak}** يوم (رسائل اليوم: ${msgs})`);
-}
+    // 6. أوامر الستريك
+    if (msg.content.startsWith('!ستريك')) {
+        const target = msg.mentions.members.first() || msg.member;
+        const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
+        const streak = userData ? userData.streakCount : 0;
+        const msgs = userData ? userData.dailyMsgs : 0;
+
+        msg.reply(`🔥 ستريك ${target.user.username} الحالي هو: **${streak}** يوم (رسائل اليوم: ${msgs})`);
+    }
+
 
     // 3. 🛡️ فحص الرتب المستثناة (Bypass Roles)
 
