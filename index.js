@@ -836,6 +836,18 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'security', content));
 });
+app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
+    const config = await GuildConfig.findOne({ guildId: req.params.guildId });
+
+    res.render('roles', {
+        guildId: req.params.guildId,
+        rolesPanel: config?.rolesPanel || [],
+        rolesChannel: config?.rolesChannel || "",
+        channels: (client.guilds.cache.get(req.params.guildId)?.channels.cache || [])
+            .filter(c => c.type === 0)
+            .map(c => ({ id: c.id, name: c.name }))
+    });
+});
 
 app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
@@ -1552,7 +1564,43 @@ client.on('messageCreate', async (msg) => {
             return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
         }
     } // إغلاق شرط hasBypass
+if (msg.content === '!rolespanel') {
 
+    const config = await GuildConfig.findOne({ guildId: msg.guild.id });
+    if (!config?.rolesPanel?.length) return msg.reply("❌ ما في رتب مضافة");
+
+    const channel = msg.guild.channels.cache.get(config.rolesChannel);
+    if (!channel) return msg.reply("❌ الروم غير موجود");
+
+    const rows = [];
+    let row = new ActionRowBuilder();
+
+    for (const r of config.rolesPanel) {
+
+        if (r.type === "button") {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`role_${r.roleId}`)
+                    .setLabel(r.label)
+                    .setStyle(ButtonStyle.Secondary)
+            );
+        }
+
+        if (row.components.length === 5) {
+            rows.push(row);
+            row = new ActionRowBuilder();
+        }
+    }
+
+    if (row.components.length > 0) rows.push(row);
+
+    channel.send({
+        content: "🎭 نظام الرتب",
+        components: rows
+    });
+
+    msg.reply("✅ تم إرسال لوحة الرتب");
+}
     // 6. نظام الستريك المطور
     const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
     if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
@@ -1796,7 +1844,36 @@ app.post('/save/:guildId/security', checkAuth, async (req, res) => {
 
     res.redirect(`/manage/${req.params.guildId}/security`);
 });
+app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
 
+    const rolesPanel = [];
+
+    for (let i = 0; i < 8; i++) {
+        if (req.body[`role_${i}`]) {
+            rolesPanel.push({
+                roleId: req.body[`role_${i}`],
+                label: req.body[`label_${i}`] || "Role",
+                emoji: req.body[`emoji_${i}`] || "",
+                color: req.body[`color_${i}`] || "#5865F2",
+                type: req.body[`type_${i}`] || "button",
+                enabled: true
+            });
+        }
+    }
+
+    await GuildConfig.findOneAndUpdate(
+        { guildId: req.params.guildId },
+        {
+            $set: {
+                rolesPanel,
+                rolesChannel: req.body.channel
+            }
+        },
+        { upsert: true }
+    );
+
+    res.redirect(`/manage/${req.params.guildId}/roles`);
+});
 // حفظ إعدادات اللوق
 app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     const b = req.body;
@@ -2226,7 +2303,21 @@ client.on('interactionCreate', async (interaction) => {
             const type = interaction.values ? interaction.values[0] : "عام";
             return openTicket(interaction, config, type);
         }
+if (interaction.isButton() && interaction.customId.startsWith('role_')) {
 
+    const roleId = interaction.customId.split('_')[1];
+    const role = interaction.guild.roles.cache.get(roleId);
+
+    if (!role) return interaction.reply({ content: "❌ الرتبة غير موجودة", ephemeral: true });
+
+    if (interaction.member.roles.cache.has(roleId)) {
+        await interaction.member.roles.remove(roleId);
+        return interaction.reply({ content: "❌ تم سحب الرتبة", ephemeral: true });
+    } else {
+        await interaction.member.roles.add(roleId);
+        return interaction.reply({ content: "✅ تم إعطاء الرتبة", ephemeral: true });
+    }
+}
         // =========================
         // 🎛️ أزرار التحكم (داخل التكت)
         // =========================
