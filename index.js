@@ -518,6 +518,7 @@ function ui(guild, active, content) {
                 <a class="${active=='levels'?'active':''}" href="/manage/${guild.id}/levels">🏆 المستويات</a>
                 <a class="${active=='welcome'?'active':''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
                 <a class="${active=='giveaway'?'active':''}" href="/manage/${guild.id}/giveaway">🎉 القيف اواي</a>
+                <a class="${active=='roles'?'active':''}" href="/manage/${guild.id}/roles">🎭 الرتب</a>
                 <a class="${active=='mod'?'active':''}" href="/manage/${guild.id}/mod">🛡️ أوامر الإشراف</a>
             </div>
         </div>
