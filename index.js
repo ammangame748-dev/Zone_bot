@@ -374,6 +374,14 @@ app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
         // عرض الخطأ التقني للمستخدم لمعرفة السبب الحقيقي
         res.status(500).send(`حدث خطأ تقني: ${err.message}`);
     }
+    let footerData = { text: 'Zone System • استمر ولا تقطع | !' };
+
+const avatar = msg.author.displayAvatarURL();
+if (avatar && avatar.startsWith('http')) {
+    footerData.iconURL = avatar;
+}
+
+embed.setFooter(footerData);
 });
 
 
