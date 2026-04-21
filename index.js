@@ -1606,58 +1606,9 @@ if (msg.content === '!rolespanel') {
 
     msg.reply("✅ تم إرسال لوحة الرتب");
 }
-async function openTicket(interaction, config, type) {
-    try {
-        await interaction.deferReply({ ephemeral: true });
 
-        // ✅ نجيب الكونفيق من الداتابيز
-        const conf = await TicketConfig.findOne({ guildId: interaction.guild.id });
-        if (!conf) return interaction.editReply("❌ الإعدادات غير موجودة");
 
-        // ✅ زيادة العداد
-        conf.ticketCount = (conf.ticketCount || 0) + 1;
-        await conf.save();
 
-        const ticketNumber = conf.ticketCount;
-        const channelName = `ticket-${ticketNumber}`;
-
-        // ✅ إنشاء الروم
-        const channel = await interaction.guild.channels.create({
-            name: channelName,
-            type: ChannelType.GuildText,
-            parent: conf.categoryId || null,
-            permissionOverwrites: [
-                {
-                    id: interaction.guild.id,
-                    deny: ['ViewChannel'],
-                },
-                {
-                    id: interaction.user.id,
-                    allow: ['ViewChannel', 'SendMessages'],
-                },
-                {
-                    id: conf.adminRole,
-                    allow: ['ViewChannel', 'SendMessages'],
-                },
-            ],
-        });
-
-        // ✅ رسالة داخل التكت
-        const embed = new EmbedBuilder()
-            .setTitle("🎫 تكت جديد")
-            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: ${type}`)
-            .setColor("#5865F2");
-
-        await channel.send({ content: `${interaction.user}`, embeds: [embed] });
-
-        // ✅ رد للمستخدم
-        await interaction.editReply(`✅ تم فتح التكت: ${channel}`);
-
-    } catch (err) {
-        console.error("❌ خطأ في فتح التكت:", err);
-        interaction.editReply("❌ صار خطأ أثناء فتح التكت");
-    }
-}
     // 6. نظام الستريك المطور
     const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
     if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
@@ -2542,6 +2493,49 @@ client.on('interactionCreate', async (interaction) => {
         console.error("Interaction Error:", err);
     }
 });
+// حطه بآخر الملف قبل سطر تسجيل الدخول
+async function openTicket(interaction, config, type) {
+    try {
+        if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
+
+        const ticketNumber = (config.ticketCount || 0) + 1;
+        await TicketConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { $inc: { ticketCount: 1 } });
+
+        const channel = await interaction.guild.channels.create({
+            name: `ticket-${ticketNumber}`,
+            type: ChannelType.GuildText,
+            permissionOverwrites: [
+                { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+            ],
+        });
+
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 تكت جديد")
+            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: ${type}`)
+            .setColor("#5865F2");
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق').setStyle(ButtonStyle.Danger)
+        );
+
+        await channel.send({ content: `${interaction.user} <@&${config.adminRole}>`, embeds: [embed], components: [row] });
+        
+        await TicketData.create({
+            guildId: interaction.guild.id,
+            channelId: channel.id,
+            ownerId: interaction.user.id,
+            openedAt: new Date()
+        });
+
+        await interaction.editReply(`✅ تم فتح التكت: ${channel}`);
+    } catch (err) {
+        console.error("❌ Error in openTicket:", err);
+        if (interaction.deferred) await interaction.editReply("❌ حدث خطأ أثناء فتح التكت");
+    }
+}
 
 
 app.listen(3000, () => {
