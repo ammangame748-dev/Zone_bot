@@ -841,17 +841,54 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
     res.send(ui(g, 'security', content));
 });
 app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
-    const config = await GuildConfig.findOne({ guildId: req.params.guildId });
+    try {
+        const g = client.guilds.cache.get(req.params.guildId);
+        if (!g) return res.redirect('/dashboard');
 
-    res.render('roles', {
-        guildId: req.params.guildId,
-        rolesPanel: config?.rolesPanel || [],
-        rolesChannel: config?.rolesChannel || "",
-        channels: (client.guilds.cache.get(req.params.guildId)?.channels.cache || [])
-            .filter(c => c.type === 0)
-            .map(c => ({ id: c.id, name: c.name }))
-    });
+        let config = await GuildConfig.findOne({ guildId: g.id }) || { rolesPanel: [] };
+        const channels = g.channels.cache.filter(c => c.type === 0);
+
+        let rolesHtml = '';
+        // إنشاء 8 خانات للرتب كما في المنطق السابق
+        for (let i = 0; i < 8; i++) {
+            const rData = config.rolesPanel && config.rolesPanel[i] ? config.rolesPanel[i] : {};
+            rolesHtml += `
+            <div class="card" style="margin-bottom:15px; border-right: 4px solid var(--p);">
+                <h4>🎭 رتبة #${i + 1}</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <select name="role_${i}">
+                        <option value="">-- اختر الرتبة --</option>
+                        ${g.roles.cache.filter(r => r.name !== "@everyone").map(role => 
+                            `<option value="${role.id}" ${rData.roleId === role.id ? 'selected' : ''}>${role.name}</option>`
+                        ).join('')}
+                    </select>
+                    <input type="text" name="label_${i}" value="${rData.label || ''}" placeholder="اسم الزر (مثلاً: رتبة 1)">
+                </div>
+            </div>`;
+        }
+
+        const content = `
+        <form method="POST" action="/save/${g.id}/roles">
+            <div class="card">
+                <h3>🎭 إعدادات لوحة الرتب الذاتية</h3>
+                <label>📍 قناة إرسال اللوحة:</label>
+                <select name="channel" required>
+                    <option value="">-- اختر الروم --</option>
+                    ${channels.map(c => `<option value="${c.id}" ${config.rolesChannel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
+                </select>
+            </div>
+            ${rolesHtml}
+            <button class="btn-save">💾 حفظ إعدادات الرتب</button>
+        </form>
+        `;
+
+        res.send(ui(g, 'roles', content));
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("خطأ في تحميل صفحة الرتب");
+    }
 });
+
 
 app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
