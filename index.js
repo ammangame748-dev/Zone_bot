@@ -13,8 +13,10 @@ const ms = require('ms');
 const { 
     Client, GatewayIntentBits, Partials, EmbedBuilder, AuditLogEvent, 
     AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
-    StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, PermissionFlagsBits 
+    StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, PermissionFlagsBits,
+    ModalBuilder, TextInputBuilder, TextInputStyle // ضيف هذول هون
 } = require('discord.js');
+
 
 // 2. الآن تعرّف الـ Models (بعد ما صار المونجوس معروف للكود)
 const TicketData = mongoose.model('TicketData', new mongoose.Schema({ticketCount: { type: Number, default: 0 },
