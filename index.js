@@ -17,7 +17,7 @@ const {
 } = require('discord.js');
 
 // 2. الآن تعرّف الـ Models (بعد ما صار المونجوس معروف للكود)
-const TicketData = mongoose.model('TicketData', new mongoose.Schema({
+const TicketData = mongoose.model('TicketData', new mongoose.Schema({ticketCount: { type: Number, default: 0 },
     guildId: String,
     channelId: String,
     ownerId: String,
@@ -25,6 +25,7 @@ const TicketData = mongoose.model('TicketData', new mongoose.Schema({
     openedAt: Date,
     closedAt: Date,
     closedBy: String
+    
 }));
 
 const UserLevel = mongoose.model('UserLevel', new mongoose.Schema({
@@ -46,10 +47,10 @@ const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
     rewardRole: String, 
     streakChannel: String 
 }));
-
+ 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
+app.set('view engine', 'ejs');
 // التأكد من وجود مجلد الصور لضمان عدم توقف البوت
 if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
 
@@ -1426,6 +1427,7 @@ for (let i = 0; i < 4; i++) {
 
         const config = await TicketConfig.findOneAndUpdate(
             { guildId: req.params.guildId }, { $set: updateData }, { upsert: true, new: true }
+            
         );
 
         // 3. الإرسال للقناة المحددة
@@ -1602,6 +1604,58 @@ if (msg.content === '!rolespanel') {
 
     msg.reply("✅ تم إرسال لوحة الرتب");
 }
+async function openTicket(interaction, config, type) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        // ✅ نجيب الكونفيق من الداتابيز
+        const conf = await TicketConfig.findOne({ guildId: interaction.guild.id });
+        if (!conf) return interaction.editReply("❌ الإعدادات غير موجودة");
+
+        // ✅ زيادة العداد
+        conf.ticketCount = (conf.ticketCount || 0) + 1;
+        await conf.save();
+
+        const ticketNumber = conf.ticketCount;
+        const channelName = `ticket-${ticketNumber}`;
+
+        // ✅ إنشاء الروم
+        const channel = await interaction.guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            parent: conf.categoryId || null,
+            permissionOverwrites: [
+                {
+                    id: interaction.guild.id,
+                    deny: ['ViewChannel'],
+                },
+                {
+                    id: interaction.user.id,
+                    allow: ['ViewChannel', 'SendMessages'],
+                },
+                {
+                    id: conf.adminRole,
+                    allow: ['ViewChannel', 'SendMessages'],
+                },
+            ],
+        });
+
+        // ✅ رسالة داخل التكت
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 تكت جديد")
+            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: ${type}`)
+            .setColor("#5865F2");
+
+        await channel.send({ content: `${interaction.user}`, embeds: [embed] });
+
+        // ✅ رد للمستخدم
+        await interaction.editReply(`✅ تم فتح التكت: ${channel}`);
+
+    } catch (err) {
+        console.error("❌ خطأ في فتح التكت:", err);
+        interaction.editReply("❌ صار خطأ أثناء فتح التكت");
+    }
+}
     // 6. نظام الستريك المطور
     const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
     if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
@@ -1749,6 +1803,7 @@ ${dailyMsgs} رسالة
         }
 
         return msg.channel.send({ embeds: [embed], components: components, files: files });
+    
     }
 
     // ==========================================
