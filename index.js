@@ -1891,35 +1891,67 @@ app.post('/save/:guildId/security', checkAuth, async (req, res) => {
     res.redirect(`/manage/${req.params.guildId}/security`);
 });
 app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const g = client.guilds.cache.get(guildId);
+        if (!g) return res.status(404).send("السيرفر غير موجود");
 
-    const rolesPanel = [];
-
-    for (let i = 0; i < 8; i++) {
-        if (req.body[`role_${i}`]) {
-            rolesPanel.push({
-                roleId: req.body[`role_${i}`],
-                label: req.body[`label_${i}`] || "Role",
-                emoji: req.body[`emoji_${i}`] || "",
-                color: req.body[`color_${i}`] || "#5865F2",
-                type: req.body[`type_${i}`] || "button",
-                enabled: true
-            });
-        }
-    }
-
-    await GuildConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        {
-            $set: {
-                rolesPanel,
-                rolesChannel: req.body.channel
+        const rolesPanel = [];
+        // 1. تجميع البيانات من الفورم
+        for (let i = 0; i < 8; i++) {
+            if (req.body[`role_${i}`]) {
+                rolesPanel.push({
+                    roleId: req.body[`role_${i}`],
+                    label: req.body[`label_${i}`] || "رتبة",
+                    type: "button"
+                });
             }
-        },
-        { upsert: true }
-    );
+        }
 
-    res.redirect(`/manage/${req.params.guildId}/roles`);
+        // 2. حفظ البيانات في الداتابيز
+        await GuildConfig.findOneAndUpdate(
+            { guildId },
+            { $set: { rolesPanel, rolesChannel: req.body.channel } },
+            { upsert: true }
+        );
+
+        // 3. بناء وإرسال اللوحة فوراً لـ ديسكورد
+        const channel = g.channels.cache.get(req.body.channel);
+        if (channel && rolesPanel.length > 0) {
+            const rows = [];
+            let currentRow = new ActionRowBuilder();
+
+            rolesPanel.forEach((r, index) => {
+                const button = new ButtonBuilder()
+                    .setCustomId(`role_${r.roleId}`)
+                    .setLabel(r.label)
+                    .setStyle(ButtonStyle.Secondary);
+
+                currentRow.addComponents(button);
+
+                // كل 5 أزرار في سطر واحد (قوانين ديسكورد)
+                if (currentRow.components.length === 5 || index === rolesPanel.length - 1) {
+                    rows.push(currentRow);
+                    currentRow = new ActionRowBuilder();
+                }
+            });
+
+            const embed = new EmbedBuilder()
+                .setTitle("🎭 لوحة اختيار الرتب الذاتية")
+                .setDescription("اضغط على الأزرار أدناه للحصول على الرتبة أو إزالتها.")
+                .setColor("#5865F2")
+                .setFooter({ text: "Zone System • Self Roles" });
+
+            await channel.send({ embeds: [embed], components: rows });
+        }
+
+        res.redirect(`/manage/${guildId}/roles`);
+    } catch (err) {
+        console.error("Save Roles Error:", err);
+        res.status(500).send("حدث خطأ أثناء حفظ وإرسال الرتب.");
+    }
 });
+
 // حفظ إعدادات اللوق
 app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     const b = req.body;
