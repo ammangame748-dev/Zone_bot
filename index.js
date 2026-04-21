@@ -2357,11 +2357,18 @@ client.on('interactionCreate', async (interaction) => {
 
         // =========================
         // 🎫 فتح التكت
-        // =========================
+        // ========================= 
         if (
-            (interaction.isButton() && interaction.customId === 'open_ticket') ||
-            (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu')
-        ) {
+    (interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) ||
+    (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu')
+) {
+    const type = interaction.isStringSelectMenu()
+        ? interaction.values[0]
+        : "عام";
+
+    return openTicket(interaction, config, type);
+}
+ {
             const type = interaction.isStringSelectMenu()
                 ? interaction.values[0]
                 : "عام";
