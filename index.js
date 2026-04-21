@@ -333,58 +333,44 @@ app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
     try {
         const { targetChannel, embedTitle, embedDesc, embedColor } = req.body;
         
-        // 1. جلب السيرفر والتأكد من وجوده في الكاش
         const guild = client.guilds.cache.get(req.params.guildId);
-        if (!guild) return res.status(404).send("❌ السيرفر غير موجود في ذاكرة البوت حالياً.");
+        if (!guild) return res.status(404).send("❌ السيرفر غير موجود في الذاكرة.");
         
-        // 2. جلب القناة (محاولة الجلب من الكاش أو Fetch)
         let channel = guild.channels.cache.get(targetChannel);
         if (!channel) {
             channel = await guild.channels.fetch(targetChannel).catch(() => null);
         }
 
-        if (!channel) return res.send("⚠️ لم يتم العثور على القناة، تأكد من اختيار قناة نصية.");
+        if (!channel) return res.send("⚠️ لم يتم العثور على القناة.");
 
-        // 3. بناء الإيمباد مع حماية للـ Footer
+        // بناء الإيمباد مع حماية ضد الـ Crash
         const customEmbed = new EmbedBuilder()
             .setTitle(embedTitle || "Zone System") 
-            .setDescription(embedDesc || "لم يتم تحديد محتوى")
+            .setDescription(embedDesc || " ")
             .setColor(embedColor || '#5865f2')
             .setTimestamp();
 
-        // حماية: إذا كانت بيانات المستخدم موجودة نضعها في الفوتر، وإذا لا نضع نصاً فقط
+        // إصلاح رابط الـ Avatar وتفاصيل المرسل
         if (req.user) {
-            const avatar = req.user.avatar 
+            const avatarURL = req.user.avatar 
                 ? `https://discordapp.com{req.user.id}/${req.user.avatar}.png`
                 : 'https://discordapp.com';
                 
             customEmbed.setFooter({ 
                 text: `أُرسل بواسطة: ${req.user.username}`, 
-                iconURL: avatar 
+                iconURL: avatarURL 
             });
-        } else {
-            customEmbed.setFooter({ text: `Zone System Embed Sender` });
         }
 
-        // 4. الإرسال الفعلي
         await channel.send({ embeds: [customEmbed] });
         
-        // النجاح: يرجعه لصفحة الستريك
         res.redirect(`/manage/${req.params.guildId}/streaks`);
 
     } catch (err) {
-        console.error("❌ الخطأ الفعلي هو:", err);
-        // عرض الخطأ التقني للمستخدم لمعرفة السبب الحقيقي
-        res.status(500).send(`حدث خطأ تقني: ${err.message}`);
+        console.error("❌ Fatal Error:", err);
+        // نرسل رد نصي بسيط بدل الانهيار
+        res.status(500).send(`حدث خطأ: ${err.message}`);
     }
-    let footerData = { text: 'Zone System • استمر ولا تقطع | !' };
-
-const avatar = msg.author.displayAvatarURL();
-if (avatar && avatar.startsWith('http')) {
-    footerData.iconURL = avatar;
-}
-
-embed.setFooter(footerData);
 });
 
 
