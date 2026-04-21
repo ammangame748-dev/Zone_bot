@@ -1817,45 +1817,61 @@ if (msg.content.startsWith('!توب-ستريك') || msg.content.startsWith('!top
         const prefix = "!"; 
         const args = msg.content.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
-
 if (command === modConfig.jail.commandName.toLowerCase()) {
-    if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) return msg.reply("❌ للإدارة فقط");
+    // 1. فحص الصلاحيات الأساسية
+    if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
 
     const target = msg.mentions.members.first();
     const timeInput = args.find(arg => /[smhdw]/.test(arg));
 
-    if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: !سجن @user 1h`);
-    if (target.id === msg.author.id) return msg.reply("❌ ما بتقدر تسجن نفسك");
+    // 2. التحقق من المدخلات
+    if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام الصحيح: \`!${command} @user 1h\``);
+    if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
+    if (target.user.bot) return msg.reply("❌ لا يمكنك سجن البوتات!");
+
+    // 3. 🛡️ حماية الرتب العليا (أهم جزء)
+    // المالك يقدر يسجن الكل، لكن الإداري ما يقدر يسجن رتبة أعلى منه أو تساويه
+    if (msg.author.id !== msg.guild.ownerId) {
+        if (target.roles.highest.position >= msg.member.roles.highest.position) {
+            return msg.reply("❌ لا يمكنك سجن شخص رتبته أعلى منك أو مساوية لرتبتك!");
+        }
+    }
 
     const durationMs = ms(timeInput);
-    if (!durationMs) return msg.reply("❌ صيغة الوقت غلط (مثلاً: 10m, 1h)");
+    if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 10m, 1h, 1d)");
 
     const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-    if (!jailRole) return msg.reply("❌ رتبة السجن مو محددة بالداشبورد");
+    if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
 
     try {
-        // 1. حفظ كل رتبه الحالية (ما عدا رتبة الجميع)
+        // 4. حفظ الرتب الأصلية في الداتابيز
         const currentRoles = target.roles.cache.filter(r => r.id !== msg.guild.id).map(r => r.id);
 
-        // 2. تخزين البيانات بالداتابيز
         await JailData.findOneAndUpdate(
             { guildId: msg.guild.id, userId: target.id },
             { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
             { upsert: true }
         );
 
-        // 3. التنفيذ: سحب كل الرتب وإعطاؤه رتبة السجن فقط
-        await target.roles.set([jailRole.id]).catch(err => console.log("صلاحيات البوت ضعيفة"));
+        // 5. التنفيذ: سحب الكل وإعطاء رتبة السجن فقط
+        // ملاحظة: تأكد أن رتبة البوت أعلى من الجميع
+        await target.roles.set([jailRole.id]).catch(err => {
+            return msg.reply("❌ فشل سحب الرتب، تأكد أن رتبة البوت أعلى من رتبة العضو.");
+        });
 
-        msg.channel.send(`🔒 تم سجن ${target} لمدة ${timeInput} وسحب كل رتبه.`);
+        msg.channel.send(`🔒 تم سجن ${target} لمدة **${timeInput}** بنجاح واستبدال كافة رتبه برتبة السجن.`);
 
-        // 4. مؤقت لفك السجن تلقائياً
+        // 6. المؤقت التلقائي لفك السجن
         setTimeout(async () => {
             await handleUnjail(target, msg.guild.id);
         }, durationMs);
 
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Jail Error:", e);
+        msg.reply("❌ حدث خطأ فني أثناء محاولة السجن.");
+    }
 }
+
 
 
         if (command === (modConfig.jail.unjailCommand || 'unjail').toLowerCase()) {
