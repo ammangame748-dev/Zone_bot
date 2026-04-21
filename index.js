@@ -2396,33 +2396,36 @@ client.on('interactionCreate', async (interaction) => {
             return openTicket(interaction, config, type);
         }
 
-        // =========================
-        // 🎭 الرتب (roles panel)
-        // =========================
-        if (interaction.isButton() && interaction.customId.startsWith('role_')) {
-            const roleId = interaction.customId.split('_')[1];
-            const role = interaction.guild.roles.cache.get(roleId);
+      // --- [ 🎭 نظام الرتب الذاتية - رتبة واحدة فقط ] ---
+if (interaction.isButton() && interaction.customId.startsWith('role_')) {
+    const roleId = interaction.customId.split('_')[1];
+    const role = interaction.guild.roles.cache.get(roleId);
 
-            if (!role) {
-                return interaction.reply({
-                    content: "❌ الرتبة غير موجودة",
-                    ephemeral: true
-                });
-            }
+    if (!role) return interaction.reply({ content: "❌ الرتبة غير موجودة", ephemeral: true });
 
-            if (interaction.member.roles.cache.has(roleId)) {
-                await interaction.member.roles.remove(roleId);
-                return interaction.reply({
-                    content: "❌ تم سحب الرتبة",
-                    ephemeral: true
-                });
-            } else {
-                await interaction.member.roles.add(roleId);
-                return interaction.reply({
-                    content: "✅ تم إعطاء الرتبة",
-                    ephemeral: true
-                });
-            }
+    // 1. جلب كل الرتب الموجودة في اللوحة من الداتابيز
+    const allPanelRoles = config.rolesPanel.map(r => r.roleId);
+
+    // 2. فحص إذا العضو عنده الرتبة اللي ضغط عليها أصلاً (عشان يشيلها)
+    if (interaction.member.roles.cache.has(roleId)) {
+        await interaction.member.roles.remove(roleId);
+        return interaction.reply({ content: `❌ تم سحب رتبة **${role.name}** منك.`, ephemeral: true });
+    }
+
+    // 3. (الخطوة الأهم) إزالة أي رتبة ثانية تابعة لنفس اللوحة قبل إعطاء الجديدة
+    const rolesToRemove = interaction.member.roles.cache.filter(r => allPanelRoles.includes(r.id) && r.id !== roleId);
+    
+    if (rolesToRemove.size > 0) {
+        await interaction.member.roles.remove(rolesToRemove);
+    }
+
+    // 4. إعطاء الرتبة الجديدة
+    await interaction.member.roles.add(roleId);
+    return interaction.reply({ 
+        content: `✅ تم إعطاؤك رتبة **${role.name}** (وسحب باقي رتب اللوحة إن وجدت).`, 
+        ephemeral: true 
+    });
+
         }
 
  
