@@ -16,6 +16,16 @@ const {
     StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, PermissionFlagsBits,
     ModalBuilder, TextInputBuilder, TextInputStyle // ضيف هذول هون
 } = require('discord.js');
+const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
+    guildId: String,
+    streamers: [{
+        kickUsername: String,      // اسم المستخدم في كيك
+        channelId: String,       // روم التنبيه
+        roleId: String,          // الرتبة اللي يجيها منشن
+        customMessage: String,   // الرسالة المخصصة
+        isLive: { type: Boolean, default: false } // لحماية البوت من تكرار التنبيه
+    }]
+}));
 
 
 // 2. الآن تعرّف الـ Models (بعد ما صار المونجوس معروف للكود)
@@ -260,6 +270,82 @@ app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
     res.redirect('/dashboard');
 });
+
+app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+
+    // جلب البيانات من الداتابيز أو وضع مصفوفة فارغة
+    let s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
+
+    // محتوى الصفحة (Content)
+    const content = `
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>🟢 نظام تنبيهات Kick المطور</h3>
+            <button onclick="toggleKickForm()" class="btn-save" style="width:auto; padding:10px 20px; background: #00E701; color:black;">➕ إضافة ستريمر</button>
+        </div>
+
+        <!-- فوروم الإضافة (مخفي ويظهر عند الضغط على الزر) -->
+        <div id="add-kick-form" style="display:none; border: 1px solid #00E701; padding: 20px; border-radius: 15px; margin-bottom: 30px;">
+            <form method="POST" action="/save/${g.id}/kick">
+                <label>اسم المستخدم في Kick:</label>
+                <input type="text" name="kickUser" placeholder="مثلاً: hook" required>
+
+                <label>قناة التنبيه:</label>
+                <select name="channelId">
+                    ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+                </select>
+
+                <label>الرتبة المطلوب عمل منشن لها:</label>
+                <select name="roleId">
+                    <option value="">-- بدون منشن --</option>
+                    ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                </select>
+
+                <label>رسالة التنبيه:</label>
+                <textarea name="msg" placeholder="استخدم %name% لاسم الستريمر..."></textarea>
+
+                <button class="btn-save">💾 حفظ الإضافة</button>
+            </form>
+        </div>
+
+        <!-- جدول عرض الستريمرز المضافين -->
+        <table style="width:100%; color:white; border-collapse: collapse; text-align:right;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--p);">
+                    <th style="padding:10px;">الستريمر</th>
+                    <th>القناة</th>
+                    <th>التحكم</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${s.streamers.map((st, i) => `
+                <tr style="border-bottom: 1px solid #222;">
+                    <td style="padding:15px;">${st.kickUsername}</td>
+                    <td>#${g.channels.cache.get(st.channelId)?.name || 'قناة محذوفة'}</td>
+                    <td>
+                        <a href="/delete-kick/${g.id}/${i}" style="color:var(--s); text-decoration:none;">🗑️ حذف</a>
+                    </td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function toggleKickForm() {
+            const form = document.getElementById('add-kick-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
+    `;
+
+    // إرسال البيانات لدالة ui لعرضها في السايدبار المعتاد
+    res.send(ui(g, 'kick', content));
+});
+
+
 // --- [ صفحة عرض إعدادات الستريك ] ---
 app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
     try {
@@ -360,6 +446,46 @@ app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
     }
 });
 
+app.post('/save/:guildId/kick', checkAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { kickUser, channelId, roleId, msg } = req.body;
+
+        // تنظيف اسم المستخدم (إزالة الرابط إذا وضعه المستخدم)
+        const username = kickUser.replace('https://kick.com', '').replace('/', '').trim();
+
+        await KickConfig.findOneAndUpdate(
+            { guildId },
+            { 
+                $push: { 
+                    streamers: { 
+                        kickUsername: username, 
+                        channelId, 
+                        roleId, 
+                        customMessage: msg,
+                        isLive: false 
+                    } 
+                } 
+            },
+            { upsert: true }
+        );
+
+        res.redirect(`/manage/${guildId}/kick`);
+    } catch (err) {
+        res.status(500).send("خطأ في إضافة الستريمر");
+    }
+});
+
+// مسار الحذف
+app.get('/delete-kick/:guildId/:index', checkAuth, async (req, res) => {
+    const { guildId, index } = req.params;
+    const config = await KickConfig.findOne({ guildId });
+    if (config) {
+        config.streamers.splice(index, 1);
+        await config.save();
+    }
+    res.redirect(`/manage/${guildId}/kick`);
+});
 
 
 
@@ -488,6 +614,8 @@ function ui(guild, active, content) {
             <div class="nav">
                 <a class="${active=='home'?'active':''}" href="/dashboard">📊 الإحصائيات</a>
                 <a class="${active=='security'?'active':''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
+                // أضف هذا السطر مع باقي الروابط في دالة ui
+<a class="${active=='kick'?'active':''}" href="/manage/${guild.id}/kick">🟢 تنبيهات Kick</a>
                 <a class="${active=='streaks'?'active':''}" href="/manage/${guild.id}/streaks">🔥 الستريك المطور</a>
                 <a class="${active=='logs'?'active':''}" href="/manage/${guild.id}/logs">📜 اللوج</a>
                 <a class="${active=='tickets'?'active':''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
@@ -2586,6 +2714,43 @@ async function openTicket(interaction, config, type) {
 }
 
 
+const axios = require('axios');
+
+setInterval(async () => {
+    const allConfigs = await KickConfig.find({});
+    for (const config of allConfigs) {
+        for (const streamer of config.streamers) {
+            try {
+                // فحص حالة البث عبر API وسيط أو مباشرة
+                const response = await axios.get(`https://kick.com{streamer.kickUsername}`);
+                const data = response.data;
+                const isCurrentlyLive = data.livestream !== null;
+
+                if (isCurrentlyLive && !streamer.isLive) {
+                    // الشخص فتح بث الآن!
+                    const guild = client.guilds.cache.get(config.guildId);
+                    const channel = guild?.channels.cache.get(streamer.channelId);
+                    if (channel) {
+                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : "";
+                        const embed = new EmbedBuilder()
+                            .setTitle(data.user.username)
+                            .setURL(`https://kick.com{streamer.kickUsername}`)
+                            .setDescription(streamer.customMessage.replace('%name%', data.user.username) || `${data.user.username} بدأ بثاً مباشراً الآن!`)
+                            .addFields({ name: 'العنوان', value: data.livestream.session_title })
+                            .setImage(data.livestream.thumbnail.url)
+                            .setColor('#00E701'); // لون كيك الأخضر
+
+                        channel.send({ content: mention, embeds: [embed] });
+                    }
+                    streamer.isLive = true; // تحديث الحالة لمنع تكرار الإرسال
+                } else if (!isCurrentlyLive) {
+                    streamer.isLive = false; // إعادة الضبط عند إغلاق البث
+                }
+            } catch (e) { /* معالجة أخطاء الفحص */ }
+        }
+        await config.save();
+    }
+}, 60000); // يفحص كل دقيقة
 
 
 app.listen(3000, () => {
