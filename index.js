@@ -1689,6 +1689,44 @@ ${dailyMsgs} رسالة
 
     msg.reply({ embeds: [embed] });
 }
+// --- [ أمر توب الستريك !top-streak ] ---
+if (msg.content.startsWith('!توب-ستريك') || msg.content.startsWith('!top-streak')) {
+    // جلب أعلى 10 مستخدمين مرتبين حسب streakCount من الأكبر للأصغر
+    const topUsers = await UserLevel.find({ guildId: msg.guild.id, streakCount: { $gt: 0 } })
+        .sort({ streakCount: -1 })
+        .limit(10);
+
+    if (topUsers.length === 0) return msg.reply("❌ لا يوجد متصدرين في نظام الستريك بعد.");
+
+    const embed = new EmbedBuilder()
+        .setTitle(`🏆 قائمة متصدري الستريك في ${msg.guild.name}`)
+        .setColor('#FFAC33')
+        .setThumbnail(msg.guild.iconURL())
+        .setTimestamp();
+
+    let description = "";
+
+    for (let i = 0; i < topUsers.length; i++) {
+        const uData = topUsers[i];
+        // محاولة جلب العضو من الكاش أو من ديسكورد لتظهر التاغ الخاص به
+        const user = await client.users.fetch(uData.userId).catch(() => null);
+        const userTag = user ? `**${user.username}**` : `عضو غادر (${uData.userId})`;
+        
+        // أشكال الميداليات لأول 3 مراكز
+        let medal = "";
+        if (i === 0) medal = "🥇";
+        else if (i === 1) medal = "🥈";
+        else if (i === 2) medal = "🥉";
+        else medal = `**#${i + 1}**`;
+
+        description += `${medal} | ${userTag} — \`${uData.streakCount} يوم\`\n`;
+    }
+
+    embed.setDescription(description);
+    embed.setFooter({ text: "Zone System • المنافسة مشتعلة! 🔥" });
+
+    msg.reply({ embeds: [embed] });
+}
 
 
     // 8. 🤖 الرد الآلي
