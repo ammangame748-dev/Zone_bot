@@ -2303,25 +2303,35 @@ async function handleUnjail(member, guildId) {
         const jailData = await JailData.findOne({ guildId, userId: member.id });
         const modConfig = await ModConfig.findOne({ guildId });
 
-        if (jailData && jailData.oldRoles) {
-            // تصفية الرتب للتأكد أنها لسا موجودة بالسيرفر
-            const rolesToRestore = jailData.oldRoles.filter(rId => guild.roles.cache.has(rId));
-            
-            // استرجاع الرتب الأصلية (هذا الأمر يمسح رتبة السجن تلقائياً لأنه يستبدل الكل)
-            await member.roles.set(rolesToRestore).catch(() => {
-                // إذا فشل الـ set، يحاول يضيفهم يدوي ويشيل السجن
-                member.roles.add(rolesToRestore);
-                if(modConfig.jail.roleId) member.roles.remove(modConfig.jail.roleId);
-            });
+        if (!jailData) return;
 
-            await JailData.deleteOne({ guildId, userId: member.id });
-            
-            const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
-            if (jailChannel) jailChannel.send(`🔓 تم فك سجن <@${member.id}> ورجعت رتبه كاملة.`);
+        // 1. فلترة الرتب الموجودة فقط بالسيرفر
+        const rolesToRestore = (jailData.oldRoles || [])
+            .filter(rId => guild.roles.cache.has(rId));
+
+        // 2. إزالة رتبة السجن أولاً
+        if (modConfig?.jail?.roleId) {
+            await member.roles.remove(modConfig.jail.roleId).catch(() => {});
         }
-    } catch (err) { console.error("Unjail Error:", err); }
-}
 
+        // 3. إضافة الرتب القديمة وحدة وحدة (أكثر استقرار من set)
+        for (const roleId of rolesToRestore) {
+            await member.roles.add(roleId).catch(() => {});
+        }
+
+        // 4. حذف بيانات السجن
+        await JailData.deleteOne({ guildId, userId: member.id });
+
+        // 5. لوق
+        const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
+        if (jailChannel) {
+            jailChannel.send(`🔓 تم فك سجن <@${member.id}> ورجعت رتبته بنجاح.`);
+        }
+
+    } catch (err) {
+        console.error("Unjail Error:", err);
+    }
+}
 
 
 // --- 📂 لوق تعديل الرومات (اسم، وصف، نوع) ---
