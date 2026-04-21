@@ -1708,11 +1708,10 @@ if (msg.content.startsWith('!توب-ستريك') || msg.content.startsWith('!top
 
     for (let i = 0; i < topUsers.length; i++) {
         const uData = topUsers[i];
-        // محاولة جلب العضو من الكاش أو من ديسكورد لتظهر التاغ الخاص به
-        const user = await client.users.fetch(uData.userId).catch(() => null);
-        const userTag = user ? `**${user.username}**` : `عضو غادر (${uData.userId})`;
         
-        // أشكال الميداليات لأول 3 مراكز
+        // استخدام المنشن مباشرة بدلاً من الاسم
+        const userTag = `<@${uData.userId}>`;
+        
         let medal = "";
         if (i === 0) medal = "🥇";
         else if (i === 1) medal = "🥈";
@@ -1721,6 +1720,7 @@ if (msg.content.startsWith('!توب-ستريك') || msg.content.startsWith('!top
 
         description += `${medal} | ${userTag} — \`${uData.streakCount} يوم\`\n`;
     }
+
 
     embed.setDescription(description);
     embed.setFooter({ text: "Zone System • المنافسة مشتعلة! 🔥" });
