@@ -2431,6 +2431,62 @@ client.on('interactionCreate', async (interaction) => {
 
 });
 
+async function openTicket(interaction, config, type) {
+    try {
+        if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
+
+        // 1. تحديث عداد التذاكر
+        const ticketNumber = (config.ticketCount || 0) + 1;
+        await TicketConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { $inc: { ticketCount: 1 } });
+
+        // 2. إنشاء الروم وتحديد الصلاحيات
+        const channel = await interaction.guild.channels.create({
+            name: `ticket-${ticketNumber}`,
+            type: ChannelType.GuildText,
+            permissionOverwrites: [
+                { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+            ],
+        });
+
+        // 3. بناء الإيمباد (النيون)
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 تذكرتك الجديدة")
+            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: **${type}**`)
+            .setColor(config.color || "#5865F2")
+            .setTimestamp();
+
+        // 4. أزرار التحكم (استلام، إغلاق، إضافة، استدعاء)
+        const controlRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('claim_ticket').setLabel('📌 استلام').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 إغلاق').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('add_member').setLabel('➕ إضافة').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('summon_member').setLabel('📣 استدعاء').setStyle(ButtonStyle.Secondary)
+        );
+
+        // 5. الإرسال في الروم مع منشن الإدارة وصاحب التكت
+        await channel.send({ 
+            content: `${interaction.user} | <@&${config.adminRole}>`, 
+            embeds: [embed], 
+            components: [controlRow] 
+        });
+        
+        // 6. حفظ بيانات التكت في الداتابيز (ضروري للأزرار)
+        await TicketData.create({
+            guildId: interaction.guild.id,
+            channelId: channel.id,
+            ownerId: interaction.user.id,
+            openedAt: new Date()
+        });
+
+        await interaction.editReply({ content: `✅ تم فتح تذكرتك بنجاح: ${channel}` });
+
+    } catch (err) {
+        console.error("❌ Error in openTicket:", err);
+        if (interaction.deferred) await interaction.editReply("❌ حدث خطأ تقني أثناء فتح التكت.");
+    }
+}
 
 
 
