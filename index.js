@@ -332,44 +332,38 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
 app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
     try {
         const { targetChannel, embedTitle, embedDesc, embedColor } = req.body;
-        
         const guild = client.guilds.cache.get(req.params.guildId);
-        if (!guild) return res.status(404).send("❌ السيرفر غير موجود في الذاكرة.");
+        if (!guild) return res.status(404).send("❌ السيرفر غير موجود.");
         
         let channel = guild.channels.cache.get(targetChannel);
-        if (!channel) {
-            channel = await guild.channels.fetch(targetChannel).catch(() => null);
-        }
-
+        if (!channel) channel = await guild.channels.fetch(targetChannel).catch(() => null);
         if (!channel) return res.send("⚠️ لم يتم العثور على القناة.");
 
-        // بناء الإيمباد مع حماية ضد الـ Crash
         const customEmbed = new EmbedBuilder()
             .setTitle(embedTitle || "Zone System") 
             .setDescription(embedDesc || " ")
             .setColor(embedColor || '#5865f2')
             .setTimestamp();
 
-        // إصلاح رابط الـ Avatar وتفاصيل المرسل
+        // نظام حماية للأفاتار لضمان عدم حدوث خطأ URL
+        let footerText = "Zone System Embed Sender";
+        let iconURL = 'https://discordapp.com';
+
         if (req.user) {
-            const avatarURL = req.user.avatar 
-                ? `https://discordapp.com{req.user.id}/${req.user.avatar}.png`
-                : 'https://discordapp.com';
-                
-            customEmbed.setFooter({ 
-                text: `أُرسل بواسطة: ${req.user.username}`, 
-                iconURL: avatarURL 
-            });
+            footerText = `أُرسل بواسطة: ${req.user.username}`;
+            if (req.user.avatar) {
+                iconURL = `https://discordapp.com{req.user.id}/${req.user.avatar}.png`;
+            }
         }
 
+        customEmbed.setFooter({ text: footerText, iconURL: iconURL });
+
         await channel.send({ embeds: [customEmbed] });
-        
         res.redirect(`/manage/${req.params.guildId}/streaks`);
 
     } catch (err) {
-        console.error("❌ Fatal Error:", err);
-        // نرسل رد نصي بسيط بدل الانهيار
-        res.status(500).send(`حدث خطأ: ${err.message}`);
+        console.error("❌ Embed Error:", err);
+        res.status(500).send(`حدث خطأ في بناء الإيمباد: ${err.message}`);
     }
 });
 
