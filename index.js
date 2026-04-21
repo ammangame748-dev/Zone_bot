@@ -332,40 +332,34 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
 app.post('/send-custom-embed/:guildId', checkAuth, async (req, res) => {
     try {
         const { targetChannel, embedTitle, embedDesc, embedColor } = req.body;
+        
         const guild = client.guilds.cache.get(req.params.guildId);
-        if (!guild) return res.status(404).send("❌ السيرفر غير موجود.");
+        if (!guild) return res.status(404).send("❌ السيرفر غير موجود في ذاكرة البوت.");
         
         let channel = guild.channels.cache.get(targetChannel);
         if (!channel) channel = await guild.channels.fetch(targetChannel).catch(() => null);
-        if (!channel) return res.send("⚠️ لم يتم العثور على القناة.");
 
+        if (!channel) return res.send("⚠️ لم يتم العثور على القناة، تأكد من اختيار قناة نصية.");
+
+        // بناء الإيمباد بالأساسيات فقط
         const customEmbed = new EmbedBuilder()
             .setTitle(embedTitle || "Zone System") 
             .setDescription(embedDesc || " ")
             .setColor(embedColor || '#5865f2')
             .setTimestamp();
 
-        // نظام حماية للأفاتار لضمان عدم حدوث خطأ URL
-        let footerText = "Zone System Embed Sender";
-        let iconURL = 'https://discordapp.com';
-
-        if (req.user) {
-            footerText = `أُرسل بواسطة: ${req.user.username}`;
-            if (req.user.avatar) {
-                iconURL = `https://discordapp.com{req.user.id}/${req.user.avatar}.png`;
-            }
-        }
-
-        customEmbed.setFooter({ text: footerText, iconURL: iconURL });
-
+        // إرسال الإيمباد
         await channel.send({ embeds: [customEmbed] });
+        
+        // إعادة التوجيه لصفحة الستريك بعد النجاح
         res.redirect(`/manage/${req.params.guildId}/streaks`);
 
     } catch (err) {
-        console.error("❌ Embed Error:", err);
-        res.status(500).send(`حدث خطأ في بناء الإيمباد: ${err.message}`);
+        console.error("❌ Embed Send Error:", err);
+        res.status(500).send(`حدث خطأ أثناء الإرسال: ${err.message}`);
     }
 });
+
 
 
 
