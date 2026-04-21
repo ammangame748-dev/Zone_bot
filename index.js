@@ -2396,39 +2396,50 @@ client.on('interactionCreate', async (interaction) => {
             return openTicket(interaction, config, type);
         }
 
-      // --- [ 🎭 نظام الرتب الذاتية - رتبة واحدة فقط ] ---
+// --- [ 🎭 نظام الرتب الذاتية - رتبة واحدة فقط ] ---
 if (interaction.isButton() && interaction.customId.startsWith('role_')) {
-    const roleId = interaction.customId.split('_')[1];
-    const role = interaction.guild.roles.cache.get(roleId);
+    try {
+        const roleId = interaction.customId.replace('role_', '');
+        const role = interaction.guild.roles.cache.get(roleId);
 
-    if (!role) return interaction.reply({ content: "❌ الرتبة غير موجودة", ephemeral: true });
+        if (!role) return interaction.reply({ content: "❌ الرتبة غير موجودة بالسيرفر.", ephemeral: true });
 
-    // 1. جلب كل الرتب الموجودة في اللوحة من الداتابيز
-    const allPanelRoles = config.rolesPanel.map(r => r.roleId);
+        // 1. جلب إعدادات السيرفر والتأكد من وجود مصفوفة الرتب
+        const guildData = await GuildConfig.findOne({ guildId: interaction.guild.id });
+        const allPanelRoles = (guildData && guildData.rolesPanel) ? guildData.rolesPanel.map(r => r.roleId) : [];
 
-    // 2. فحص إذا العضو عنده الرتبة اللي ضغط عليها أصلاً (عشان يشيلها)
-    if (interaction.member.roles.cache.has(roleId)) {
-        await interaction.member.roles.remove(roleId);
-        return interaction.reply({ content: `❌ تم سحب رتبة **${role.name}** منك.`, ephemeral: true });
-    }
-
-    // 3. (الخطوة الأهم) إزالة أي رتبة ثانية تابعة لنفس اللوحة قبل إعطاء الجديدة
-    const rolesToRemove = interaction.member.roles.cache.filter(r => allPanelRoles.includes(r.id) && r.id !== roleId);
-    
-    if (rolesToRemove.size > 0) {
-        await interaction.member.roles.remove(rolesToRemove);
-    }
-
-    // 4. إعطاء الرتبة الجديدة
-    await interaction.member.roles.add(roleId);
-    return interaction.reply({ 
-        content: `✅ تم إعطاؤك رتبة **${role.name}** (وسحب باقي رتب اللوحة إن وجدت).`, 
-        ephemeral: true 
-    });
-
+        // 2. إذا العضو ضغط على رتبة هي معه أصلاً -> يسحبها منه
+        if (interaction.member.roles.cache.has(roleId)) {
+            await interaction.member.roles.remove(roleId).catch(() => {});
+            return interaction.reply({ content: `❌ تم سحب رتبة **${role.name}** منك.`, ephemeral: true });
         }
 
- 
+        // 3. التأكد من صلاحية البوت
+        if (role.position >= interaction.guild.members.me.roles.highest.position) {
+            return interaction.reply({ content: "⚠️ رتبة البوت أقل من الرتبة المطلوبة، ارفع رتبة البوت.", ephemeral: true });
+        }
+
+        // 4. إزالة أي رتبة أخرى تابعة للوحة (إذا كانت موجودة في الداتابيز)
+        if (allPanelRoles.length > 0) {
+            const rolesToRemove = interaction.member.roles.cache.filter(r => allPanelRoles.includes(r.id));
+            if (rolesToRemove.size > 0) {
+                await interaction.member.roles.remove(rolesToRemove).catch(() => {});
+            }
+        }
+
+        // 5. إعطاء الرتبة الجديدة
+        await interaction.member.roles.add(roleId);
+        return interaction.reply({ 
+            content: `✅ تم إعطاؤك رتبة **${role.name}** (وتبديل الرتب الأخرى إن وجدت).`, 
+            ephemeral: true 
+        });
+
+    } catch (err) {
+        console.error("Role Error:", err);
+        if (!interaction.replied) interaction.reply({ content: "❌ حدث خطأ، جرب مرة أخرى.", ephemeral: true });
+    }
+}
+
         // --- 3. أزرار التحكم داخل التكت ---
         if (interaction.isButton()) {
             const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
