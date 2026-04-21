@@ -1818,52 +1818,45 @@ if (msg.content.startsWith('!توب-ستريك') || msg.content.startsWith('!top
         const args = msg.content.slice(prefix.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
 
-        if (command === modConfig.jail.commandName.toLowerCase()) {
-            if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return msg.reply("❌ عذراً، هذا الأمر مخصص للإدارة العليا فقط!");
-            }
+if (command === modConfig.jail.commandName.toLowerCase()) {
+    if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) return msg.reply("❌ للإدارة فقط");
 
-            const target = msg.mentions.members.first();
-            const timeInput = args.find(arg => /[smhdw]/.test(arg));
+    const target = msg.mentions.members.first();
+    const timeInput = args.find(arg => /[smhdw]/.test(arg));
 
-            if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: \`${prefix}${command} @user 1h\``);
-            if (target.id === msg.author.id) return msg.reply("❌ لا يمكنك سجن نفسك!");
+    if (!target || !timeInput) return msg.reply(`⚠️ الاستخدام: !سجن @user 1h`);
+    if (target.id === msg.author.id) return msg.reply("❌ ما بتقدر تسجن نفسك");
 
-            const durationMs = ms(timeInput);
-            if (!durationMs) return msg.reply("❌ صيغة الوقت غير صحيحة (مثال: 1h, 30m).");
+    const durationMs = ms(timeInput);
+    if (!durationMs) return msg.reply("❌ صيغة الوقت غلط (مثلاً: 10m, 1h)");
 
-            const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
-            const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
+    const jailRole = msg.guild.roles.cache.get(modConfig.jail.roleId);
+    if (!jailRole) return msg.reply("❌ رتبة السجن مو محددة بالداشبورد");
 
-            if (!jailRole) return msg.reply("❌ رتبة السجن غير مضبوطة في الداشبورد!");
+    try {
+        // 1. حفظ كل رتبه الحالية (ما عدا رتبة الجميع)
+        const currentRoles = target.roles.cache.filter(r => r.id !== msg.guild.id).map(r => r.id);
 
-            try {
-                const currentRoles = target.roles.cache.filter(r => r.name !== '@everyone').map(r => r.id);
-                await JailData.findOneAndUpdate(
-                    { guildId: msg.guild.id, userId: target.id },
-                    { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
-                    { upsert: true }
-                );
+        // 2. تخزين البيانات بالداتابيز
+        await JailData.findOneAndUpdate(
+            { guildId: msg.guild.id, userId: target.id },
+            { oldRoles: currentRoles, endAt: new Date(Date.now() + durationMs) },
+            { upsert: true }
+        );
 
-                const dmEmbed = new EmbedBuilder()
-                    .setTitle('⚖️ لقد تم سجنك!')
-                    .setThumbnail(msg.guild.iconURL())
-                    .setDescription(`مرحباً ${target.user.username}، تم سجنك في سيرفر **${msg.guild.name}**.`)
-                    .addFields(
-                        { name: '⏳ المدة:', value: timeInput, inline: true },
-                        { name: '📍 الروم المخصص:', value: `<#${modConfig.jail.channelId}>`, inline: true },
-                        { name: '🛡️ المسؤول:', value: `${msg.author.tag}`, inline: true }
-                    )
-                    .setColor('Red').setTimestamp();
-                
-                await target.send({ embeds: [dmEmbed] }).catch(() => console.log("خاص العضو مغلق"));
+        // 3. التنفيذ: سحب كل الرتب وإعطاؤه رتبة السجن فقط
+        await target.roles.set([jailRole.id]).catch(err => console.log("صلاحيات البوت ضعيفة"));
 
-                await target.roles.set([jailRole.id]);
-                msg.channel.send(`🔒 تم سجن ${target} بنجاح وإرسال التفاصيل له بالخاص.`);
+        msg.channel.send(`🔒 تم سجن ${target} لمدة ${timeInput} وسحب كل رتبه.`);
 
-                setTimeout(async () => { await handleUnjail(target, msg.guild.id, jailChannel); }, durationMs);
-            } catch (e) { console.error(e); }
-        }
+        // 4. مؤقت لفك السجن تلقائياً
+        setTimeout(async () => {
+            await handleUnjail(target, msg.guild.id);
+        }, durationMs);
+
+    } catch (e) { console.error(e); }
+}
+
 
         if (command === (modConfig.jail.unjailCommand || 'unjail').toLowerCase()) {
             if (!msg.member.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -2289,47 +2282,30 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 async function handleUnjail(member, guildId) {
     try {
         const guild = client.guilds.cache.get(guildId);
-        if (!guild) return console.log("السيرفر غير موجود");
+        if (!guild || !member) return;
 
-        // 1. جلب البيانات من الداتابيز
         const jailData = await JailData.findOne({ guildId, userId: member.id });
         const modConfig = await ModConfig.findOne({ guildId });
 
-        console.log(`محاولة فك سجن العضو: ${member.id}`);
-
-        if (jailData && jailData.oldRoles && jailData.oldRoles.length > 0) {
-            // 2. تصفية الرتب (نتأكد إنها لسا موجودة بالسيرفر ومش رتبة الجميع)
-            const rolesToRestore = jailData.oldRoles.filter(rId => 
-                guild.roles.cache.has(rId) && rId !== guild.id
-            );
-
-            console.log(`الرتب اللي رح ترجع: ${rolesToRestore.join(', ')}`);
-
-            // 🌟 الخطوة السحرية: نصفر رتبه (نشيل السجن وكل شي) ثم نعطيه القديم دفعة وحدة
-            await member.roles.set(rolesToRestore).catch(async (err) => {
-                console.error("فشل في استرجاع الرتب، بحاول طريقة بديلة...");
-                // طريقة بديلة لو فشل الـ set
-                await member.roles.add(rolesToRestore);
+        if (jailData && jailData.oldRoles) {
+            // تصفية الرتب للتأكد أنها لسا موجودة بالسيرفر
+            const rolesToRestore = jailData.oldRoles.filter(rId => guild.roles.cache.has(rId));
+            
+            // استرجاع الرتب الأصلية (هذا الأمر يمسح رتبة السجن تلقائياً لأنه يستبدل الكل)
+            await member.roles.set(rolesToRestore).catch(() => {
+                // إذا فشل الـ set، يحاول يضيفهم يدوي ويشيل السجن
+                member.roles.add(rolesToRestore);
+                if(modConfig.jail.roleId) member.roles.remove(modConfig.jail.roleId);
             });
 
-            // 3. مسح بيانات السجن عشان ما يتكرر
             await JailData.deleteOne({ guildId, userId: member.id });
             
-        } else {
-            // 4. إذا ما في رتب مخزنة، بس بنشيل رتبة السجن
-            console.log("لا يوجد رتب مخزنة، جاري حذف رتبة السجن فقط");
-            const jailRoleId = modConfig?.jail?.roleId;
-            if (jailRoleId) await member.roles.remove(jailRoleId).catch(() => {});
+            const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
+            if (jailChannel) jailChannel.send(`🔓 تم فك سجن <@${member.id}> ورجعت رتبه كاملة.`);
         }
-
-        // 5. إشعار في روم السجن
-        const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
-        if (jailChannel) jailChannel.send(`🔓 تم فك سجن <@${member.id}> بنجاح واستعادة رتبه.`);
-
-    } catch (err) {
-        console.error("❌ خطأ قاتل في فك السجن:", err);
-    }
+    } catch (err) { console.error("Unjail Error:", err); }
 }
+
 
 
 // --- 📂 لوق تعديل الرومات (اسم، وصف، نوع) ---
