@@ -2493,14 +2493,16 @@ client.on('interactionCreate', async (interaction) => {
         console.error("Interaction Error:", err);
     }
 });
-// حطه بآخر الملف قبل سطر تسجيل الدخول
+
 async function openTicket(interaction, config, type) {
     try {
         if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
 
+        // 1. تحديث العداد
         const ticketNumber = (config.ticketCount || 0) + 1;
         await TicketConfig.findOneAndUpdate({ guildId: interaction.guild.id }, { $inc: { ticketCount: 1 } });
 
+        // 2. إنشاء الروم بنفس الاسم المعتاد
         const channel = await interaction.guild.channels.create({
             name: `ticket-${ticketNumber}`,
             type: ChannelType.GuildText,
@@ -2511,18 +2513,29 @@ async function openTicket(interaction, config, type) {
             ],
         });
 
+        // 3. بناء الإيمباد (النيون)
         const embed = new EmbedBuilder()
             .setTitle("🎫 تكت جديد")
-            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: ${type}`)
-            .setColor("#5865F2");
+            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: **${type}**`)
+            .setColor(config.color || "#5865F2")
+            .setTimestamp();
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق').setStyle(ButtonStyle.Danger)
+        // 4. أزرار التحكم (الاستلام، الإغلاق، إضافة عضو) - رجعناها زي ما كانت
+        const controlRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('claim_ticket').setLabel('📌 استلام').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 إغلاق').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('add_member').setLabel('➕ إضافة').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('summon_member').setLabel('📣 استدعاء').setStyle(ButtonStyle.Secondary)
         );
 
-        await channel.send({ content: `${interaction.user} <@&${config.adminRole}>`, embeds: [embed], components: [row] });
+        // 5. الإرسال مع منشن الإدارة
+        await channel.send({ 
+            content: `${interaction.user} | <@&${config.adminRole}>`, 
+            embeds: [embed], 
+            components: [controlRow] 
+        });
         
+        // 6. تسجيل التكت في الداتابيز
         await TicketData.create({
             guildId: interaction.guild.id,
             channelId: channel.id,
@@ -2530,10 +2543,11 @@ async function openTicket(interaction, config, type) {
             openedAt: new Date()
         });
 
-        await interaction.editReply(`✅ تم فتح التكت: ${channel}`);
+        await interaction.editReply({ content: `✅ تم فتح تذكرتك: ${channel}` });
+
     } catch (err) {
         console.error("❌ Error in openTicket:", err);
-        if (interaction.deferred) await interaction.editReply("❌ حدث خطأ أثناء فتح التكت");
+        if (interaction.deferred) await interaction.editReply("❌ حدث خطأ تقني أثناء فتح التكت.");
     }
 }
 
