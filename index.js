@@ -1818,7 +1818,7 @@ ${dailyMsgs} رسالة
     msg.reply({ embeds: [embed] });
 }
 // --- [ أمر توب الستريك !top-streak ] ---
-if (msg.content.startsWith('!توب-ستريك') || msg.content.startsWith('!top-streak')) {
+if (msg.content.startsWith ('!توب') || msg.content.startsWith('!top-streak')) {
     // جلب أعلى 10 مستخدمين مرتبين حسب streakCount من الأكبر للأصغر
     const topUsers = await UserLevel.find({ guildId: msg.guild.id, streakCount: { $gt: 0 } })
         .sort({ streakCount: -1 })
