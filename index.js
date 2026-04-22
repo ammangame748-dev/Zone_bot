@@ -1754,10 +1754,15 @@ if (msg.content === '!rolespanel') {
         const now = new Date();
         const isSameDay = u.lastMessageDate && u.lastMessageDate.toDateString() === now.toDateString();
 
-        if (!isSameDay) {
-            u.dailyMsgs = 0;
-            u.warned = false;
-        }
+       if (!isSameDay) {
+    // إذا اليوم تغير ولسه ما كمل → ينكسر الستريك
+    if (u.dailyMsgs < sConf.requiredMessages) {
+        u.streakCount = 0;
+    }
+
+    u.dailyMsgs = 0;
+    u.warned = false;
+}
 
         if (u.dailyMsgs < sConf.requiredMessages) {
             u.dailyMsgs++;
@@ -2715,43 +2720,53 @@ async function openTicket(interaction, config, type) {
 
 
 const axios = require('axios');
-
 setInterval(async () => {
-    const allConfigs = await KickConfig.find({});
-    for (const config of allConfigs) {
-        for (const streamer of config.streamers) {
+    const allUsers = await UserLevel.find({});
+
+    for (const u of allUsers) {
+        if (!u.lastMessageDate) continue;
+
+        const now = Date.now();
+        const last = new Date(u.lastMessageDate).getTime();
+
+        const diff = now - last;
+
+        const fullDay = 24 * 60 * 60 * 1000;
+        const warnTime = fullDay - (5 * 60 * 60 * 1000); // قبل 5 ساعات
+
+        // 🔔 التنبيه قبل ما يروح
+        if (diff >= warnTime && diff < fullDay && !u.warned) {
             try {
-                // فحص حالة البث عبر API وسيط أو مباشرة
-                const response = await axios.get(`https://kick.com{streamer.kickUsername}`);
-                const data = response.data;
-                const isCurrentlyLive = data.livestream !== null;
+                const guild = client.guilds.cache.get(u.guildId);
+                const member = await guild.members.fetch(u.userId).catch(() => null);
 
-                if (isCurrentlyLive && !streamer.isLive) {
-                    // الشخص فتح بث الآن!
-                    const guild = client.guilds.cache.get(config.guildId);
-                    const channel = guild?.channels.cache.get(streamer.channelId);
-                    if (channel) {
-                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : "";
-                        const embed = new EmbedBuilder()
-                            .setTitle(data.user.username)
-                            .setURL(`https://kick.com{streamer.kickUsername}`)
-                            .setDescription(streamer.customMessage.replace('%name%', data.user.username) || `${data.user.username} بدأ بثاً مباشراً الآن!`)
-                            .addFields({ name: 'العنوان', value: data.livestream.session_title })
-                            .setImage(data.livestream.thumbnail.url)
-                            .setColor('#00E701'); // لون كيك الأخضر
-
-                        channel.send({ content: mention, embeds: [embed] });
-                    }
-                    streamer.isLive = true; // تحديث الحالة لمنع تكرار الإرسال
-                } else if (!isCurrentlyLive) {
-                    streamer.isLive = false; // إعادة الضبط عند إغلاق البث
+                if (member) {
+                    await member.send({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle("⚠️ تنبيه الستريك!")
+                                .setDescription(`🔥 باقي أقل من 5 ساعات ويختفي الستريك!\n\n💬 اكتب ${sConf.requiredMessages} رسالة لتحافظ عليه.`)
+                                .setColor('#FFA500')
+                        ]
+                    }).catch(() => {});
                 }
-            } catch (e) { /* معالجة أخطاء الفحص */ }
-        }
-        await config.save();
-    }
-}, 60000); // يفحص كل دقيقة
 
+                u.warned = true;
+                await u.save();
+
+            } catch (e) {}
+        }
+
+        // ❌ حذف الستريك بعد 24 ساعة
+        if (diff >= fullDay) {
+            u.streakCount = 0;
+            u.dailyMsgs = 0;
+            u.warned = false;
+            await u.save();
+        }
+    }
+
+}, 60 * 1000); // كل دقيقة
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
