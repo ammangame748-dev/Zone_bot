@@ -218,22 +218,31 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
 // ==========================================
 // 5️⃣ الدوال المساعدة (Helper Functions)
 // ==========================================
-async function getExecutor(guild, eventType) {
-    try {
-        await new Promise(resolve => setTimeout(resolve, 2500)); // زيادة وقت الانتظار لضمان التسجيل
-        const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
-        const entry = auditLogs.entries.first();
-        if (!entry || !entry.executor) return "غير معروف (تلقائي)";
-        
-        // التحقق من وقت العملية (عشان ما يجيب مسؤول قديم)
-        const now = Date.now();
-        if (now - entry.createdTimestamp > 10000) return "غير معروف (تلقائي)";
+async function sendLog(guild, type, embed) {
+    const config = await GuildConfig.findOne({ guildId: guild.id });
+    if (!config?.logs) return;
 
-        return `<@${entry.executor.id}>`; 
-    } catch (e) { return "صلاحيات ناقصة"; }
+    const logChannelId = config.logs[type]?.channel;
+    const enabled = config.logs[type]?.enabled;
+
+    if (!enabled || !logChannelId) return;
+
+    const logChannel = guild.channels.cache.get(logChannelId);
+    if (!logChannel) return;
+
+    logChannel.send({ embeds: [embed] }).catch(() => {});
 }
 
-
+async function getExecutor(guild, actionType) {
+    try {
+        const logs = await guild.fetchAuditLogs({ limit: 1, type: actionType });
+        const entry = logs.entries.first();
+        if (!entry) return "غير معروف";
+        return `<@${entry.executor.id}>`;
+    } catch {
+        return "غير معروف";
+    }
+}
 
 // ✅ الآن يمكنك إكمال باقي الأكواد (client.on) والـ Express Routes بالأسفل
 
@@ -2291,115 +2300,163 @@ app.get('/logout', (req, res) => {
 
 
 client.on('messageDelete', async (message) => {
-    if (!message.guild || message.author?.bot) return;
-    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
+    if (!message.guild || !message.author) return;
 
-    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
-    if (!logCh) return;
+    const logs = await message.guild.fetchAuditLogs({
+        type: AuditLogEvent.MessageDelete
+    }).catch(() => {});
 
-    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
+    const executor = logs?.entries.first()?.executor;
 
     const embed = new EmbedBuilder()
-        .setAuthor({ name: '🗑️ حذف رسالة' })
-        .setColor('#ff4757')
+        .setTitle("🗑️ Message Deleted")
+        .setColor("Red")
         .addFields(
-            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
-            { name: '🛡️ المسؤول عن الحذف:', value: executor, inline: true },
-            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
-            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
-        ).setTimestamp();
-    
-    logCh.send({ embeds: [embed] }).catch(() => {});
+            { name: "👤 Author", value: `<@${message.author.id}>`, inline: true },
+            { name: "🛡️ Deleted By", value: executor ? `<@${executor.id}>` : "Unknown", inline: true },
+            { name: "📍 Channel", value: `<#${message.channel.id}>`, inline: true },
+            { name: "🧾 Content", value: message.content || "No Content" }
+        )
+        .setTimestamp();
+
+    sendLog(message.guild, "messages", embed);
 });
 
-// --- [ 2. لوق تعديل الرسائل ] ---
 client.on('messageUpdate', async (oldMsg, newMsg) => {
-    if (!oldMsg.guild || oldMsg.author?.bot || oldMsg.content === newMsg.content) return;
-    const s = await GuildConfig.findOne({ guildId: oldMsg.guild.id });
-    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
+    if (!oldMsg.guild || !oldMsg.author) return;
+    if (oldMsg.content === newMsg.content) return;
 
-    const logCh = oldMsg.guild.channels.cache.get(s.logs.messages.channel);
     const embed = new EmbedBuilder()
-        .setAuthor({ name: '📝 تعديل رسالة' })
-        .setColor('#ffa502')
+        .setTitle("✏️ Message Edited")
+        .setColor("Orange")
         .addFields(
-            { name: '👤 الكاتب:', value: `<@${oldMsg.author.id}>`, inline: true },
-            { name: '📍 القناة:', value: `<#${oldMsg.channel.id}>`, inline: true },
-            { name: '⬅️ قبل:', value: oldMsg.content || 'فارغ' },
-            { name: '➡️ بعد:', value: newMsg.content || 'فارغ' }
-        ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
-});
+            { name: "👤 Author", value: `<@${oldMsg.author.id}>`, inline: true },
+            { name: "📍 Channel", value: `<#${oldMsg.channel.id}>`, inline: true },
+            { name: "⬅️ Before", value: oldMsg.content || "Empty" },
+            { name: "➡️ After", value: newMsg.content || "Empty" }
+        )
+        .setTimestamp();
 
-// --- [ 3. لوق دخول وخروج الأعضاء ] ---
-client.on('guildMemberAdd', async (member) => {
-    const s = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (s?.logs?.members?.enabled && s.logs.members.channel) {
-        const logCh = member.guild.channels.cache.get(s.logs.members.channel);
+    sendLog(oldMsg.guild, "messages", embed);
+});
+client.on('guildMemberRemove', async (member) => {
+    const executor = await getExecutor(member.guild, AuditLogEvent.MemberKick);
+
+    const embed = new EmbedBuilder()
+        .setTitle("🚪 Member Kicked / Left")
+        .setColor("Grey")
+        .setDescription(`
+👤 User: <@${member.id}>
+🛡️ By: ${executor}
+        `)
+        .setTimestamp();
+
+    sendLog(member.guild, "members", embed);
+});
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    if (oldMember.communicationDisabledUntil !== newMember.communicationDisabledUntil) {
+
+        const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate);
+
         const embed = new EmbedBuilder()
-            .setAuthor({ name: '📥 دخول عضو' })
-            .setColor('#2ed573')
-            .setDescription(`**العضو:** <@${member.id}>\n**الأيدي:** \`${member.id}\``)
+            .setTitle("⏳ Timeout Update")
+            .setColor("Yellow")
+            .setDescription(`
+👤 User: <@${newMember.id}>
+🛡️ By: ${executor}
+⏰ Timeout: ${newMember.communicationDisabledUntil ? "Applied" : "Removed"}
+            `)
             .setTimestamp();
-        if (logCh) logCh.send({ embeds: [embed] });
+
+        sendLog(newMember.guild, "moderation", embed);
     }
+});
+client.on('guildBanAdd', async (ban) => {
+    const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanAdd);
+
+    const embed = new EmbedBuilder()
+        .setTitle("⛔ Member Banned")
+        .setColor("DarkRed")
+        .setDescription(`
+👤 User: <@${ban.user.id}>
+🛡️ Banned By: ${executor}
+        `)
+        .setTimestamp();
+
+    sendLog(ban.guild, "moderation", embed);
+});
+client.on('guildMemberAdd', async (member) => {
+    const embed = new EmbedBuilder()
+        .setTitle("📥 Member Joined")
+        .setColor("Green")
+        .setDescription(`<@${member.id}> joined`)
+        .setTimestamp();
+
+    sendLog(member.guild, "members", embed);
 });
 
 client.on('guildMemberRemove', async (member) => {
-    const s = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (s?.logs?.members?.enabled && s.logs.members.channel) {
-        const logCh = member.guild.channels.cache.get(s.logs.members.channel);
-        const executor = await getExecutor(member.guild, AuditLogEvent.MemberKick);
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: '📤 خروج/طرد عضو' })
-            .setColor('#ff4757')
-            .setDescription(`**العضو:** <@${member.id}>\n**المسؤول:** ${executor.id ? `<@${executor.id}>` : 'خرج بنفسه'}`)
-            .setTimestamp();
-        if (logCh) logCh.send({ embeds: [embed] });
-    }
+    const embed = new EmbedBuilder()
+        .setTitle("📤 Member Left")
+        .setColor("Red")
+        .setDescription(`<@${member.id}> left`)
+        .setTimestamp();
+
+    sendLog(member.guild, "members", embed);
 });
 
-// --- [ 4. لوق الرومات (حذف وتعديل) ] ---
 client.on('channelDelete', async (channel) => {
-    const s = await GuildConfig.findOne({ guildId: channel.guild.id });
-    if (!s?.logs?.channels?.enabled || !s.logs.channels.channel) return;
-    const logCh = channel.guild.channels.cache.get(s.logs.channels.channel);
+
     const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelDelete);
 
     const embed = new EmbedBuilder()
-        .setAuthor({ name: '🗑️ حذف قناة' })
-        .setColor('#ff4757')
+        .setTitle("🗑️ Channel Deleted")
+        .setColor("Red")
         .addFields(
-            { name: '📍 اسم القناة:', value: `\`${channel.name}\``, inline: true },
-            { name: '🛡️ المسؤول:', value: executor.id ? `<@${executor.id}>` : `${executor}`, inline: true }
-        ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] });
-});
-
-client.on('channelUpdate', async (oldChannel, newChannel) => {
-    const s = await GuildConfig.findOne({ guildId: newChannel.guild.id });
-    if (!s?.logs?.channels?.enabled || !s.logs.channels.channel) return;
-    const logCh = newChannel.guild.channels.cache.get(s.logs.channels.channel);
-    if (!logCh) return;
-
-    const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
-    
-    let changes = [];
-    if (oldChannel.name !== newChannel.name) changes.push(`📝 **تغيير الاسم:** من \`${oldChannel.name}\` إلى \`${newChannel.name}\``);
-    if (oldChannel.topic !== newChannel.topic) changes.push(`📑 **تغيير الوصف:** من \`${oldChannel.topic || 'لا يوجد'}\` إلى \`${newChannel.topic || 'لا يوجد'}\``);
-    
-    if (changes.length === 0) return; // إذا التغيير ليس بالاسم أو الوصف
-
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: '⚙️ تحديث إعدادات القناة' })
-        .setColor('#ffa502')
-        .setDescription(`📍 **القناة:** <#${newChannel.id}>\n🛡️ **بواسطة:** ${executor}\n\n${changes.join('\n')}`)
+            { name: "📍 Name", value: channel.name },
+            { name: "🛡️ By", value: executor }
+        )
         .setTimestamp();
 
-    logCh.send({ embeds: [embed] }).catch(() => {});
+    sendLog(channel.guild, "channels", embed);
 });
 
+client.on('channelUpdate', async (oldC, newC) => {
+
+    const executor = await getExecutor(newC.guild, AuditLogEvent.ChannelUpdate);
+
+    const changes = [];
+
+    if (oldC.name !== newC.name)
+        changes.push(`Name: ${oldC.name} ➜ ${newC.name}`);
+
+    if (oldC.permissionOverwrites.cache.size !== newC.permissionOverwrites.cache.size)
+        changes.push(`🔐 Permissions changed`);
+
+    const embed = new EmbedBuilder()
+        .setTitle("✏️ Channel Updated")
+        .setColor("Purple")
+        .setDescription(changes.join("\n") || "No major changes")
+        .addFields({ name: "🛡️ By", value: executor })
+        .setTimestamp();
+
+    sendLog(newC.guild, "channels", embed);
+});
+client.on('channelCreate', async (channel) => {
+
+    const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelCreate);
+
+    const embed = new EmbedBuilder()
+        .setTitle("✨ Channel Created")
+        .setColor("Green")
+        .addFields(
+            { name: "📍 Name", value: channel.name },
+            { name: "🛡️ By", value: executor }
+        )
+        .setTimestamp();
+
+    sendLog(channel.guild, "channels", embed);
+});
 // عند تعديل اسم رتبة أو لونها
 client.on('roleUpdate', async (oldRole, newRole) => {
     const s = await GuildConfig.findOne({ guildId: newRole.guild.id });
@@ -2439,27 +2496,30 @@ client.on('roleCreate', async (role) => {
     if (logCh) logCh.send({ embeds: [embed] });
 });
 
-// --- [ 5. لوق الرتب (تعديل وتحديث رتب الأعضاء) ] ---
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
-    const s = await GuildConfig.findOne({ guildId: newMember.guild.id });
-    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
-    const logCh = newMember.guild.channels.cache.get(s.logs.roles.channel);
+client.on('guildMemberUpdate', async (oldM, newM) => {
+    const added = newM.roles.cache.filter(r => !oldM.roles.cache.has(r.id));
+    const removed = oldM.roles.cache.filter(r => !newM.roles.cache.has(r.id));
 
-    const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
-    const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
+    if (added.size === 0 && removed.size === 0) return;
 
-    if (addedRoles.size > 0 || removedRoles.size > 0) {
-        const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberRoleUpdate);
-        const embed = new EmbedBuilder().setAuthor({ name: '🎭 تحديث رتب العضو' }).setTimestamp();
+    const logs = await newM.guild.fetchAuditLogs({
+        type: AuditLogEvent.MemberRoleUpdate
+    }).catch(() => {});
 
-        if (addedRoles.size > 0) {
-            embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        } else {
-            embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => `<@&${r.id}>`).join(', ') });
-        }
-        embed.addFields({ name: '👤 العضو:', value: `<@${newMember.id}>` }, { name: '🛡️ المسؤول:', value: executor.id ? `<@${executor.id}>` : `${executor}` });
-        if (logCh) logCh.send({ embeds: [embed] });
-    }
+    const executor = logs?.entries.first()?.executor;
+
+    const embed = new EmbedBuilder()
+        .setTitle("🎭 Role Update")
+        .setColor("Blue")
+        .addFields(
+            { name: "👤 Member", value: `<@${newM.id}>`, inline: true },
+            { name: "🛡️ By", value: executor ? `<@${executor.id}>` : "Unknown", inline: true },
+            { name: "➕ Added", value: added.map(r => `<@&${r.id}>`).join(", ") || "None" },
+            { name: "➖ Removed", value: removed.map(r => `<@&${r.id}>`).join(", ") || "None" }
+        )
+        .setTimestamp();
+
+    sendLog(newM.guild, "roles", embed);
 });
 
 
