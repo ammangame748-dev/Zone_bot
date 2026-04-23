@@ -133,11 +133,14 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         punishment: { type: String, default: 'none' },
         bypassRoles: [String]
     },
-    levels: {
-        enabled: Boolean,
-        xpPerMessage: { type: Number, default: 10 },
-        levelUpChannel: String
-    },
+// ابحث عن GuildConfig وحدث قسم levels ليكون هكذا:
+levels: {
+    enabled: Boolean,
+    xpPerMessage: { type: Number, default: 10 },
+    levelUpChannel: String,
+    leaderboardCommand: { type: String, default: '!levels' } // أضف هذا السطر
+},
+
     // 1️⃣ أضف هذا التعريف في بداية الملف مع باقي الـ Schemas
 
     logs: {
