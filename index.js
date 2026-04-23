@@ -1035,26 +1035,25 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     res.send(ui(g, 'levels', content));
 });
 
-// --- [ مسار حفظ إعدادات الليفل ] ---
 app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const b = req.body;
 
-        // تحديث قاعدة البيانات
+        // التحديث الجديد بيشمل حفظ "leaderboardCommand"
         await GuildConfig.findOneAndUpdate(
             { guildId },
             { 
                 $set: { 
-                    "levels.enabled": b.enabled === 'on', // فحص إذا كان التفعيل شغّال
-                    "levels.xpPerMessage": Number(b.xp) || 10, // تحويل الـ XP لرقم
-                    "levels.levelUpChannel": b.channel // قناة الترقية
+                    "levels.enabled": b.enabled === 'on',
+                    "levels.xpPerMessage": Number(b.xp) || 10,
+                    "levels.levelUpChannel": b.channel,
+                    "levels.leaderboardCommand": b.leaderboardCommand || '!levels' // حفظ الاختصار هون
                 } 
             },
             { upsert: true }
         );
 
-        // بعد الحفظ، يرجعه لنفس الصفحة عشان ما تطلع الشاشة البيضاء
         res.redirect(`/manage/${guildId}/levels`);
         
     } catch (err) {
@@ -1062,6 +1061,7 @@ app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
         res.status(500).send("حدث خطأ أثناء حفظ إعدادات الليفل.");
     }
 });
+
 app.post('/reset-levels/:guildId', checkAuth, async (req, res) => {
     await UserLevel.updateMany({ guildId: req.params.guildId }, { $set: { xp: 0, level: 1, msgCount: 0 } });
     res.redirect(`/manage/${req.params.guildId}/levels`);
@@ -1677,6 +1677,30 @@ client.on('messageCreate', async (msg) => {
     // 2. جلب إعدادات السيرفر (s)
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
     if (!s) return;
+// --- أمر التوب ليفل المخصص من الداشبورد ---
+if (s && s.levels?.enabled && s.levels.leaderboardCommand) {
+    if (msg.content.trim() === s.levels.leaderboardCommand.trim()) {
+        const topLevels = await UserLevel.find({ guildId: msg.guild.id })
+            .sort({ level: -1, xp: -1 })
+            .limit(15);
+
+        if (topLevels.length === 0) return msg.reply("❌ لا توجد بيانات مستويات.");
+
+        const embed = new EmbedBuilder()
+            .setTitle(`🏆 أعلى 15 ليفل في السيرفر`)
+            .setColor('#f1c40f')
+            .setThumbnail(msg.guild.iconURL({ dynamic: true }))
+            .setTimestamp();
+
+        let desc = topLevels.map((u, i) => {
+            let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `**#${i + 1}**`;
+            return `${medal} | <@${u.userId}> — ليفل: \`${u.level}\` (رسائل: \`${u.msgCount || 0}\`)`;
+        }).join('\n');
+
+        embed.setDescription(desc);
+        return msg.reply({ embeds: [embed] });
+    }
+}
 
     // 3. جلب بيانات العضو (u)
     let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
