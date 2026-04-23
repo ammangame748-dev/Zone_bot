@@ -996,12 +996,12 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
 
-    let content = `
+        let content = `
     <form method="POST" action="/save/${g.id}/levels">
         <div class="card">
-            <h3>🏆 نظام الليفل</h3>
+            <h3>🏆 نظام المستويات</h3>
 
-            <label>تفعيل</label>
+            <label>تفعيل النظام</label>
             <input type="checkbox" name="enabled" ${s.levels?.enabled ? 'checked' : ''}>
 
             <label>XP لكل رسالة</label>
@@ -1010,11 +1010,24 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
             <label>روم الترقية</label>
             <select name="channel">
                 ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}">${c.name}</option>`
+                    `<option value="${c.id}" ${s.levels?.levelUpChannel === c.id ? 'selected' : ''}>${c.name}</option>`
                 )}
             </select>
+
+            <label>⌨️ اختصار عرض المتصدرين (مثلاً: !توب-ليفل):</label>
+            <input type="text" name="leaderboardCommand" value="${s.levels?.leaderboardCommand || '!levels'}" placeholder="اكتب الأمر هنا...">
         </div>
 
+        <button class="btn-save">💾 حفظ الإعدادات</button>
+    </form>
+
+    <div class="card" style="border: 1px solid var(--s); margin-top: 20px;">
+        <h3 style="color: var(--s);">⚠️ منطقة الخطر</h3>
+        <p style="font-size: 13px; color: #aaa;">الضغط على الزر أدناه سيقوم بحذف جميع مستويات أعضاء السيرفر نهائياً.</p>
+        <form method="POST" action="/reset-levels/${g.id}" onsubmit="return confirm('⚠️ هل أنت متأكد تماماً؟ سيتم تصفير ليفل جميع الأعضاء ولا يمكن التراجع!')">
+            <button class="btn-save" style="background: var(--s);">🔥 تصفير ليفل الجميع</button>
+        </form>
+    </div>
         <button class="btn-save">حفظ</button>
     </form>
     `;
@@ -1049,7 +1062,10 @@ app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
         res.status(500).send("حدث خطأ أثناء حفظ إعدادات الليفل.");
     }
 });
-
+app.post('/reset-levels/:guildId', checkAuth, async (req, res) => {
+    await UserLevel.updateMany({ guildId: req.params.guildId }, { $set: { xp: 0, level: 1, msgCount: 0 } });
+    res.redirect(`/manage/${req.params.guildId}/levels`);
+});
 
 app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
@@ -1876,6 +1892,31 @@ if (msg.content.startsWith ('!توب') || msg.content.startsWith('!top-streak'))
             lvChannel.send(`🎉 مبروك ${msg.author}! صرت لفل **${u.level}**`).catch(() => {});
         }
         await u.save();
+            // البحث عن إعدادات الليفل لتنفيذ أمر التوب المخصص
+    if (s.levels?.enabled && s.levels.leaderboardCommand) {
+        if (msg.content === s.levels.leaderboardCommand) {
+            const topLevels = await UserLevel.find({ guildId: msg.guild.id })
+                .sort({ level: -1, xp: -1 })
+                .limit(15);
+
+            if (topLevels.length === 0) return msg.reply("❌ لا توجد بيانات مستويات بعد.");
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🏆 قائمة أعلى 15 ليفل في ${msg.guild.name}`)
+                .setColor('#f1c40f')
+                .setThumbnail(msg.guild.iconURL())
+                .setTimestamp();
+
+            let desc = topLevels.map((u, i) => {
+                let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `**#${i + 1}**`;
+                return `${medal} | <@${u.userId}> — ليفل: \`${u.level}\` (رسائل: \`${u.msgCount}\`)`;
+            }).join('\n');
+
+            embed.setDescription(desc);
+            return msg.reply({ embeds: [embed] });
+        }
+    }
+
     }
 
  
