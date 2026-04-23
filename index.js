@@ -220,13 +220,16 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
 // ==========================================
 async function getExecutor(guild, eventType) {
     try {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000)); // تأخير 2 ثانية لضمان تسجيل اللوق
         const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
         const entry = auditLogs.entries.first();
         if (!entry) return "تلقائي / غير معروف";
-        return `${entry.executor.tag}`;
-    } catch (e) { return "صلاحيات ناقصة (Audit Log)"; }
+        
+        // نرجع يوزر كامل عشان نقدر نمنشنه
+        return entry.executor; 
+    } catch (e) { return "صلاحيات ناقصة"; }
 }
+
 
 // ✅ الآن يمكنك إكمال باقي الأكواد (client.on) والـ Express Routes بالأسفل
 
@@ -2281,6 +2284,29 @@ app.get('/logout', (req, res) => {
     });
 });
 
+
+
+// --- [ 1. لوق حذف الرسائل ] ---
+client.on('messageDelete', async (message) => {
+    if (!message.guild || message.author?.bot) return;
+    const s = await GuildConfig.findOne({ guildId: message.guild.id });
+    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
+
+    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
+    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
+
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: '🗑️ حذف رسالة' })
+        .setColor('#ff4757')
+        .addFields(
+            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
+            { name: '🛡️ الحاذف:', value: executor.id ? `<@${executor.id}>` : `${executor}`, inline: true },
+            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
+            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
+        ).setTimestamp();
+    if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
+});
+
 // --- [ 2. لوق تعديل الرسائل ] ---
 client.on('messageUpdate', async (oldMsg, newMsg) => {
     if (!oldMsg.guild || oldMsg.author?.bot || oldMsg.content === newMsg.content) return;
@@ -2300,149 +2326,38 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
     if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
 });
 
-
-// --- [ 4. لوق دخول الأعضاء ] ---
+// --- [ 3. لوق دخول وخروج الأعضاء ] ---
 client.on('guildMemberAdd', async (member) => {
     const s = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (!s?.logs?.members?.enabled || !s.logs.members.channel) return;
-    const logCh = member.guild.channels.cache.get(s.logs.members.channel);
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: '📥 دخول عضو' })
-        .setColor('#2ed573')
-        .setDescription(`**العضو:** <@${member.id}>\n**الأيدي:** ${member.id}`)
-        .setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] });
-});
-
-
-client.on('guildMemberAdd', async (member) => {
-    try {
-        // 1. جلب إعدادات السيرفر من الداتابيز
-        const s = await GuildConfig.findOne({ guildId: member.guild.id });
-        if (!s) return;
-
-        // --- [ أولاً: نظام اللوق (Logs) ] ---
-        if (s.logs?.members?.enabled && s.logs.members.channel) {
-            const logCh = member.guild.channels.cache.get(s.logs.members.channel);
-            if (logCh) {
-                const logEmbed = new EmbedBuilder()
-                    .setAuthor({ name: '📥 عضو دخل السيرفر' })
-                    .setColor('#2ed573')
-                    .setDescription(`**العضو:** ${member.user.tag}\n**الأيدي:** ${member.id}`)
-                    .setTimestamp();
-       
-
-
-
-const menu = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-        .setCustomId('ticket_menu')
-        .setPlaceholder('اختر نوع التكت')
-        .addOptions([
-            { label: 'Support', value: 'support' },
-            { label: 'Report', value: 'report' },
-            { label: 'Other', value: 'other' }
-        ])
-);
-// --- [ دالة كشف المسؤول عن الفعل ] ---
-async function getExecutor(guild, eventType) {
-    try {
-        await new Promise(resolve => setTimeout(resolve, 1500)); // انتظار بسيط لضمان تسجيل الحدث
-        const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
-        const entry = auditLogs.entries.first();
-        if (!entry) return "غير معروف (تلقائي)";
-        return `${entry.executor.tag}`;
-    } catch (e) { return "صلاحيات ناقصة"; }
-}
-
-// --- [ 1. لوق حذف الرسائل ] ---
-client.on('messageDelete', async (message) => {
-    if (!message.guild || message.author?.bot) return;
-    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-    if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
-
-    const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
-    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
-
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: '🗑️ حذف رسالة' })
-        .setColor('#ff4757')
-        .addFields(
-            { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
-            { name: '🛡️ الحاذف:', value: executor.includes('(') ? `<@${executor.split('(')[1].split(')')[0]}>` : executor, inline: true },
-            { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
-            { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
-        ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
-});
-         logCh.send({ embeds: [logEmbed] }).catch(() => {});
-            }
-        }
-
-        // --- ---
-      // --- [ داخل نظام الترحيب بالصورة ] ---
-if (s.welcome?.enabled && s.welcome.channel) {
-    const welcomeCh = member.guild.channels.cache.get(s.welcome.channel);
-    if (welcomeCh) {
-        // 1. إنشاء الكانفاس بنفس أبعاد المعاينة
-        const canvas = createCanvas(800, 400); 
-        const ctx = canvas.getContext('2d');
-
-        // 2. تحميل الصورة الخلفية
-        if (s.welcome.imagePath && fs.existsSync(s.welcome.imagePath)) {
-            const background = await loadImage(s.welcome.imagePath);
-            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
-        } else {
-            ctx.fillStyle = '#1a1a2e';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-
-        // 3. جلب الإعدادات "المحفوظة" من الداتابيز
-        const fontSize = parseInt(s.welcome.fontSize) || 40;
-        const posX = parseInt(s.welcome.textX) || 250; // القيمة المحفوظة لـ X
-        const posY = parseInt(s.welcome.textY) || 150; // القيمة المحفوظة لـ Y
-
-        // 4. إعدادات الخط
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = "black";
-
-        // 5. معالجة النص
-        let welcomeText = s.welcome.customText || 'Welcome {user}';
-        welcomeText = welcomeText.replace('{user}', member.user.username);
-
-        // 6. الرسم في المكان الدقيق
-        // ملاحظة: تأكد أن posX و posY هما نفس القيم التي تظهر في المعاينة بالداشبورد
-        ctx.fillText(welcomeText, posX, posY);
-
-        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
-        await welcomeCh.send({ content: `✨ حياك الله ${member} في سيرفرنا!`, files: [attachment] }).catch(() => {});
-    }
-}
-
-
-    } catch (error) {
-        console.error("❌ خطأ في حدث دخول العضو:", error);
+    if (s?.logs?.members?.enabled && s.logs.members.channel) {
+        const logCh = member.guild.channels.cache.get(s.logs.members.channel);
+        const embed = new EmbedBuilder()
+            .setAuthor({ name: '📥 دخول عضو' })
+            .setColor('#2ed573')
+            .setDescription(`**العضو:** <@${member.id}>\n**الأيدي:** \`${member.id}\``)
+            .setTimestamp();
+        if (logCh) logCh.send({ embeds: [embed] });
     }
 });
 
-// --- [ 4. لوق خروج الأعضاء ] ---
 client.on('guildMemberRemove', async (member) => {
     const s = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (!s?.logs?.members?.enabled || !s.logs.members.channel) return;
-    const logCh = member.guild.channels.cache.get(s.logs.members.channel);
-    const embed = new EmbedBuilder().setAuthor({ name: '📤 عضو خرج/طُرد' }).setColor('#ff4757')
-        .setDescription(`**العضو:** ${member.user.tag}`).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] });
+    if (s?.logs?.members?.enabled && s.logs.members.channel) {
+        const logCh = member.guild.channels.cache.get(s.logs.members.channel);
+        const executor = await getExecutor(member.guild, AuditLogEvent.MemberKick);
+        const embed = new EmbedBuilder()
+            .setAuthor({ name: '📤 خروج/طرد عضو' })
+            .setColor('#ff4757')
+            .setDescription(`**العضو:** <@${member.id}>\n**المسؤول:** ${executor.id ? `<@${executor.id}>` : 'خرج بنفسه'}`)
+            .setTimestamp();
+        if (logCh) logCh.send({ embeds: [embed] });
+    }
 });
 
-// --- 📂 لوق حذف الرومات ---
+// --- [ 4. لوق الرومات (حذف وتعديل) ] ---
 client.on('channelDelete', async (channel) => {
-    if (!channel.guild) return;
     const s = await GuildConfig.findOne({ guildId: channel.guild.id });
     if (!s?.logs?.channels?.enabled || !s.logs.channels.channel) return;
-
     const logCh = channel.guild.channels.cache.get(s.logs.channels.channel);
     const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelDelete);
 
@@ -2450,31 +2365,33 @@ client.on('channelDelete', async (channel) => {
         .setAuthor({ name: '🗑️ حذف قناة' })
         .setColor('#ff4757')
         .addFields(
-            { name: '📍 اسم القناة:', value: channel.name, inline: true },
-            { name: '🛡️ المسؤول عن الحذف:', value: executor, inline: true }
+            { name: '📍 اسم القناة:', value: `\`${channel.name}\``, inline: true },
+            { name: '🛡️ المسؤول:', value: executor.id ? `<@${executor.id}>` : `${executor}`, inline: true }
         ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] }).catch(e => console.log("Error sending log:", e));
+    if (logCh) logCh.send({ embeds: [embed] });
 });
 
-// --- 🛡️ لوق حذف وتعديل الرتب ---
-client.on('roleDelete', async (role) => {
-    const s = await GuildConfig.findOne({ guildId: role.guild.id });
-    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
+client.on('channelUpdate', async (oldChannel, newChannel) => {
+    const s = await GuildConfig.findOne({ guildId: newChannel.guild.id });
+    if (!s?.logs?.channels?.enabled || !s.logs.channels.channel) return;
+    const logCh = newChannel.guild.channels.cache.get(s.logs.channels.channel);
+    const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
 
-    const logCh = role.guild.channels.cache.get(s.logs.roles.channel);
-    const executor = await getExecutor(role.guild, AuditLogEvent.RoleDelete);
+    if (oldChannel.name === newChannel.name) return; // لو التعديل مو بالاسم
 
     const embed = new EmbedBuilder()
-        .setAuthor({ name: '🗑️ حذف رتبة' })
-        .setColor('#ff4757')
+        .setAuthor({ name: '⚙️ تعديل قناة' })
+        .setColor('#ffa502')
         .addFields(
-            { name: '📛 اسم الرتبة:', value: role.name, inline: true },
-            { name: '🛡️ المسؤول:', value: executor, inline: true }
+            { name: '📍 القناة:', value: `<#${newChannel.id}>`, inline: false },
+            { name: '⬅️ الاسم القديم:', value: `\`${oldChannel.name}\``, inline: true },
+            { name: '➡️ الاسم الجديد:', value: `\`${newChannel.name}\``, inline: true },
+            { name: '🛡️ المسؤول:', value: executor.id ? `<@${executor.id}>` : `${executor}`, inline: false }
         ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] }).catch(e => console.log("Error sending log:", e));
+    if (logCh) logCh.send({ embeds: [embed] });
 });
 
-// --- 🎭 لوق إعطاء/إزالة رتبة من عضو ---
+// --- [ 5. لوق الرتب (تعديل وتحديث رتب الأعضاء) ] ---
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const s = await GuildConfig.findOne({ guildId: newMember.guild.id });
     if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
@@ -2488,14 +2405,27 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         const embed = new EmbedBuilder().setAuthor({ name: '🎭 تحديث رتب العضو' }).setTimestamp();
 
         if (addedRoles.size > 0) {
-            embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => r.name).join(', ') });
+            embed.setColor('#2ed573').addFields({ name: '➕ رتب أضيفت:', value: addedRoles.map(r => `<@&${r.id}>`).join(', ') });
         } else {
-            embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => r.name).join(', ') });
+            embed.setColor('#ff4757').addFields({ name: '➖ رتب أزيلت:', value: removedRoles.map(r => `<@&${r.id}>`).join(', ') });
         }
-        embed.addFields({ name: '👤 المستلم:', value: `${newMember.user.tag}` }, { name: '🛡️ المسؤول:', value: executor });
-        if (logCh) logCh.send({ embeds: [embed] }).catch(e => console.log("Error sending log:", e));
+        embed.addFields({ name: '👤 العضو:', value: `<@${newMember.id}>` }, { name: '🛡️ المسؤول:', value: executor.id ? `<@${executor.id}>` : `${executor}` });
+        if (logCh) logCh.send({ embeds: [embed] });
     }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
 async function handleUnjail(member, guildId) {
     try {
         const guild = client.guilds.cache.get(guildId);
@@ -2535,54 +2465,6 @@ async function handleUnjail(member, guildId) {
 }
 
 
-// --- 📂 لوق تعديل الرومات (اسم، وصف، نوع) ---
-client.on('channelUpdate', async (oldChannel, newChannel) => {
-    // 1. التحقق من السيرفر والإعدادات
-    if (!newChannel.guild) return;
-    const s = await GuildConfig.findOne({ guildId: newChannel.guild.id });
-    if (!s?.logs?.channels?.enabled || !s.logs.channels.channel) return;
-
-    const logCh = newChannel.guild.channels.cache.get(s.logs.channels.channel);
-    if (!logCh) return;
-
-    // 2. تحديد نوع التغيير (الاسم أو الوصف أو النوع)
-    let changeType = "";
-    let before = "";
-    let after = "";
-
-    if (oldChannel.name !== newChannel.name) {
-        changeType = "📝 تعديل اسم القناة";
-        before = oldChannel.name;
-        after = newChannel.name;
-    } else if (oldChannel.topic !== newChannel.topic) {
-        changeType = "📝 تعديل وصف القناة (Topic)";
-        before = oldChannel.topic || "لا يوجد وصف";
-        after = newChannel.topic || "لا يوجد وصف";
-    } else if (oldChannel.type !== newChannel.type) {
-        changeType = "📝 تعديل نوع القناة";
-        before = `Type: ${oldChannel.type}`;
-        after = `Type: ${newChannel.type}`;
-    }
-
-    // إذا لم يكن التغيير من الأشياء التي نراقبها، نتوقف هنا
-    if (!changeType) return;
-
-    // 3. جلب المسؤول عن التعديل
-    const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
-
-    const embed = new EmbedBuilder()
-        .setAuthor({ name: changeType })
-        .setColor('#ffa502')
-        .addFields(
-            { name: '📍 القناة:', value: `${newChannel} (${newChannel.id})`, inline: false },
-            { name: '⬅️ قبل:', value: before, inline: true },
-            { name: '➡️ بعد:', value: after, inline: true },
-            { name: '🛡️ بواسطة:', value: executor, inline: false }
-        )
-        .setTimestamp();
-
-    logCh.send({ embeds: [embed] }).catch(e => console.log("Log Error:", e));
-});
 
 // تأكد من وجود كلمة async هنا
 client.on('interactionCreate', async (interaction) => { 
