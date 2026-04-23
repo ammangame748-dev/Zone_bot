@@ -220,15 +220,19 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
 // ==========================================
 async function getExecutor(guild, eventType) {
     try {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // تأخير 2 ثانية لضمان تسجيل اللوق
+        await new Promise(resolve => setTimeout(resolve, 2500)); // زيادة وقت الانتظار لضمان التسجيل
         const auditLogs = await guild.fetchAuditLogs({ limit: 1, type: eventType });
         const entry = auditLogs.entries.first();
-        if (!entry) return "تلقائي / غير معروف";
+        if (!entry || !entry.executor) return "غير معروف (تلقائي)";
         
-        // نرجع يوزر كامل عشان نقدر نمنشنه
-        return entry.executor; 
+        // التحقق من وقت العملية (عشان ما يجيب مسؤول قديم)
+        const now = Date.now();
+        if (now - entry.createdTimestamp > 10000) return "غير معروف (تلقائي)";
+
+        return `<@${entry.executor.id}>`; 
     } catch (e) { return "صلاحيات ناقصة"; }
 }
+
 
 
 // ✅ الآن يمكنك إكمال باقي الأكواد (client.on) والـ Express Routes بالأسفل
@@ -2286,13 +2290,14 @@ app.get('/logout', (req, res) => {
 
 
 
-// --- [ 1. لوق حذف الرسائل ] ---
 client.on('messageDelete', async (message) => {
     if (!message.guild || message.author?.bot) return;
     const s = await GuildConfig.findOne({ guildId: message.guild.id });
     if (!s?.logs?.messages?.enabled || !s.logs.messages.channel) return;
 
     const logCh = message.guild.channels.cache.get(s.logs.messages.channel);
+    if (!logCh) return;
+
     const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete);
 
     const embed = new EmbedBuilder()
@@ -2300,11 +2305,12 @@ client.on('messageDelete', async (message) => {
         .setColor('#ff4757')
         .addFields(
             { name: '👤 صاحب الرسالة:', value: `<@${message.author.id}>`, inline: true },
-            { name: '🛡️ الحاذف:', value: executor.id ? `<@${executor.id}>` : `${executor}`, inline: true },
+            { name: '🛡️ المسؤول عن الحذف:', value: executor, inline: true },
             { name: '📍 القناة:', value: `<#${message.channel.id}>`, inline: false },
             { name: '📄 المحتوى:', value: message.content || 'صورة/ملف' }
         ).setTimestamp();
-    if (logCh) logCh.send({ embeds: [embed] }).catch(() => {});
+    
+    logCh.send({ embeds: [embed] }).catch(() => {});
 });
 
 // --- [ 2. لوق تعديل الرسائل ] ---
@@ -2375,19 +2381,61 @@ client.on('channelUpdate', async (oldChannel, newChannel) => {
     const s = await GuildConfig.findOne({ guildId: newChannel.guild.id });
     if (!s?.logs?.channels?.enabled || !s.logs.channels.channel) return;
     const logCh = newChannel.guild.channels.cache.get(s.logs.channels.channel);
-    const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
+    if (!logCh) return;
 
-    if (oldChannel.name === newChannel.name) return; // لو التعديل مو بالاسم
+    const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
+    
+    let changes = [];
+    if (oldChannel.name !== newChannel.name) changes.push(`📝 **تغيير الاسم:** من \`${oldChannel.name}\` إلى \`${newChannel.name}\``);
+    if (oldChannel.topic !== newChannel.topic) changes.push(`📑 **تغيير الوصف:** من \`${oldChannel.topic || 'لا يوجد'}\` إلى \`${newChannel.topic || 'لا يوجد'}\``);
+    
+    if (changes.length === 0) return; // إذا التغيير ليس بالاسم أو الوصف
 
     const embed = new EmbedBuilder()
-        .setAuthor({ name: '⚙️ تعديل قناة' })
+        .setAuthor({ name: '⚙️ تحديث إعدادات القناة' })
         .setColor('#ffa502')
+        .setDescription(`📍 **القناة:** <#${newChannel.id}>\n🛡️ **بواسطة:** ${executor}\n\n${changes.join('\n')}`)
+        .setTimestamp();
+
+    logCh.send({ embeds: [embed] }).catch(() => {});
+});
+
+// عند تعديل اسم رتبة أو لونها
+client.on('roleUpdate', async (oldRole, newRole) => {
+    const s = await GuildConfig.findOne({ guildId: newRole.guild.id });
+    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
+    const logCh = newRole.guild.channels.cache.get(s.logs.roles.channel);
+    if (!logCh) return;
+
+    if (oldRole.name === newRole.name && oldRole.color === newRole.color) return;
+
+    const executor = await getExecutor(newRole.guild, AuditLogEvent.RoleUpdate);
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: '🎭 تعديل بيانات رتبة' })
+        .setColor('#3498db')
         .addFields(
-            { name: '📍 القناة:', value: `<#${newChannel.id}>`, inline: false },
-            { name: '⬅️ الاسم القديم:', value: `\`${oldChannel.name}\``, inline: true },
-            { name: '➡️ الاسم الجديد:', value: `\`${newChannel.name}\``, inline: true },
-            { name: '🛡️ المسؤول:', value: executor.id ? `<@${executor.id}>` : `${executor}`, inline: false }
+            { name: '🎭 الرتبة:', value: `<@&${newRole.id}>`, inline: true },
+            { name: '🛡️ المسؤول:', value: executor, inline: true },
+            { name: '⬅️ الاسم القديم:', value: `\`${oldRole.name}\``, inline: true },
+            { name: '➡️ الاسم الجديد:', value: `\`${newRole.name}\``, inline: true }
         ).setTimestamp();
+
+    logCh.send({ embeds: [embed] });
+});
+
+// عند إنشاء رتبة جديدة
+client.on('roleCreate', async (role) => {
+    const s = await GuildConfig.findOne({ guildId: role.guild.id });
+    if (!s?.logs?.roles?.enabled || !s.logs.roles.channel) return;
+    const logCh = role.guild.channels.cache.get(s.logs.roles.channel);
+    
+    const executor = await getExecutor(role.guild, AuditLogEvent.RoleCreate);
+    const embed = new EmbedBuilder()
+        .setAuthor({ name: '✨ إنشاء رتبة جديدة' })
+        .setColor('#2ecc71')
+        .setDescription(`🎭 **الرتبة:** <@&${role.id}>\n🛡️ **المسؤول:** ${executor}`)
+        .setTimestamp();
+    
     if (logCh) logCh.send({ embeds: [embed] });
 });
 
