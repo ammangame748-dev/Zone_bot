@@ -200,6 +200,29 @@ const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
     ended: { type: Boolean, default: false }
 }));
 
+const Clan = mongoose.model('Clan', new mongoose.Schema({
+    guildId: String,
+    clanIndex: Number, // من 0 لـ 7 (الـ 8 كلانات)
+    clanName: String,
+    roleId: String,
+    leaderId: String,
+    assistantId: String,
+    points: { type: Number, default: 0 },
+    applyChannel: String,
+    applyMessage: String,
+    members: [String] // مصفوفة للأيديات (حد أقصى 10)
+}));
+
+const ClanMember = mongoose.model('ClanMember', new mongoose.Schema({
+    guildId: String,
+    userId: String,
+    clanIndex: Number,
+    points: { type: Number, default: 0 },
+    msgCount: { type: Number, default: 0 },
+    voiceMinutes: { type: Number, default: 0 }
+}));
+
+
 // 4.5 إعدادات نظام التذاكر النيون
 const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     guildId: String,
@@ -644,6 +667,8 @@ function ui(guild, active, content) {
                 <a class="${active=='giveaway'?'active':''}" href="/manage/${guild.id}/giveaway">🎉 القيف اواي</a>
                 <a class="${active=='roles'?'active':''}" href="/manage/${guild.id}/roles">🎭 الرتب</a>
                 <a class="${active=='mod'?'active':''}" href="/manage/${guild.id}/mod">🛡️ أوامر الإشراف</a>
+                <a class="${active=='clans'?'active':''}" href="/manage/${guild.id}/clans">🚩 نظام الكلانات</a>
+
             </div>
         </div>
         <div class="main">
@@ -1469,6 +1494,49 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'tickets', content));
 });
+app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+
+    let clansData = await Clan.find({ guildId: g.id });
+    
+    let content = `<h3 style="color:var(--accent)">🚩 إدارة الـ 8 كلانات</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">`;
+
+    for (let i = 0; i < 8; i++) {
+        let c = clansData.find(x => x.clanIndex === i) || { clanName: '', applyMessage: '' };
+        content += `
+        <div class="card" style="border-top: 3px solid var(--p);">
+            <h4>🛡️ كلان #${i + 1}</h4>
+            <form method="POST" action="/save/${g.id}/clan/${i}">
+                <label>اسم الكلان:</label>
+                <input type="text" name="clanName" value="${c.clanName || ''}" placeholder="اسم الكلان">
+                
+                <label>رتبة الكلان:</label>
+                <select name="roleId">
+                    <option value="">-- اختر الرتبة --</option>
+                    ${g.roles.cache.map(r => `<option value="${r.id}" ${c.roleId==r.id?'selected':''}>${r.name}</option>`).join('')}
+                </select>
+
+                <label>أيدي القائد (Leader ID):</label>
+                <input type="text" name="leaderId" value="${c.leaderId || ''}" placeholder="ID">
+
+                <label>محتوى إيمباد التقديم:</label>
+                <textarea name="applyMsg" placeholder="اكتب وصف الكلان وشروط التقديم...">${c.applyMessage || ''}</textarea>
+
+                <label>📍 قناة إرسال التقديم:</label>
+                <select name="applyChannel">
+                    <option value="">-- لا ترسل الآن --</option>
+                    ${g.channels.cache.filter(ch => ch.type === 0).map(ch => `<option value="${ch.id}">${ch.name}</option>`).join('')}
+                </select>
+
+                <button class="btn-save" style="margin-top:10px;">💾 حفظ وإرسال التقديم</button>
+            </form>
+        </div>`;
+    }
+    content += `</div>`;
+    res.send(ui(g, 'clans', content));
+});
 
 
 app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
@@ -1521,6 +1589,37 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
     `;
 
     res.send(ui(g, 'mod', content));
+});
+app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
+    const { clanName, roleId, leaderId, applyMsg, applyChannel } = req.body;
+    const { guildId, index } = req.params;
+
+    const config = await Clan.findOneAndUpdate(
+        { guildId, clanIndex: index },
+        { clanName, roleId, leaderId, applyMessage: applyMsg },
+        { upsert: true, new: true }
+    );
+
+    if (applyChannel) {
+        const channel = client.channels.cache.get(applyChannel);
+        if (channel) {
+            const embed = new EmbedBuilder()
+                .setTitle(`📢 تقديم لكلان: ${clanName}`)
+                .setDescription(applyMsg || 'اضغط على الزر أدناه للتقديم')
+                .setColor('#00d2ff')
+                .setTimestamp();
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`apply_clan_${index}`)
+                    .setLabel('📝 تقديم للكلان')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+            channel.send({ embeds: [embed], components: [row] });
+        }
+    }
+    res.redirect(`/manage/${guildId}/clans`);
 });
 
 
@@ -1719,6 +1818,22 @@ if (s && s.levels?.enabled && s.levels.leaderboardCommand) {
         embed.setDescription(desc);
         return msg.reply({ embeds: [embed] });
     }
+}
+// --- [ نظام نقاط الكلان التلقائي ] ---
+const memberClan = await Clan.findOne({ guildId: msg.guild.id, members: msg.author.id });
+if (memberClan) {
+    let mData = await ClanMember.findOne({ guildId: msg.guild.id, userId: msg.author.id, clanIndex: memberClan.clanIndex });
+    if (!mData) mData = new ClanMember({ guildId: msg.guild.id, userId: msg.author.id, clanIndex: memberClan.clanIndex });
+
+    mData.msgCountForPoints++;
+    
+    if (mData.msgCountForPoints >= 30) {
+        mData.msgCountForPoints = 0; // تصفير العداد بعد الـ 30 رسالة
+        mData.points += 20; // نقاط العضو
+        memberClan.points += 20; // نقاط الكلان العامة
+        await memberClan.save();
+    }
+    await mData.save();
 }
 
     // 3. جلب بيانات العضو (u)
@@ -2104,6 +2219,22 @@ if (command === modConfig.jail.commandName.toLowerCase()) {
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
+if (msg.content === 'تحكم') {
+    const myClan = await Clan.findOne({ guildId: msg.guild.id, $or: [{ leaderId: msg.author.id }, { assistantId: msg.author.id }] });
+    if (!myClan) return; // لازم يكون قائد أو مساعد
+
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId(`clan_control_${myClan.clanIndex}`)
+        .setPlaceholder('⚙️ قائمة تحكم الكلان')
+        .addOptions([
+            { label: 'إضافة عضو', value: 'add_mem', emoji: '➕' },
+            { label: 'طرد عضو', value: 'kick_mem', emoji: '❌' },
+            { label: 'إضافة مساعد', value: 'add_assist', emoji: '🥈' },
+            { label: 'نقاطي ونقاط الكلان', value: 'show_points', emoji: '📊' }
+        ]);
+
+    msg.reply({ components: [new ActionRowBuilder().addComponents(menu)] });
+}
 
 }); // إغلاق حدث messageCreate بشكل صحيح
 
@@ -2588,6 +2719,134 @@ client.on('interactionCreate', async (interaction) => {
             const type = interaction.isStringSelectMenu() ? interaction.values[0] : "عام";
             return openTicket(interaction, config, type);
         }
+// --- [ نظام التقديم للكلانات (Modal) ] ---
+if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
+    const clanIdx = interaction.customId.replace('apply_clan_', '');
+    
+    const modal = new ModalBuilder()
+        .setCustomId(`modal_apply_${clanIdx}`)
+        .setTitle('📝 طلب انضمام للكلان');
+
+    const q1 = new TextInputBuilder()
+        .setCustomId('stay_time')
+        .setLabel("كم مدة تواجدك في السيرفر؟")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("مثلاً: 5 ساعات يومياً")
+        .setRequired(true);
+
+    const q2 = new TextInputBuilder()
+        .setCustomId('afk_time')
+        .setLabel("كم مدة تواجدك بالـ AFK؟")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("مثلاً: ساعتين")
+        .setRequired(true);
+
+    const q3 = new TextInputBuilder()
+        .setCustomId('info')
+        .setLabel("اسمك، عمرك، ومن وين؟")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("أحمد، 20، الأردن")
+        .setRequired(true);
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(q1),
+        new ActionRowBuilder().addComponents(q2),
+        new ActionRowBuilder().addComponents(q3)
+    );
+
+    return interaction.showModal(modal);
+}
+if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
+    const clanIdx = interaction.customId.replace('clan_control_', '');
+    const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+
+    // فحص الصلاحية (قائد أو مساعد)
+    if (interaction.user.id !== clan.leaderId && interaction.user.id !== clan.assistantId) {
+        return interaction.reply({ content: "❌ هذه القائمة مخصصة لقادة الكلان فقط!", ephemeral: true });
+    }
+
+    const action = interaction.values[0];
+
+    // خيار استعلام النقاط (مباشر)
+    if (action === 'show_points') {
+        const memberData = await ClanMember.findOne({ guildId: interaction.guild.id, userId: interaction.user.id, clanIndex: clanIdx });
+        return interaction.reply({ 
+            content: `📊 **إحصائيات كلان ${clan.clanName}:**\n\n• نقاط الكلان العامة: \`${clan.points}\`\n• نقاطك الشخصية: \`${memberData?.points || 0}\`\n• عدد الأعضاء: \`${clan.members.length}/10\``, 
+            ephemeral: true 
+        });
+    }
+
+    // الخيارات اللي محتاجة أيدي (تفتح مودال)
+    const modal = new ModalBuilder()
+        .setCustomId(`modal_clan_${action}_${clanIdx}`)
+        .setTitle(action === 'add_mem' ? 'إضافة عضو جديد' : action === 'kick_mem' ? 'طرد عضو' : 'تعيين مساعد');
+
+    const idInput = new TextInputBuilder()
+        .setCustomId('user_id')
+        .setLabel('أدخل أيدي الشخص (User ID):')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(idInput));
+    return interaction.showModal(modal);
+}
+
+// معالجة مودالات التحكم (إضافة/طرد/مساعد)
+if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_')) {
+    const parts = interaction.customId.split('_');
+    const action = parts[2]; // add, kick, assist
+    const clanIdx = parts[3];
+    const targetId = interaction.fields.getTextInputValue('user_id');
+    const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+
+    if (action === 'add_mem') {
+        if (clan.members.length >= 10) return interaction.reply({ content: "❌ الكلان ممتلئ (الحد الأقصى 10 أعضاء)!", ephemeral: true });
+        if (clan.members.includes(targetId)) return interaction.reply({ content: "❌ هذا الشخص موجود بالفعل في الكلان.", ephemeral: true });
+        
+        clan.members.push(targetId);
+        await clan.save();
+        return interaction.reply({ content: `✅ تم إضافة العضو <@${targetId}> للكلان بنجاح.` });
+    }
+
+    if (action === 'kick_mem') {
+        clan.members = clan.members.filter(id => id !== targetId);
+        if (clan.assistantId === targetId) clan.assistantId = null;
+        await clan.save();
+        return interaction.reply({ content: `❌ تم طرد العضو <@${targetId}> من الكلان.` });
+    }
+
+    if (action === 'add') { // إضافة مساعد
+        clan.assistantId = targetId;
+        if (!clan.members.includes(targetId)) clan.members.push(targetId);
+        await clan.save();
+        return interaction.reply({ content: `🥈 تم تعيين <@${targetId}> كمساعد للكلان.` });
+    }
+}
+
+
+// استلام بيانات المودال وإرسالها للقائد
+if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply_')) {
+    const clanIdx = interaction.customId.replace('modal_apply_', '');
+    const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+
+    if (!clan || !clan.leaderId) return interaction.reply({ content: "❌ عذراً، قائد الكلان غير موجود حالياً.", ephemeral: true });
+
+    const leader = await client.users.fetch(clan.leaderId).catch(() => null);
+    if (!leader) return interaction.reply({ content: "❌ لا يمكن الوصول للقائد حالياً.", ephemeral: true });
+
+    const embed = new EmbedBuilder()
+        .setTitle(`📩 طلب انضمام جديد - كلان ${clan.clanName}`)
+        .setColor('Blue')
+        .addFields(
+            { name: '👤 مقدم الطلب:', value: `${interaction.user} (ID: ${interaction.user.id})` },
+            { name: '🕒 مدة التواجد:', value: interaction.fields.getTextInputValue('stay_time') },
+            { name: '💤 مدة الـ AFK:', value: interaction.fields.getTextInputValue('afk_time') },
+            { name: '🌍 معلومات:', value: interaction.fields.getTextInputValue('info') }
+        ).setTimestamp();
+
+    await leader.send({ embeds: [embed] }).catch(() => {});
+    return interaction.reply({ content: "✅ تم إرسال طلبك بنجاح لقائد الكلان في الخاص!", ephemeral: true });
+}
 
 // --- [ 🎭 نظام الرتب الذاتية - رتبة واحدة فقط ] ---
 if (interaction.isButton() && interaction.customId.startsWith('role_')) {
@@ -2825,6 +3084,32 @@ setInterval(async () => {
     }
 
 }, 60 * 1000); // كل دقيقة
+// --- [ نظام نقاط الصوت التلقائي للكلانات ] ---
+setInterval(async () => {
+    client.guilds.cache.forEach(async (guild) => {
+        guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).forEach(async (channel) => {
+            channel.members.forEach(async (member) => {
+                if (member.user.bot || member.voice.selfDeaf || member.voice.afk) return;
+
+                const memberClan = await Clan.findOne({ guildId: guild.id, members: member.id });
+                if (memberClan) {
+                    let mData = await ClanMember.findOne({ guildId: guild.id, userId: member.id, clanIndex: memberClan.clanIndex });
+                    if (!mData) mData = new ClanMember({ guildId: guild.id, userId: member.id, clanIndex: memberClan.clanIndex });
+
+                    mData.voiceMinutes = (mData.voiceMinutes || 0) + 1;
+
+                    if (mData.voiceMinutes >= 30) {
+                        mData.voiceMinutes = 0;
+                        mData.points += 20;
+                        memberClan.points += 20;
+                        await memberClan.save();
+                    }
+                    await mData.save();
+                }
+            });
+        });
+    });
+}, 60000); // يفحص كل دقيقة
 
 app.listen(3000, () => {
     console.log('🚀 Dashboard: http://localhost:3000');
