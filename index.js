@@ -1623,6 +1623,7 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
 });
 
 
+
 app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
     try {
         // تأمين المدخلات: نستخدم قيمة افتراضية إذا كانت الخانة فارغة لمنع خطأ toLowerCase
@@ -2825,16 +2826,29 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_'
 
 
 // استلام بيانات المودال وإرسالها للقائد
+// استلام بيانات المودال وإرسالها للقائد مع أزرار القبول والرفض
 if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply_')) {
     const clanIdx = interaction.customId.replace('modal_apply_', '');
     const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
 
-    if (!clan || !clan.leaderId) return interaction.reply({ content: "❌ عذراً، قائد الكلان غير موجود حالياً.", ephemeral: true });
+    if (!clan || !clan.leaderId) return interaction.reply({ content: "❌ قائد الكلان غير محدد.", ephemeral: true });
 
     const leader = await client.users.fetch(clan.leaderId).catch(() => null);
-    if (!leader) return interaction.reply({ content: "❌ لا يمكن الوصول للقائد حالياً.", ephemeral: true });
+    if (!leader) return interaction.reply({ content: "❌ لا يمكن الوصول للقائد.", ephemeral: true });
 
-    const embed = new EmbedBuilder()
+    // إنشاء أزرار القبول والرفض للقائد
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`accept_member_${interaction.user.id}_${clanIdx}`)
+            .setLabel('✅ قبول')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId(`reject_member_${interaction.user.id}_${clanIdx}`)
+            .setLabel('❌ رفض')
+            .setStyle(ButtonStyle.Danger)
+    );
+
+    const leaderEmbed = new EmbedBuilder()
         .setTitle(`📩 طلب انضمام جديد - كلان ${clan.clanName}`)
         .setColor('Blue')
         .addFields(
@@ -2844,9 +2858,10 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply_
             { name: '🌍 معلومات:', value: interaction.fields.getTextInputValue('info') }
         ).setTimestamp();
 
-    await leader.send({ embeds: [embed] }).catch(() => {});
-    return interaction.reply({ content: "✅ تم إرسال طلبك بنجاح لقائد الكلان في الخاص!", ephemeral: true });
+    await leader.send({ embeds: [leaderEmbed], components: [row] }).catch(() => {});
+    return interaction.reply({ content: "✅ تم إرسال طلبك بنجاح لقائد الكلان!", ephemeral: true });
 }
+
 
 // --- [ 🎭 نظام الرتب الذاتية - رتبة واحدة فقط ] ---
 if (interaction.isButton() && interaction.customId.startsWith('role_')) {
