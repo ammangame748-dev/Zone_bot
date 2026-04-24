@@ -2825,7 +2825,8 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_'
 }
 // --- [ معالجة ضغط أزرار القبول والرفض من قبل القائد ] ---
 if (interaction.isButton() && (interaction.customId.startsWith('accept_member_') || interaction.customId.startsWith('reject_member_'))) {
-    
+        await interaction.deferUpdate(); // 🔥 مهم جدًا
+
     // سحب البيانات من الـ Custom ID
     const parts = interaction.customId.split('_');
     const action = parts[0]; // accept أو reject
@@ -2833,7 +2834,13 @@ if (interaction.isButton() && (interaction.customId.startsWith('accept_member_')
     const clanIdx = parts[3];
 
     // جلب بيانات الكلان من الداتابيز
-    const clan = await Clan.findOne({ guildId: interaction.guildId || interaction.message.guildId, clanIndex: clanIdx });
+const guildId = interaction.guild?.id || interaction.message?.guildId;
+
+const clan = await Clan.findOne({ guildId: guildId, clanIndex: clanIdx });
+
+if (!clan) {
+    return interaction.reply({ content: "❌ الكلان غير موجود.", ephemeral: true });
+}
     if (!clan) return interaction.reply({ content: "❌ خطأ: لم يتم العثور على بيانات الكلان.", ephemeral: true });
 
     const targetUser = await client.users.fetch(targetUserId).catch(() => null);
