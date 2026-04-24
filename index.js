@@ -2823,6 +2823,50 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_'
         return interaction.reply({ content: `🥈 تم تعيين <@${targetId}> كمساعد للكلان.` });
     }
 }
+// --- [ معالجة ضغط أزرار القبول والرفض من قبل القائد ] ---
+if (interaction.isButton() && (interaction.customId.startsWith('accept_member_') || interaction.customId.startsWith('reject_member_'))) {
+    
+    // سحب البيانات من الـ Custom ID
+    const parts = interaction.customId.split('_');
+    const action = parts[0]; // accept أو reject
+    const targetUserId = parts[2];
+    const clanIdx = parts[3];
+
+    // جلب بيانات الكلان من الداتابيز
+    const clan = await Clan.findOne({ guildId: interaction.guildId || interaction.message.guildId, clanIndex: clanIdx });
+    if (!clan) return interaction.reply({ content: "❌ خطأ: لم يتم العثور على بيانات الكلان.", ephemeral: true });
+
+    const targetUser = await client.users.fetch(targetUserId).catch(() => null);
+
+    if (action === 'accept') {
+        // فحص العدد
+        if (clan.members.length >= 10) {
+            return interaction.reply({ content: "❌ الكلان ممتلئ حالياً (10 أعضاء)!", ephemeral: true });
+        }
+
+        // إضافة العضو إذا مش موجود
+        if (!clan.members.includes(targetUserId)) {
+            clan.members.push(targetUserId);
+            await clan.save();
+        }
+
+        // إرسال رسالة للمقدم
+        if (targetUser) {
+            targetUser.send(`✅ مبروك! لقد تم قبولك في كلان **${clan.clanName}** بواسطة القائد <@${interaction.user.id}>.`).catch(() => {});
+        }
+
+        return interaction.update({ content: `✅ تم قبول <@${targetUserId}> بنجاح وإضافته للكلان.`, components: [] });
+    }
+
+    if (action === 'reject') {
+        // إرسال رسالة رفض للمقدم
+        if (targetUser) {
+            targetUser.send(`❌ نعتذر منك، لقد تم رفض طلب انضمامك لكلان **${clan.clanName}** بواسطة القائد <@${interaction.user.id}>.`).catch(() => {});
+        }
+
+        return interaction.update({ content: `❌ تم رفض طلب انضمام <@${targetUserId}>.`, components: [] });
+    }
+}
 
 
 // استلام بيانات المودال وإرسالها للقائد
