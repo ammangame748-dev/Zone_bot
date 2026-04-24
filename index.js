@@ -2912,61 +2912,61 @@ if (!clan) {
     }
 }
 
-
-// استلام بيانات المودال وإرسالها للقائد
-// استلام بيانات المودال وإرسالها للقائد مع أزرار القبول والرفض
-if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_')) {
+if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply_')) {
     try {
-        const parts = interaction.customId.split('_');
-        const action = parts[2];
-        const clanIdx = parts[3];
-        const targetId = interaction.fields.getTextInputValue('user_id');
+        const clanIdx = interaction.customId.replace('modal_apply_', '');
 
-        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-
-        if (!clan) {
-            return interaction.reply({ content: "❌ الكلان غير موجود.", ephemeral: true });
+        const guildId = interaction.guild?.id;
+        if (!guildId) {
+            return interaction.reply({ content: "❌ خطأ بالسيرفر.", ephemeral: true });
         }
 
-        if (action === 'add_mem') {
-            if (clan.members.length >= 10) {
-                return interaction.reply({ content: "❌ الكلان ممتلئ!", ephemeral: true });
-            }
+        const clan = await Clan.findOne({ guildId: guildId, clanIndex: clanIdx });
 
-            if (clan.members.includes(targetId)) {
-                return interaction.reply({ content: "❌ العضو موجود.", ephemeral: true });
-            }
-
-            clan.members.push(targetId);
-            await clan.save();
-
-            return interaction.reply({ content: `✅ تم إضافة <@${targetId}>` });
+        if (!clan || !clan.leaderId) {
+            return interaction.reply({ content: "❌ الكلان أو القائد غير موجود.", ephemeral: true });
         }
 
-        if (action === 'kick_mem') {
-            clan.members = clan.members.filter(id => id !== targetId);
-            if (clan.assistantId === targetId) clan.assistantId = null;
-
-            await clan.save();
-
-            return interaction.reply({ content: `❌ تم طرد <@${targetId}>` });
+        const leader = await client.users.fetch(clan.leaderId).catch(() => null);
+        if (!leader) {
+            return interaction.reply({ content: "❌ ما قدرت أوصل للقائد.", ephemeral: true });
         }
 
-        if (action === 'add') {
-            if (clan.members.length >= 10 && !clan.members.includes(targetId)) {
-                return interaction.reply({ content: "❌ الكلان ممتلئ!", ephemeral: true });
-            }
+        const stay = interaction.fields.getTextInputValue('stay_time') || "غير محدد";
+        const afk = interaction.fields.getTextInputValue('afk_time') || "غير محدد";
+        const info = interaction.fields.getTextInputValue('info') || "لا يوجد";
 
-            clan.assistantId = targetId;
-            if (!clan.members.includes(targetId)) clan.members.push(targetId);
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`accept_member_${interaction.user.id}_${clanIdx}`)
+                .setLabel('✅ قبول')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(`reject_member_${interaction.user.id}_${clanIdx}`)
+                .setLabel('❌ رفض')
+                .setStyle(ButtonStyle.Danger)
+        );
 
-            await clan.save();
+        const leaderEmbed = new EmbedBuilder()
+            .setTitle(`📩 طلب انضمام - ${clan.clanName}`)
+            .setColor('Blue')
+            .addFields(
+                { name: '👤 المستخدم', value: `${interaction.user} (${interaction.user.id})` },
+                { name: '⏱️ التواجد', value: stay },
+                { name: '💤 AFK', value: afk },
+                { name: '🌍 معلومات', value: info }
+            )
+            .setTimestamp();
 
-            return interaction.reply({ content: `🥈 تم تعيين <@${targetId}> مساعد` });
-        }
+        await leader.send({ embeds: [leaderEmbed], components: [row] }).catch(() => {});
+
+        return interaction.reply({
+            content: "✅ تم إرسال طلبك للقائد",
+            ephemeral: true
+        });
 
     } catch (err) {
-        console.error("Modal Clan Error:", err);
+        console.error("Apply Error:", err);
         if (!interaction.replied) {
             interaction.reply({ content: "❌ صار خطأ بالنظام.", ephemeral: true });
         }
