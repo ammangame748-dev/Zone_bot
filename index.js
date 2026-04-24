@@ -2805,110 +2805,116 @@ if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_co
 
 if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_')) {
     try {
+        await interaction.deferReply({ ephemeral: true }); // 🔥 مهم جداً
+
         const parts = interaction.customId.split('_');
         const action = parts[2];
         const clanIdx = parts[3];
+
         const targetId = interaction.fields.getTextInputValue('user_id');
 
         const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+        if (!clan) return interaction.editReply("❌ الكلان غير موجود.");
 
-        if (!clan) {
-            return interaction.reply({ content: "❌ الكلان غير موجود.", ephemeral: true });
-        }
-
+        // ✅ إضافة عضو
         if (action === 'add_mem') {
             if (clan.members.length >= 10) {
-                return interaction.reply({ content: "❌ الكلان ممتلئ!", ephemeral: true });
+                return interaction.editReply("❌ الكلان ممتلئ (10 أعضاء).");
             }
 
             if (clan.members.includes(targetId)) {
-                return interaction.reply({ content: "❌ العضو موجود.", ephemeral: true });
+                return interaction.editReply("❌ العضو موجود بالفعل.");
             }
 
             clan.members.push(targetId);
             await clan.save();
 
-            return interaction.reply({ content: `✅ تم إضافة <@${targetId}>` });
+            return interaction.editReply(`✅ تم إضافة <@${targetId}> للكلان.`);
         }
 
+        // ❌ طرد عضو
         if (action === 'kick_mem') {
             clan.members = clan.members.filter(id => id !== targetId);
-            if (clan.assistantId === targetId) clan.assistantId = null;
 
-            await clan.save();
-
-            return interaction.reply({ content: `❌ تم طرد <@${targetId}>` });
-        }
-
-        if (action === 'add') {
-            if (clan.members.length >= 10 && !clan.members.includes(targetId)) {
-                return interaction.reply({ content: "❌ الكلان ممتلئ!", ephemeral: true });
+            if (clan.assistantId === targetId) {
+                clan.assistantId = null;
             }
 
+            await clan.save();
+
+            return interaction.editReply(`❌ تم طرد <@${targetId}>.`);
+        }
+
+        // 🥈 تعيين مساعد
+        if (action === 'add') {
             clan.assistantId = targetId;
-            if (!clan.members.includes(targetId)) clan.members.push(targetId);
+
+            if (!clan.members.includes(targetId)) {
+                clan.members.push(targetId);
+            }
 
             await clan.save();
 
-            return interaction.reply({ content: `🥈 تم تعيين <@${targetId}> مساعد` });
+            return interaction.editReply(`🥈 تم تعيين <@${targetId}> كمساعد.`);
         }
 
     } catch (err) {
-        console.error("Modal Clan Error:", err);
+        console.error("Clan Modal Error:", err);
         if (!interaction.replied) {
-            interaction.reply({ content: "❌ صار خطأ.", ephemeral: true });
+            interaction.editReply("❌ صار خطأ.");
         }
     }
 }
-// --- [ معالجة ضغط أزرار القبول والرفض من قبل القائد ] ---
+
 if (interaction.isButton() && (interaction.customId.startsWith('accept_member_') || interaction.customId.startsWith('reject_member_'))) {
-        await interaction.deferUpdate(); // 🔥 مهم جدًا
+    try {
+        await interaction.deferUpdate(); // 🔥 مهم
 
-    // سحب البيانات من الـ Custom ID
-    const parts = interaction.customId.split('_');
-    const action = parts[0]; // accept أو reject
-    const targetUserId = parts[2];
-    const clanIdx = parts[3];
+        const parts = interaction.customId.split('_');
+        const action = parts[0];
+        const targetUserId = parts[2];
+        const clanIdx = parts[3];
 
-    // جلب بيانات الكلان من الداتابيز
-const guildId = interaction.guild?.id || interaction.message?.guildId;
+        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+        if (!clan) return interaction.followUp({ content: "❌ الكلان غير موجود.", ephemeral: true });
 
-const clan = await Clan.findOne({ guildId: guildId, clanIndex: clanIdx });
+        const targetUser = await client.users.fetch(targetUserId).catch(() => null);
 
-if (!clan) {
-    return interaction.reply({ content: "❌ الكلان غير موجود.", ephemeral: true });
-}
-    if (!clan) return interaction.reply({ content: "❌ خطأ: لم يتم العثور على بيانات الكلان.", ephemeral: true });
+        // ✅ قبول
+        if (action === 'accept') {
+            if (clan.members.length >= 10) {
+                return interaction.followUp({ content: "❌ الكلان ممتلئ.", ephemeral: true });
+            }
 
-    const targetUser = await client.users.fetch(targetUserId).catch(() => null);
+            if (!clan.members.includes(targetUserId)) {
+                clan.members.push(targetUserId);
+                await clan.save();
+            }
 
-    if (action === 'accept') {
-        // فحص العدد
-        if (clan.members.length >= 10) {
-            return interaction.reply({ content: "❌ الكلان ممتلئ حالياً (10 أعضاء)!", ephemeral: true });
+            if (targetUser) {
+                targetUser.send(`✅ تم قبولك في كلان ${clan.clanName}`).catch(() => {});
+            }
+
+            return interaction.message.edit({
+                content: `✅ تم قبول <@${targetUserId}>`,
+                components: []
+            });
         }
 
-        // إضافة العضو إذا مش موجود
-        if (!clan.members.includes(targetUserId)) {
-            clan.members.push(targetUserId);
-            await clan.save();
+        // ❌ رفض
+        if (action === 'reject') {
+            if (targetUser) {
+                targetUser.send(`❌ تم رفض طلبك في كلان ${clan.clanName}`).catch(() => {});
+            }
+
+            return interaction.message.edit({
+                content: `❌ تم رفض <@${targetUserId}>`,
+                components: []
+            });
         }
 
-        // إرسال رسالة للمقدم
-        if (targetUser) {
-            targetUser.send(`✅ مبروك! لقد تم قبولك في كلان **${clan.clanName}** بواسطة القائد <@${interaction.user.id}>.`).catch(() => {});
-        }
-
-        return interaction.editReply({ content: `✅ تم قبول <@${targetUserId}> بنجاح وإضافته للكلان.`, components: [] });
-    }
-
-    if (action === 'reject') {
-        // إرسال رسالة رفض للمقدم
-        if (targetUser) {
-            targetUser.send(`❌ نعتذر منك، لقد تم رفض طلب انضمامك لكلان **${clan.clanName}** بواسطة القائد <@${interaction.user.id}>.`).catch(() => {});
-        }
-
-        return interaction.editReply({ content: `❌ تم رفض طلب انضمام <@${targetUserId}>.`, components: [] });
+    } catch (err) {
+        console.error("Accept/Reject Error:", err);
     }
 }
 
