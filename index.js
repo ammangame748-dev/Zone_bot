@@ -2257,6 +2257,9 @@ if (command === modConfig.jail.commandName.toLowerCase()) {
 if (msg.content === 'تحكم') {
     const myClan = await Clan.findOne({ guildId: msg.guild.id, $or: [{ leaderId: msg.author.id }, { assistantId: msg.author.id }] });
     if (!myClan) return; // لازم يكون قائد أو مساعد
+     if (myClan.textChannelId && msg.channel.id !== myClan.textChannelId) {
+        return msg.reply(`❌ هذا الأمر مخصص فقط داخل روم الكلان الخاص بك: <#${myClan.textChannelId}>`);
+    }
    if (msg.channel.id !== myClan.textChannelId) {
         return msg.reply(`❌ يمكنك استخدام هذا الأمر فقط في الروم الخاص بالكلان: <#${myClan.textChannelId}>`)
             .then(m => setTimeout(() => m.delete(), 5000));
@@ -2273,9 +2276,7 @@ if (msg.content === 'تحكم') {
 
     msg.reply({ components: [new ActionRowBuilder().addComponents(menu)] });
 }
-if (msg.channel.id !== myClan.textChannelId) {
-    return msg.reply(`❌ هذا الأمر مخصص فقط داخل روم الكلان الخاص بك: <#${myClan.textChannelId}>`);
-}
+
 
 }); // إغلاق حدث messageCreate بشكل صحيح
 
