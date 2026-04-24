@@ -1603,36 +1603,57 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'mod', content));
 });
+
 app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
-// أضف textChannelId و voiceChannelId هنا
-const { clanName, roleId, leaderId, applyMsg, applyChannel, textChannelId, voiceChannelId } = req.body;
+    try {
+        const { guildId, index } = req.params;
+        // استلام البيانات الجديدة
+        const { 
+            clanName, roleId, leaderId, applyMsg, 
+            applyChannel, textChannelId, voiceChannelId 
+        } = req.body;
 
-const config = await Clan.findOneAndUpdate(
-    { guildId, clanIndex: index },
-    { clanName, roleId, leaderId, applyMessage: applyMsg, textChannelId, voiceChannelId }, // وأضفهم هنا أيضاً
-    { upsert: true, new: true }
-);
+        // تحديث قاعدة البيانات
+        const config = await Clan.findOneAndUpdate(
+            { guildId, clanIndex: index },
+            { 
+                clanName, 
+                roleId, 
+                leaderId, 
+                applyMessage: applyMsg,
+                textChannelId: textChannelId || null, // تأمين في حال كانت فارغة
+                voiceChannelId: voiceChannelId || null 
+            },
+            { upsert: true, new: true }
+        );
 
-    if (applyChannel) {
-        const channel = client.channels.cache.get(applyChannel);
-        if (channel) {
-            const embed = new EmbedBuilder()
-                .setTitle(`📢 تقديم لكلان: ${clanName}`)
-                .setDescription(applyMsg || 'اضغط على الزر أدناه للتقديم')
-                .setColor('#00d2ff')
-                .setTimestamp();
+        // إرسال رسالة التقديم إذا تم اختيار قناة
+        if (applyChannel) {
+            const channel = client.channels.cache.get(applyChannel);
+            if (channel) {
+                const embed = new EmbedBuilder()
+                    .setTitle(`📢 تقديم لكلان: ${clanName || 'جديد'}`)
+                    .setDescription(applyMsg || 'اضغط على الزر أدناه للتقديم')
+                    .setColor('#00d2ff')
+                    .setTimestamp();
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`apply_clan_${index}`)
-                    .setLabel('📝 تقديم للكلان')
-                    .setStyle(ButtonStyle.Primary)
-            );
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`apply_clan_${index}`)
+                        .setLabel('📝 تقديم للكلان')
+                        .setStyle(ButtonStyle.Primary)
+                );
 
-            channel.send({ embeds: [embed], components: [row] });
+                await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
+            }
         }
+
+        res.redirect(`/manage/${guildId}/clans`);
+
+    } catch (err) {
+        console.error("❌ Clan Save Error:", err);
+        res.status(500).send("حدث خطأ في السيرفر، راجع الكونسول.");
     }
-    res.redirect(`/manage/${guildId}/clans`);
 });
 
 
