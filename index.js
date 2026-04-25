@@ -2763,6 +2763,9 @@ client.on('interactionCreate', async (interaction) => {
         }
         const guildData = await GuildConfig.findOne({ guildId: interaction.guild?.id });
 
+// =========================
+// 🚫 منع استخدام الأوامر خارج قناة التحكم
+// =========================
 if (
     guildData?.controlChannelId &&
     interaction.channel?.id !== guildData.controlChannelId
@@ -2772,33 +2775,35 @@ if (
         ephemeral: true
     });
 }
-// --- [ نظام التقديم للكلانات (Modal) ] ---
-if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
-    const clanIdx = interaction.customId.replace('apply_clan_', '');
-    
+
+
+// =========================
+// 📝 نظام التقديم للكلان (Modal)
+// =========================
+if (interaction.isButton() && interaction.customId.startsWith('apply_clan:')) {
+
+    const clanIdx = interaction.customId.split(':')[1];
+
     const modal = new ModalBuilder()
-        .setCustomId(`modal_apply_${clanIdx}`)
+        .setCustomId(`modal_apply:${clanIdx}`)
         .setTitle('📝 طلب انضمام للكلان');
 
     const q1 = new TextInputBuilder()
         .setCustomId('stay_time')
         .setLabel("كم مدة تواجدك في السيرفر؟")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("مثلاً: 5 ساعات يومياً")
         .setRequired(true);
 
     const q2 = new TextInputBuilder()
         .setCustomId('afk_time')
         .setLabel("كم مدة تواجدك بالـ AFK؟")
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder("مثلاً: ساعتين")
         .setRequired(true);
 
     const q3 = new TextInputBuilder()
         .setCustomId('info')
         .setLabel("اسمك، عمرك، ومن وين؟")
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder("أحمد، 20، الأردن")
         .setRequired(true);
 
     modal.addComponents(
@@ -2809,24 +2814,28 @@ if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
 
     return interaction.showModal(modal);
 }
-if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
-    const clanIdx = interaction.customId.split('_')[2]; // استخراج الرقم صح
+
+
+// =========================
+// 🎛️ منيو التحكم بالكلان
+// =========================
+if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control:')) {
+
+    const clanIdx = interaction.customId.split(':')[1];
     const action = interaction.values[0];
 
     const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
     if (!clan) return interaction.reply({ content: "❌ الكلان غير موجود.", ephemeral: true });
 
     if (action === 'show_points') {
-        const mData = await ClanMember.findOne({ guildId: interaction.guild.id, userId: interaction.user.id });
-        return interaction.reply({ 
-            content: `📊 **إحصائيات الكلان:**\n• النقاط: \`${clan.points}\`\n• أعضاء: \`${clan.members.length}/10\``, 
-            ephemeral: true 
+        return interaction.reply({
+            content: `📊 **إحصائيات الكلان:**\n• النقاط: \`${clan.points}\`\n• أعضاء: \`${clan.members.length}/10\``,
+            ephemeral: true
         });
     }
 
-    // فتح الـ Modal
     const modal = new ModalBuilder()
-        .setCustomId(`modal_clan_${action}_${clanIdx}`) // التأكد من الترتيب: action ثم index
+        .setCustomId(`modal_clan:${action}:${clanIdx}`)
         .setTitle('إدارة الكلان');
 
     const idInput = new TextInputBuilder()
@@ -2836,107 +2845,149 @@ if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_co
         .setRequired(true);
 
     modal.addComponents(new ActionRowBuilder().addComponents(idInput));
+
     return interaction.showModal(modal);
 }
-if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan_')) {
+
+
+// =========================
+// ⚙️ تنفيذ مودال إدارة الكلان
+// =========================
+if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan:')) {
+
     try {
         await interaction.deferReply({ ephemeral: true });
 
-        const parts = interaction.customId.split('_'); 
-        // الترتيب: [0]modal, [1]clan, [2]action, [3]index
-        const action = parts[2]; 
-        const clanIdx = parts[3];
+        const [_, action, clanIdx] = interaction.customId.split(':');
+        const targetId = interaction.fields.getTextInputValue('user_id')?.trim();
 
-        const targetId = interaction.fields.getTextInputValue('user_id').trim();
         const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+        if (!clan) return interaction.editReply("❌ الكلان غير موجود.");
 
+        if (!targetId) return interaction.editReply("❌ ID غير صحيح.");
+
+        // ➕ إضافة عضو
         if (action === 'add_mem') {
-            if (clan.members.length >= 10) return interaction.editReply("❌ الكلان ممتلئ.");
-            if (!clan.members.includes(targetId)) clan.members.push(targetId);
-            await clan.save();
-            
-            // فتح الروم فوراً
-            if (clan.textChannelId) {
-                const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
-                if (textCh) await textCh.permissionOverwrites.edit(targetId, { ViewChannel: true, SendMessages: true }).catch(()=>{});
+
+            if (clan.members.length >= 10)
+                return interaction.editReply("❌ الكلان ممتلئ.");
+
+            if (!clan.members.includes(targetId)) {
+                clan.members.push(targetId);
+                await clan.save();
             }
+
+            const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
+            if (textCh) {
+                await textCh.permissionOverwrites.edit(targetId, {
+                    ViewChannel: true,
+                    SendMessages: true
+                }).catch(() => {});
+            }
+
             return interaction.editReply(`✅ تم إضافة <@${targetId}>.`);
         }
 
+        // ❌ طرد عضو
         if (action === 'kick_mem') {
+
             clan.members = clan.members.filter(id => id !== targetId);
             await clan.save();
-            
-            // سحب الروم فوراً
-            if (clan.textChannelId) {
-                const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
-                if (textCh) await textCh.permissionOverwrites.delete(targetId).catch(()=>{});
+
+            const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
+            if (textCh) {
+                await textCh.permissionOverwrites.delete(targetId).catch(() => {});
             }
+
             return interaction.editReply(`❌ تم طرد <@${targetId}>.`);
         }
-    } catch (e) {
-        console.error(e);
-        interaction.editReply("❌ حدث خطأ فني بالداتابيز.");
+
+    } catch (err) {
+        console.error(err);
+        if (!interaction.replied) {
+            interaction.editReply("❌ حدث خطأ فني بالداتابيز.");
+        }
     }
 }
 
 
-if (interaction.isButton() && (interaction.customId.startsWith('accept_member_') || interaction.customId.startsWith('reject_member_'))) {
-    try {
-        // تأخير التحديث لضمان عدم ظهور "Interaction Failed"
-        await interaction.deferUpdate(); 
+// =========================
+// ✅ قبول / رفض طلب الانضمام
+// =========================
+if (
+    interaction.isButton() &&
+    (interaction.customId.startsWith('accept_member:') ||
+     interaction.customId.startsWith('reject_member:'))
+) {
 
-        const parts = interaction.customId.split('_');
-        const action = parts[0]; // accept أو reject
-        const targetUserId = parts[2];
-        const clanIdx = parts[3];
+    try {
+        await interaction.deferUpdate();
+
+        const [action, targetUserId, clanIdx] = interaction.customId.split(':');
 
         const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-        if (!clan) return console.log("الكلان غير موجود");
+        if (!clan) return;
 
         const targetUser = await client.users.fetch(targetUserId).catch(() => null);
 
-        // ✅ في حالة القبول
-        if (action === 'accept') {
+        // =========================
+        // ✅ قبول
+        // =========================
+        if (action === 'accept_member') {
+
             if (clan.members.length >= 10) {
-                return interaction.followUp({ content: "❌ الكلان ممتلئ بالفعل (10 أعضاء).", ephemeral: true });
+                return interaction.followUp({
+                    content: "❌ الكلان ممتلئ.",
+                    ephemeral: true
+                });
             }
 
             if (!clan.members.includes(targetUserId)) {
                 clan.members.push(targetUserId);
                 await clan.save();
             }
-// فتح صلاحيات الرومات للعضو الجديد
-if (clan.textChannelId) {
-    const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
-    if (textCh) await textCh.permissionOverwrites.edit(targetUserId, { ViewChannel: true, SendMessages: true });
-}
-if (clan.voiceChannelId) {
-    const voiceCh = interaction.guild.channels.cache.get(clan.voiceChannelId);
-    if (voiceCh) await voiceCh.permissionOverwrites.edit(targetUserId, { ViewChannel: true, Connect: true });
-}
+
+            const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
+            const voiceCh = interaction.guild.channels.cache.get(clan.voiceChannelId);
+
+            if (textCh) {
+                await textCh.permissionOverwrites.edit(targetUserId, {
+                    ViewChannel: true,
+                    SendMessages: true
+                }).catch(() => {});
+            }
+
+            if (voiceCh) {
+                await voiceCh.permissionOverwrites.edit(targetUserId, {
+                    ViewChannel: true,
+                    Connect: true
+                }).catch(() => {});
+            }
 
             if (targetUser) {
-                await targetUser.send(`✅ تهانينا! تم قبول طلب انضمامك لكلان: **${clan.clanName}**`).catch(() => {});
+                targetUser.send(`✅ تم قبولك في كلان **${clan.clanName}**`).catch(() => {});
             }
 
             return interaction.editReply({
-                content: `✅ تم قبول <@${targetUserId}> بنجاح بواسطة ${interaction.user}`,
-                embeds: [], // مسح الإيمباد القديم
-                components: [] // إزالة الأزرار
+                content: `✅ تم قبول <@${targetUserId}> بواسطة ${interaction.user}`,
+                components: [],
+                embeds: []
             });
         }
 
-        // ❌ في حالة الرفض
-        if (action === 'reject') {
+        // =========================
+        // ❌ رفض
+        // =========================
+        if (action === 'reject_member') {
+
             if (targetUser) {
-                await targetUser.send(`❌ للأسف، تم رفض طلب انضمامك لكلان: **${clan.clanName}**`).catch(() => {});
+                targetUser.send(`❌ تم رفضك من كلان **${clan.clanName}**`).catch(() => {});
             }
 
             return interaction.editReply({
-                content: `❌ تم رفض طلب <@${targetUserId}> بواسطة ${interaction.user}`,
-                embeds: [],
-                components: []
+                content: `❌ تم رفض <@${targetUserId}> بواسطة ${interaction.user}`,
+                components: [],
+                embeds: []
             });
         }
 
@@ -2946,16 +2997,18 @@ if (clan.voiceChannelId) {
 }
 
 
-if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply_')) {
+// =========================
+// 📩 تقديم الطلب للكلان
+// =========================
+if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply:')) {
+
     try {
-        const clanIdx = interaction.customId.replace('modal_apply_', '');
+        const clanIdx = interaction.customId.split(':')[1];
 
-        const guildId = interaction.guild?.id;
-        if (!guildId) {
-            return interaction.reply({ content: "❌ خطأ بالسيرفر.", ephemeral: true });
-        }
-
-        const clan = await Clan.findOne({ guildId: guildId, clanIndex: clanIdx });
+        const clan = await Clan.findOne({
+            guildId: interaction.guild.id,
+            clanIndex: clanIdx
+        });
 
         if (!clan || !clan.leaderId) {
             return interaction.reply({ content: "❌ الكلان أو القائد غير موجود.", ephemeral: true });
@@ -2966,33 +3019,34 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply_
             return interaction.reply({ content: "❌ ما قدرت أوصل للقائد.", ephemeral: true });
         }
 
-        const stay = interaction.fields.getTextInputValue('stay_time') || "غير محدد";
-        const afk = interaction.fields.getTextInputValue('afk_time') || "غير محدد";
-        const info = interaction.fields.getTextInputValue('info') || "لا يوجد";
+        const stay = interaction.fields.getTextInputValue('stay_time');
+        const afk = interaction.fields.getTextInputValue('afk_time');
+        const info = interaction.fields.getTextInputValue('info');
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`accept_member_${interaction.user.id}_${clanIdx}`)
-                .setLabel('✅ قبول')
+                .setCustomId(`accept_member:${interaction.user.id}:${clanIdx}`)
+                .setLabel('قبول')
                 .setStyle(ButtonStyle.Success),
+
             new ButtonBuilder()
-                .setCustomId(`reject_member_${interaction.user.id}_${clanIdx}`)
-                .setLabel('❌ رفض')
+                .setCustomId(`reject_member:${interaction.user.id}:${clanIdx}`)
+                .setLabel('رفض')
                 .setStyle(ButtonStyle.Danger)
         );
 
-        const leaderEmbed = new EmbedBuilder()
+        const embed = new EmbedBuilder()
             .setTitle(`📩 طلب انضمام - ${clan.clanName}`)
             .setColor('Blue')
             .addFields(
-                { name: '👤 المستخدم', value: `${interaction.user} (${interaction.user.id})` },
+                { name: '👤 المستخدم', value: `${interaction.user}` },
                 { name: '⏱️ التواجد', value: stay },
                 { name: '💤 AFK', value: afk },
                 { name: '🌍 معلومات', value: info }
             )
             .setTimestamp();
 
-        await leader.send({ embeds: [leaderEmbed], components: [row] }).catch(() => {});
+        await leader.send({ embeds: [embed], components: [row] }).catch(() => {});
 
         return interaction.reply({
             content: "✅ تم إرسال طلبك للقائد",
