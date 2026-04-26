@@ -1654,6 +1654,20 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
         console.error("❌ Clan Save Error:", err);
         res.status(500).send("حدث خطأ في السيرفر، راجع الكونسول.");
     }
+    if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
+const clanIndex = interaction.customId.split('_')[2];
+
+const application = await ClanApplication.findOne({
+    guildId: interaction.guild.id,
+    clanIndex,
+    status: 'pending'
+});
+
+    return interaction.reply({
+        content: "✅ تم إرسال طلبك بنجاح، انتظر موافقة الإدارة.",
+        ephemeral: true
+    });
+}
 });
 
 
@@ -2778,41 +2792,53 @@ if (
 
 
 // =========================
-// 📝 نظام التقديم للكلان (Modal)
+// 🛑 قبول / رفض الكلان (ADMIN)
 // =========================
-if (interaction.isButton() && interaction.customId.startsWith('apply_clan:')) {
+if (interaction.isButton()) {
 
-    const clanIdx = interaction.customId.split(':')[1];
+    if (
+        interaction.customId.startsWith('clan_accept_') ||
+        interaction.customId.startsWith('clan_reject_')
+    ) {
 
-    const modal = new ModalBuilder()
-        .setCustomId(`modal_apply:${clanIdx}`)
-        .setTitle('📝 طلب انضمام للكلان');
+        const clanIndex = interaction.customId.split('_')[2];
 
-    const q1 = new TextInputBuilder()
-        .setCustomId('stay_time')
-        .setLabel("كم مدة تواجدك في السيرفر؟")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+await ClanApplication.create({
+    guildId: interaction.guild.id,
+    userId: interaction.user.id,
+    clanIndex,
+    status: 'pending'
+});
 
-    const q2 = new TextInputBuilder()
-        .setCustomId('afk_time')
-        .setLabel("كم مدة تواجدك بالـ AFK؟")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+        if (!application)
+            return interaction.reply({ content: "❌ الطلب غير موجود.", ephemeral: true });
 
-    const q3 = new TextInputBuilder()
-        .setCustomId('info')
-        .setLabel("اسمك، عمرك، ومن وين؟")
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
+        // قبول
+        if (interaction.customId.startsWith('clan_accept_')) {
+            application.status = 'accepted';
+            await application.save();
 
-    modal.addComponents(
-        new ActionRowBuilder().addComponents(q1),
-        new ActionRowBuilder().addComponents(q2),
-        new ActionRowBuilder().addComponents(q3)
-    );
+            const member = await interaction.guild.members.fetch(application.userId).catch(() => null);
+            if (member) {
+                await member.send("✅ تم قبولك في الكلان!");
+            }
 
-    return interaction.showModal(modal);
+            return interaction.reply({ content: "✅ تم قبول اللاعب.", ephemeral: true });
+        }
+
+        // رفض
+        if (interaction.customId.startsWith('clan_reject_')) {
+            application.status = 'rejected';
+            await application.save();
+
+            const member = await interaction.guild.members.fetch(application.userId).catch(() => null);
+            if (member) {
+                await member.send("❌ تم رفض طلبك للكلان.");
+            }
+
+            return interaction.reply({ content: "❌ تم رفض اللاعب.", ephemeral: true });
+        }
+    }
 }
 
 
@@ -3304,7 +3330,7 @@ setInterval(async () => {
             channel.members.forEach(async (member) => {
                 if (member.user.bot || member.voice.selfDeaf || member.voice.afk) return;
 
-                const memberClan = await Clan.findOne({ guildId: guild.id, members: member.id });
+                const memberClan = await Clan.findOne({ guildId: guild.id, members: { $in: [member.id] } });
                 if (memberClan) {
                     let mData = await ClanMember.findOne({ guildId: guild.id, userId: member.id, clanIndex: memberClan.clanIndex });
                     if (!mData) mData = new ClanMember({ guildId: guild.id, userId: member.id, clanIndex: memberClan.clanIndex });
