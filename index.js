@@ -1654,22 +1654,54 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
         console.error("❌ Clan Save Error:", err);
         res.status(500).send("حدث خطأ في السيرفر، راجع الكونسول.");
     }
-    if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
-const clanIndex = interaction.customId.split('_')[2];
+if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
 
-const application = await ClanApplication.findOne({
-    guildId: interaction.guild.id,
-    clanIndex,
-    status: 'pending'
-});
+    const clanIndex = interaction.customId.split('_')[2];
 
-    return interaction.reply({
-        content: "✅ تم إرسال طلبك بنجاح، انتظر موافقة الإدارة.",
-        ephemeral: true
-    });
+    try {
+        // فتح مودال التقديم
+        const modal = new ModalBuilder()
+            .setCustomId(`modal_apply_${clanIndex}`)
+            .setTitle('📝 طلب انضمام للكلان');
+
+        const q1 = new TextInputBuilder()
+            .setCustomId('stay_time')
+            .setLabel("كم مدة تواجدك في السيرفر؟")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const q2 = new TextInputBuilder()
+            .setCustomId('afk_time')
+            .setLabel("كم مدة تواجدك بالـ AFK؟")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const q3 = new TextInputBuilder()
+            .setCustomId('info')
+            .setLabel("اسمك، عمرك، ومن وين؟")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(q1),
+            new ActionRowBuilder().addComponents(q2),
+            new ActionRowBuilder().addComponents(q3)
+        );
+
+        return interaction.showModal(modal);
+
+    } catch (err) {
+        console.error(err);
+
+        if (!interaction.replied && !interaction.deferred) {
+            return interaction.reply({
+                content: "❌ صار خطأ بالنظام.",
+                ephemeral: true
+            });
+        }
+    }
 }
 });
-
 
 
 app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
