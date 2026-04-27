@@ -2926,9 +2926,13 @@ collector.on('end', async (collected, reason) => {
         });
 
         if (!clan?.resultsChannelId) return;
+console.log("RESULTS CHANNEL ID:", clan.resultsChannelId);
+       const resChannel = await interaction.guild.channels.fetch(clan.resultsChannelId).catch(() => null);
 
-        const resChannel = interaction.guild.channels.cache.get(clan.resultsChannelId);
-        if (!resChannel) return;
+if (!resChannel) {
+    console.log("❌ resultsChannelId غلط أو الروم مش موجود:", clan.resultsChannelId);
+    return;
+}
 
         const embed = new EmbedBuilder()
             .setTitle(`📩 طلب انضمام جديد - كلان: ${clan.clanName}`)
@@ -2957,19 +2961,19 @@ collector.on('end', async (collected, reason) => {
             embeds: [embed],
             components: [row]
         });
+setTimeout(async () => {
+    try {
+        await thread.setArchived(true).catch(() => {});
+        await thread.setLocked(true).catch(() => {});
 
-        setTimeout(async () => {
-            try {
-                if (thread.deletable) {
-                    await thread.delete();
-                } else {
-                    await thread.setLocked(true);
-                    await thread.setArchived(true);
-                }
-            } catch (err) {
-                console.log("❌ thread error:", err.message);
-            }
-        }, 3000);
+        await thread.delete().catch((err) => {
+            console.log("❌ ما قدر يحذف الثريد:", err.message);
+        });
+
+    } catch (err) {
+        console.log("thread error:", err.message);
+    }
+}, 3000);
 
     } catch (err) {
         console.error("❌ Error in collector end:", err);
