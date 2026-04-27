@@ -2911,39 +2911,26 @@ if (!interaction.replied && !interaction.deferred) {
 
 collector.on('end', async (collected, reason) => {
     try {
-        if (reason !== 'finished') return;
+
+        console.log("Collector ended with:", reason);
+
+        if (reason !== 'done') return;
 
         await thread.send("✅ يعطيك العافية، انتهت المقابلة. سيتم إرسال طلبك للقائد وإغلاق الروم.");
 
-        // 🔢 استخراج رقم الكلان
         const parts = interaction.customId.split('_');
         const clanIdxNum = parseInt(parts[parts.length - 1]);
 
-        // 🔍 جلب الكلان
         const clan = await Clan.findOne({
             guildId: interaction.guild.id,
             clanIndex: clanIdxNum
         });
 
-        if (!clan) {
-            console.log(`❌ الكلان غير موجود: ${clanIdxNum}`);
-            return;
-        }
+        if (!clan?.resultsChannelId) return;
 
-        if (!clan.resultsChannelId) {
-            console.log(`❌ ما في resultsChannelId للكلان ${clanIdxNum}`);
-            return;
-        }
-
-        // 📍 جلب روم النتائج
         const resChannel = interaction.guild.channels.cache.get(clan.resultsChannelId);
+        if (!resChannel) return;
 
-        if (!resChannel) {
-            console.log("❌ روم النتائج غير موجود أو ID غلط:", clan.resultsChannelId);
-            return;
-        }
-
-        // 📩 إرسال التقديم
         const embed = new EmbedBuilder()
             .setTitle(`📩 طلب انضمام جديد - كلان: ${clan.clanName}`)
             .setColor('#00d2ff')
@@ -2972,7 +2959,6 @@ collector.on('end', async (collected, reason) => {
             components: [row]
         });
 
-        // 🧹 حذف الثريد بشكل آمن
         setTimeout(async () => {
             try {
                 if (thread.deletable) {
@@ -2982,7 +2968,7 @@ collector.on('end', async (collected, reason) => {
                     await thread.setArchived(true);
                 }
             } catch (err) {
-                console.log("❌ خطأ بحذف الثريد:", err.message);
+                console.log("❌ thread error:", err.message);
             }
         }, 3000);
 
