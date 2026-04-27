@@ -2914,8 +2914,7 @@ collector.on('end', async (collected, reason) => {
 
         console.log("Collector ended with:", reason);
 
-        if (reason !== 'done') return;
-
+        if (reason !== 'finished' && reason !== 'time') return;
         await thread.send("✅ يعطيك العافية، انتهت المقابلة. سيتم إرسال طلبك للقائد وإغلاق الروم.");
 
         const parts = interaction.customId.split('_');
