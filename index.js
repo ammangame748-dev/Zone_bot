@@ -2237,22 +2237,22 @@ if (msg.content.startsWith('!profile')) {
 
     // 4. اسم العضو
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 45px "Arial Arabic", Arial';
+    ctx.font = 'bold 45px Arial';
     ctx.textAlign = 'left';
     ctx.fillText(target.username, 270, 130);
 
-    // 5. نظام الكلان (تحديث تلقائي)
+    // 5. نظام الكلان (تم إزالة الإيموجي المسبب للمشكلة)
     ctx.font = '30px Arial';
     if (clanData) {
-        ctx.fillStyle = '#00ff88'; // لون أخضر للكلان
-        ctx.fillText(`🚩 Clan: ${clanData.clanName}`, 270, 180);
+        ctx.fillStyle = '#00ff88'; 
+        ctx.fillText(`Clan: ${clanData.clanName}`, 270, 180); // شلنا إيموجي العلم
     } else {
-        ctx.fillStyle = '#ff4757'; // لون أحمر إذا ما في كلان
-        ctx.fillText(`🚫 No Clan Joined`, 270, 180);
+        ctx.fillStyle = '#ff4757'; 
+        ctx.fillText(`No Clan Joined`, 270, 180);
     }
 
-    // 6. رسم مربعات البيانات (شكل زجاجي)
-    function drawStatBox(x, y, label, value, icon) {
+    // 6. رسم مربعات البيانات
+    function drawStatBox(x, y, label, value) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.beginPath();
         ctx.roundRect(x, y, 240, 160, 20);
@@ -2271,8 +2271,9 @@ if (msg.content.startsWith('!profile')) {
     }
 
     drawStatBox(50, 300, 'LEVEL', uData.level);
-    drawStatBox(305, 300, 'STREAK', `🔥 ${uData.streakCount}`);
+    drawStatBox(305, 300, 'STREAK', uData.streakCount); // شلنا إيموجي النار
     drawStatBox(560, 300, 'MESSAGES', uData.msgCount || 0);
+
 
     // 7. إرسال الصورة النهائية
     const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'zone-profile.png' });
