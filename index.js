@@ -1923,19 +1923,25 @@ if (memberClan) {
 
     if (!hasBypass) {
         // --- [ نظام الكلمات الممنوعة ] ---
-        if (s.security?.badWords && s.security.badWords.trim().length > 0) {
-            // تحويل الكلمات لمصفوفة (بناءً على الفاصلة) وتنظيف الفراغات
-            const forbiddenWords = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
-            
-            // فحص إذا كانت الرسالة تحتوي على أي كلمة ممنوعة
-            const hasBadWord = forbiddenWords.some(word => word !== "" && msg.content.toLowerCase().includes(word));
+// --- [ نظام الكلمات الممنوعة المطور ] ---
+if (s.security?.badWords && s.security.badWords.trim().length > 0) {
+    const forbiddenWords = s.security.badWords.split(',').map(w => w.trim());
+    
+    // البحث عن الكلمة كـ "كلمة كاملة" فقط
+    const hasBadWord = forbiddenWords.some(word => {
+        if (word === "") return false;
+        // RegExp مع \b تضمن إن الكلمة لازم تكون مستقلة مش جزء من كلمة ثانية
+        const regex = new RegExp(`(?<=^|[^أ-يa-zA-Z0-9])${word}(?=[^أ-يa-zA-Z0-9]|$)`, 'iu');
+        return regex.test(msg.content);
+    });
 
-            if (hasBadWord) {
-                await msg.delete().catch(() => {});
-                return msg.channel.send(`⚠️ ${msg.author}، جملتك تحتوي على كلمات غير مسموح بها هنا!`)
-                    .then(m => setTimeout(() => m.delete(), 3000));
-            }
-        }
+    if (hasBadWord) {
+        await msg.delete().catch(() => {});
+        return msg.channel.send(`⚠️ ${msg.author}، ممنوع استخدام هذه الكلمة!`)
+            .then(m => setTimeout(() => m.delete(), 3000));
+    }
+}
+
 
         // --- [ نظام الإيموجي الممنوع ] ---
         if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
