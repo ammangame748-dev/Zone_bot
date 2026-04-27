@@ -2909,39 +2909,52 @@ if (!interaction.replied && !interaction.deferred) {
                 }
             });
 
-            collector.on('end', async (collected, reason) => {
-                if (reason === 'finished') {
-                    await thread.send("✅ يعطيك العافية، انتهت المقابلة. سيتم إرسال طلبك للقائد وإغلاق الروم.");
-                    
-                    const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-                    const resChannel = interaction.guild.channels.cache.get(clan?.resultsChannelId);
+collector.on('end', async (collected, reason) => {
+    if (reason === 'finished') {
+        await thread.send("✅ يعطيك العافية، انتهت المقابلة. سيتم إرسال طلبك للقائد وإغلاق الروم.");
+        
+        // 1️⃣ استخراج رقم الكلان بشكل صحيح (تحويله لرقم)
+        const parts = interaction.customId.split('_');
+        const clanIdxNum = parseInt(parts[parts.length - 1]); 
 
-                    if (resChannel) {
-                        const embed = new EmbedBuilder()
-                            .setTitle(`📩 طلب انضمام جديد - كلان: ${clan.clanName}`)
-                            .setColor('#00d2ff')
-                            .setThumbnail(interaction.user.displayAvatarURL())
-                            .addFields(
-                                { name: '👤 المتقدم', value: `${interaction.user}`, inline: true },
-                                { name: '🆔 الأيدي', value: `\`${interaction.user.id}\``, inline: true },
-                                { name: '📝 الاسم والعمر', value: answers[0] },
-                                { name: '🔊 التواجد الصوتي', value: answers[1] },
-                                { name: '💬 التفاعل العام', value: answers[2] }
-                            ).setTimestamp();
+        // 2️⃣ البحث عن الكلان في الداتابيز باستخدام الرقم والسيرفر
+        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdxNum });
+        
+        if (!clan || !clan.resultsChannelId) {
+            console.log(`❌ لم يتم العثور على قناة نتائج للكلان رقم ${clanIdxNum}`);
+            return;
+        }
 
-                        const row = new ActionRowBuilder().addComponents(
-                            new ButtonBuilder().setCustomId(`accept_member:${interaction.user.id}:${clanIdx}`).setLabel('✅ قبول').setStyle(ButtonStyle.Success),
-                            new ButtonBuilder().setCustomId(`reject_member:${interaction.user.id}:${clanIdx}`).setLabel('❌ رفض').setStyle(ButtonStyle.Danger)
-                        );
+        const resChannel = interaction.guild.channels.cache.get(clan.resultsChannelId);
 
-                        await resChannel.send({ content: `<@${clan.leaderId}>`, embeds: [embed], components: [row] });
-                    }
-                    setTimeout(() => thread.delete().catch(() => {}), 5000);
-                } else {
-                    await thread.send("⚠️ انتهى الوقت! يرجى التقديم مرة أخرى.");
-                    setTimeout(() => thread.delete().catch(() => {}), 5000);
-                }
-            });
+        if (resChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle(`📩 طلب انضمام جديد - كلان: ${clan.clanName}`)
+                .setColor('#00d2ff')
+                .setThumbnail(interaction.user.displayAvatarURL())
+                .addFields(
+                    { name: '👤 المتقدم', value: `${interaction.user}`, inline: true },
+                    { name: '📝 الأجوبة', value: answers.map((a, i) => `**${i+1}-** ${a}`).join('\n') }
+                ).setTimestamp();
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`accept_member:${interaction.user.id}:${clanIdxNum}`) // تأكدنا من وضع الرقم هنا أيضاً
+                    .setLabel('✅ قبول')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId(`reject_member:${interaction.user.id}:${clanIdxNum}`)
+                    .setLabel('❌ رفض')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+            await resChannel.send({ content: `🔔 تقديم جديد للقائد: <@${clan.leaderId}>`, embeds: [embed], components: [row] });
+        }
+        
+        setTimeout(() => thread.delete().catch(() => {}), 5000);
+    }
+});
+
             return;
         }
 
