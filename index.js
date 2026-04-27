@@ -201,6 +201,8 @@ const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
 }));
 
 const Clan = mongoose.model('Clan', new mongoose.Schema({
+    assistantIds: [String], // مصفوفة بدل أيدي واحد عشان نخليهم 3
+    resultsChannelId: String,
     guildId: String,
     clanIndex: Number, // من 0 لـ 7
     clanName: String,
@@ -2278,29 +2280,28 @@ if (command === modConfig.jail.commandName.toLowerCase()) {
             msg.channel.send(`✅ تم فك سجن ${target} واسترجاع رتبه كاملة.`);
         }
     }
+// البحث عن أمر "تحكم" وتعديله
 if (msg.content === 'تحكم') {
-    const myClan = await Clan.findOne({ guildId: msg.guild.id, $or: [{ leaderId: msg.author.id }, { assistantId: msg.author.id }] });
-    if (!myClan) return; // لازم يكون قائد أو مساعد
-     if (myClan.textChannelId && msg.channel.id !== myClan.textChannelId) {
-        return msg.reply(`❌ هذا الأمر مخصص فقط داخل روم الكلان الخاص بك: <#${myClan.textChannelId}>`);
-    }
-   if (msg.channel.id !== myClan.textChannelId) {
-        return msg.reply(`❌ يمكنك استخدام هذا الأمر فقط في الروم الخاص بالكلان: <#${myClan.textChannelId}>`)
-            .then(m => setTimeout(() => m.delete(), 5000));
-    }
+    const myClan = await Clan.findOne({ 
+        guildId: msg.guild.id, 
+        $or: [{ leaderId: msg.author.id }, { assistantIds: msg.author.id }] 
+    });
+    
+    if (!myClan) return msg.reply("❌ هذا الأمر مخصص لقادة الكلان ومساعديهم فقط.");
+
     const menu = new StringSelectMenuBuilder()
         .setCustomId(`clan_control_${myClan.clanIndex}`)
-        .setPlaceholder('⚙️ قائمة تحكم الكلان')
+        .setPlaceholder('⚙️ لوحة إدارة الكلان')
         .addOptions([
             { label: 'إضافة عضو', value: 'add_mem', emoji: '➕' },
             { label: 'طرد عضو', value: 'kick_mem', emoji: '❌' },
             { label: 'إضافة مساعد', value: 'add_assist', emoji: '🥈' },
-            { label: 'نقاطي ونقاط الكلان', value: 'show_points', emoji: '📊' }
+            { label: 'إحصائيات الكلان', value: 'show_stats', emoji: '📊' },
+            { label: 'نقاط الأعضاء', value: 'show_points', emoji: '🏆' }
         ]);
 
     msg.reply({ components: [new ActionRowBuilder().addComponents(menu)] });
 }
-
 
 }); // إغلاق حدث messageCreate بشكل صحيح
 
@@ -2815,6 +2816,47 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan:'
 
     try {
         await interaction.deferReply({ ephemeral: true });
+        // ➕ إضافة مساعد (بحد أقصى 3)
+if (action === 'add_assist') {
+    if (clan.assistantIds.length >= 3) return interaction.editReply("❌ لا يمكنك إضافة أكثر من 3 مساعدين.");
+    if (!clan.assistantIds.includes(targetId)) {
+        clan.assistantIds.push(targetId);
+        await clan.save();
+        return interaction.editReply(`✅ تم تعيين <@${targetId}> كمساعد جديد.`);
+    }
+    return interaction.editReply("⚠️ هذا العضو مساعد بالفعل.");
+}
+
+// 📊 إحصائيات الكلان
+if (action === 'show_stats') {
+    const membersList = clan.members.map(id => `<@${id}>`).join(', ') || 'لا يوجد أعضاء';
+    const assistantsList = clan.assistantIds.map(id => `<@${id}>`).join(', ') || 'لا يوجد مساعدين';
+    
+    const statsEmbed = new EmbedBuilder()
+        .setTitle(`🚩 إحصائيات كلان: ${clan.clanName}`)
+        .setColor('Blue')
+        .addFields(
+            { name: '👑 القائد', value: `<@${clan.leaderId}>`, inline: true },
+            { name: '🥈 المساعدين', value: assistantsList, inline: false },
+            { name: '👥 عدد الأعضاء', value: `${clan.members.length} / 10`, inline: true },
+            { name: '📍 الأعضاء حالياً', value: membersList }
+        );
+    return interaction.editReply({ embeds: [statsEmbed] });
+}
+
+// 🏆 نقاط الأعضاء (تفصيلي)
+if (action === 'show_points') {
+    const membersData = await ClanMember.find({ guildId: interaction.guild.id, clanIndex: clanIdx }).sort({ points: -1 });
+    
+    let pointsList = membersData.map((m, i) => `${i+1}. <@${m.userId}> — \`${m.points}\` نقطة`).join('\n') || 'لا توجد نقاط مسجلة بعد.';
+
+    const pointsEmbed = new EmbedBuilder()
+        .setTitle(`🏆 ترتيب نقاط كلان: ${clan.clanName}`)
+        .setDescription(`**إجمالي نقاط الكلان:** \`${clan.points}\`\n\n${pointsList}`)
+        .setColor('Gold');
+    return interaction.editReply({ embeds: [pointsEmbed] });
+}
+
 
         const [_, action, clanIdx] = interaction.customId.split(':');
         const targetId = interaction.fields.getTextInputValue('user_id')?.trim();
