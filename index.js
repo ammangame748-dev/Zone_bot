@@ -2862,7 +2862,8 @@ if (!interaction.replied && !interaction.deferred) {
 
         // 1️⃣ مرحلة ضغط زر "تقديم": فتح روم المقابلة (Thread) والبدء بالأسئلة
         if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
-            const clanIdx = interaction.customId.split('_')[2];
+            const clanIdx = parseInt(interaction.customId.split('_')[2]);
+
 
             // إنشاء Thread خاص (روم مقابلة)
             const thread = await interaction.channel.threads.create({
