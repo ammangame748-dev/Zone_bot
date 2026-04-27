@@ -2786,26 +2786,58 @@ if (
 
 
 // =========================
-// 🎛️ منيو التحكم بالكلان
+// 🎛️ منيو التحكم بالكلان المطور
 // =========================
-// --- [ إدارة منيو الكلان ] ---
 if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
-    const clanIdx = interaction.customId.split('_')[2]; // التأكد من جلب الرقم صح
+    const clanIdx = interaction.customId.split('_')[2];
     const action = interaction.values[0];
 
+    // 1. أوامر العرض المباشر (ما بتحتاج Modal ولا ID)
+    if (action === 'show_stats' || action === 'show_points') {
+        await interaction.deferReply({ ephemeral: true });
+        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+        
+        if (action === 'show_stats') {
+            const membersList = clan.members?.map(id => `<@${id}>`).join(', ') || 'لا يوجد أعضاء';
+            const assistantsList = clan.assistantIds?.map(id => `<@${id}>`).join(', ') || 'لا يوجد مساعدين';
+            const embed = new EmbedBuilder()
+                .setTitle(`📊 إحصائيات كلان: ${clan.clanName}`)
+                .setColor('#00d2ff')
+                .addFields(
+                    { name: '👑 القائد', value: `<@${clan.leaderId}>`, inline: true },
+                    { name: '🥈 المساعدين', value: assistantsList, inline: false },
+                    { name: '👥 الأعضاء', value: `${clan.members?.length || 0}/10`, inline: true },
+                    { name: '📍 قائمة المنشن', value: membersList }
+                );
+            return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (action === 'show_points') {
+            const membersData = await ClanMember.find({ guildId: interaction.guild.id, clanIndex: clanIdx }).sort({ points: -1 });
+            let list = membersData.map((m, i) => `**#${i+1}** <@${m.userId}> — \`${m.points}\` نقطة`).join('\n') || 'لا يوجد نقاط مسجلة.';
+            const embed = new EmbedBuilder()
+                .setTitle(`🏆 نقاط كلان: ${clan.clanName}`)
+                .setDescription(`**إجمالي نقاط الكلان:** \`${clan.points}\`\n\n${list}`)
+                .setColor('Gold');
+            return interaction.editReply({ embeds: [embed] });
+        }
+    }
+
+    // 2. أوامر الإدارة (بتحتاج تفتح Modal عشان تحط ID)
     const modal = new ModalBuilder()
-        .setCustomId(`modal_clan:${action}:${clanIdx}`) // توحيد الفصل بنقطتين
+        .setCustomId(`modal_clan:${action}:${clanIdx}`)
         .setTitle('إدارة الكلان');
 
     const idInput = new TextInputBuilder()
         .setCustomId('user_id')
-        .setLabel('أدخل ID العضو:')
+        .setLabel('أدخل ID العضو المستهدف:')
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
     modal.addComponents(new ActionRowBuilder().addComponents(idInput));
     return interaction.showModal(modal);
 }
+
 
 
 
