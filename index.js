@@ -201,10 +201,8 @@ const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
 }));
 
 const Clan = mongoose.model('Clan', new mongoose.Schema({
-        textChannelId: String,  
-    voiceChannelId: String,
     guildId: String,
-    clanIndex: Number, // من 0 لـ 7 (الـ 8 كلانات)
+    clanIndex: Number, // من 0 لـ 7
     clanName: String,
     roleId: String,
     leaderId: String,
@@ -212,8 +210,12 @@ const Clan = mongoose.model('Clan', new mongoose.Schema({
     points: { type: Number, default: 0 },
     applyChannel: String,
     applyMessage: String,
-    members: [String] // مصفوفة للأيديات (حد أقصى 10)
+    textChannelId: String,  
+    voiceChannelId: String,
+    resultsChannelId: String, // ⬅️ هذا السطر هو اللي ناقصك وسبب كل المشكلة!
+    members: [String] 
 }));
+
 
 const ClanMember = mongoose.model('ClanMember', new mongoose.Schema({
     guildId: String,
@@ -1678,10 +1680,6 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
         res.status(500).send("حدث خطأ أثناء الحفظ، تأكد من اختيار قناة النتائج بشكل صحيح."); 
     }
 });
-
-
-
-
 
 
 app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
