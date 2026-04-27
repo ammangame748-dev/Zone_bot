@@ -3276,8 +3276,8 @@ async function openTicket(interaction, config, type) {
 
 const axios = require('axios');
 setInterval(async () => {
-    // التعديل: جلب كل المستخدمين لتجربة النظام عليك حتى لو الستريك 0
-    const allUsers = await UserLevel.find({}); 
+    // 1. جلب جميع المستخدمين بدون استثناء (حتى لو الستريك 0)
+    const allUsers = await UserLevel.find({});
 
     for (const u of allUsers) {
         if (!u.lastMessageDate) continue;
@@ -3288,11 +3288,10 @@ setInterval(async () => {
 
         const fullDay = 24 * 60 * 60 * 1000;
         
-        // --- [ إعدادات التجربة ] ---
-        // التنبيه يوصل بعد دقيقتين (120000 مللي ثانية) من آخر رسالة
-        const testWarnTime = 2 * 60 * 1000; 
+        // 2. الحسبة: تنبيه بعد 17 ساعة من آخر رسالة (يعني باقي 7 ساعات)
+        const warnTime = 17 * 60 * 60 * 1000; 
 
-        if (diff >= testWarnTime && diff < fullDay && !u.warned) {
+        if (diff >= warnTime && diff < fullDay && !u.warned) {
             const guild = client.guilds.cache.get(u.guildId);
             if (!guild) continue;
 
@@ -3300,27 +3299,26 @@ setInterval(async () => {
                 const member = await guild.members.fetch(u.userId).catch(() => null);
                 
                 if (member) {
-                    console.log(`📡 محاولة إرسال تنبيه تجريبي لـ: ${member.user.tag}`);
-                    
                     const embed = new EmbedBuilder()
-                        .setTitle("🔥 تنبيه ستريك (تجربة)")
-                        .setDescription(`هذا تنبيه تجريبي! مرّت دقيقتين على آخر رسالة لك.\n\nالستريك الحالي في قاعدة البيانات: **${u.streakCount}** يوم.`)
-                        .setColor('#00FF00') 
+                        .setTitle("⚠️ تنبيه التفاعل اليومي")
+                        .setDescription(`👋 أهلاً بك! متبقي **7 ساعات** فقط لتجديد تفاعلك اليومي.\n\n🔥 الستريك الحالي: **${u.streakCount}** يوم.\n\n💬 اكتب رسالة الآن لرفع مستواك والحفاظ على نشاطك!`)
+                        .setColor('#5865F2')
+                        .setFooter({ text: 'نظام التفاعل التلقائي • Zone System' })
                         .setTimestamp();
 
                     await member.send({ embeds: [embed] }).catch(() => {
-                        console.log("❌ الخاص مغلق عند العضو، ما وصل التنبيه.");
+                        console.log(`❌ الخاص مغلق عند ${member.user.tag}`);
                     });
 
                     u.warned = true; 
                     await u.save();
                 }
             } catch (e) {
-                console.error("Error:", e.message);
+                console.error("Warning Error:", e.message);
             }
         }
 
-        // تصفير الستريك الفعلي بعد 24 ساعة
+        // 3. تصفير الستريك والبيانات بعد مرور 24 ساعة كاملة
         if (diff >= fullDay) {
             u.streakCount = 0;
             u.dailyMsgs = 0;
@@ -3328,7 +3326,8 @@ setInterval(async () => {
             await u.save();
         }
     }
-}, 30000); // يفحص كل 30 ثانية
+}, 60000); // الفحص كل دقيقة
+
 
 
 // --- [ نظام نقاط الصوت التلقائي للكلانات ] ---
