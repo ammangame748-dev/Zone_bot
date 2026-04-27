@@ -2873,7 +2873,8 @@ if (!interaction.replied && !interaction.deferred) {
 // ✅ الإصلاح النهائي والمضمون 100% لقبول ورفض الكلانات
 // ==========================================
 if (interaction.isButton() && (interaction.customId.startsWith('accept_member:') || interaction.customId.startsWith('reject_member:'))) {
-    
+        await interaction.deferUpdate().catch(() => {}); 
+
     // 1️⃣ أهم سطر: الرد الفوري على ديسكورد لمنع رسالة "فشل التفاعل"
     if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate(); 
 
@@ -2953,17 +2954,19 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_apply:
         const afk = interaction.fields.getTextInputValue('afk_time');
         const info = interaction.fields.getTextInputValue('info');
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`accept_member:${interaction.user.id}:${clanIdx}`)
-                .setLabel('قبول')
-                .setStyle(ButtonStyle.Success),
+// التعديل المطلوب داخل modal_apply:
+const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+        // عدل السطر هاد بالزبط: شيلنا user.id وحطينا الكلمة اللي بيفهمها الكود
+        .setCustomId(`accept_member:${interaction.user.id}:${clanIdx}`) 
+        .setLabel('قبول')
+        .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+        .setCustomId(`reject_member:${interaction.user.id}:${clanIdx}`)
+        .setLabel('رفض')
+        .setStyle(ButtonStyle.Danger)
+);
 
-            new ButtonBuilder()
-                .setCustomId(`reject_member:${interaction.user.id}:${clanIdx}`)
-                .setLabel('رفض')
-                .setStyle(ButtonStyle.Danger)
-        );
 
         const embed = new EmbedBuilder()
             .setTitle(`📩 طلب انضمام - ${clan.clanName}`)
