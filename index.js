@@ -3276,8 +3276,8 @@ async function openTicket(interaction, config, type) {
 
 const axios = require('axios');
 setInterval(async () => {
-    // جلب كل المستخدمين اللي عندهم ستريك
-    const allUsers = await UserLevel.find({ streakCount: { $gt: 0 } });
+    // التعديل: جلب كل المستخدمين لتجربة النظام عليك حتى لو الستريك 0
+    const allUsers = await UserLevel.find({}); 
 
     for (const u of allUsers) {
         if (!u.lastMessageDate) continue;
@@ -3304,23 +3304,23 @@ setInterval(async () => {
                     
                     const embed = new EmbedBuilder()
                         .setTitle("🔥 تنبيه ستريك (تجربة)")
-                        .setDescription(`هذا تنبيه تجريبي! مرّت دقيقتين على آخر رسالة لك.\n\nالستريك الحالي: **${u.streakCount}** يوم.`)
-                        .setColor('#00FF00') // أخضر للتجربة
+                        .setDescription(`هذا تنبيه تجريبي! مرّت دقيقتين على آخر رسالة لك.\n\nالستريك الحالي في قاعدة البيانات: **${u.streakCount}** يوم.`)
+                        .setColor('#00FF00') 
                         .setTimestamp();
 
                     await member.send({ embeds: [embed] }).catch(() => {
                         console.log("❌ الخاص مغلق عند العضو، ما وصل التنبيه.");
                     });
-                }
 
-                u.warned = true; 
-                await u.save();
+                    u.warned = true; 
+                    await u.save();
+                }
             } catch (e) {
                 console.error("Error:", e.message);
             }
         }
 
-        // تصفير الستريك (24 ساعة)
+        // تصفير الستريك الفعلي بعد 24 ساعة
         if (diff >= fullDay) {
             u.streakCount = 0;
             u.dailyMsgs = 0;
@@ -3328,7 +3328,7 @@ setInterval(async () => {
             await u.save();
         }
     }
-}, 30000); // يفحص كل 30 ثانية عشان التجربة تكون أسرع
+}, 30000); // يفحص كل 30 ثانية
 
 
 // --- [ نظام نقاط الصوت التلقائي للكلانات ] ---
