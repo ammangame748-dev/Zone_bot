@@ -3276,43 +3276,51 @@ async function openTicket(interaction, config, type) {
 
 const axios = require('axios');
 setInterval(async () => {
-    const allUsers = await UserLevel.find({});
+    // جلب كل المستخدمين اللي عندهم ستريك
+    const allUsers = await UserLevel.find({ streakCount: { $gt: 0 } });
 
     for (const u of allUsers) {
         if (!u.lastMessageDate) continue;
 
         const now = Date.now();
         const last = new Date(u.lastMessageDate).getTime();
-
         const diff = now - last;
 
         const fullDay = 24 * 60 * 60 * 1000;
-        const warnTime = fullDay - (5 * 60 * 60 * 1000); // قبل 5 ساعات
+        
+        // --- [ إعدادات التجربة ] ---
+        // التنبيه يوصل بعد دقيقتين (120000 مللي ثانية) من آخر رسالة
+        const testWarnTime = 2 * 60 * 1000; 
 
-        // 🔔 التنبيه قبل ما يروح
-        if (diff >= warnTime && diff < fullDay && !u.warned) {
+        if (diff >= testWarnTime && diff < fullDay && !u.warned) {
+            const guild = client.guilds.cache.get(u.guildId);
+            if (!guild) continue;
+
             try {
-                const guild = client.guilds.cache.get(u.guildId);
                 const member = await guild.members.fetch(u.userId).catch(() => null);
-
+                
                 if (member) {
-                    await member.send({
-                        embeds: [
-                            new EmbedBuilder()
-                                .setTitle("⚠️ تنبيه الستريك!")
-                                .setDescription(`🔥 باقي أقل من 5 ساعات ويختفي الستريك!\n\n💬 اكتب ${sConf.requiredMessages} رسالة لتحافظ عليه.`)
-                                .setColor('#FFA500')
-                        ]
-                    }).catch(() => {});
+                    console.log(`📡 محاولة إرسال تنبيه تجريبي لـ: ${member.user.tag}`);
+                    
+                    const embed = new EmbedBuilder()
+                        .setTitle("🔥 تنبيه ستريك (تجربة)")
+                        .setDescription(`هذا تنبيه تجريبي! مرّت دقيقتين على آخر رسالة لك.\n\nالستريك الحالي: **${u.streakCount}** يوم.`)
+                        .setColor('#00FF00') // أخضر للتجربة
+                        .setTimestamp();
+
+                    await member.send({ embeds: [embed] }).catch(() => {
+                        console.log("❌ الخاص مغلق عند العضو، ما وصل التنبيه.");
+                    });
                 }
 
-                u.warned = true;
+                u.warned = true; 
                 await u.save();
-
-            } catch (e) {}
+            } catch (e) {
+                console.error("Error:", e.message);
+            }
         }
 
-        // ❌ حذف الستريك بعد 24 ساعة
+        // تصفير الستريك (24 ساعة)
         if (diff >= fullDay) {
             u.streakCount = 0;
             u.dailyMsgs = 0;
@@ -3320,8 +3328,9 @@ setInterval(async () => {
             await u.save();
         }
     }
+}, 30000); // يفحص كل 30 ثانية عشان التجربة تكون أسرع
 
-}, 60 * 1000); // كل دقيقة
+
 // --- [ نظام نقاط الصوت التلقائي للكلانات ] ---
 setInterval(async () => {
     client.guilds.cache.forEach(async (guild) => {
