@@ -2966,7 +2966,7 @@ if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan:'
             const questions = [
                 "ما هو اسمك وعمرك؟",
                 "كم ساعة تقريباً تتواجد في الرومات الصوتية يومياً؟",
-                "كم مدهتواجدك؟"
+               " كم مده التواجد "
             ];
 
             let answers = [];
