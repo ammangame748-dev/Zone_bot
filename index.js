@@ -2839,110 +2839,111 @@ if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_co
 }
 
 
+// ==========================================
+// 🚩 نظام إدارة الكلانات المتكامل (المنيو والمودال)
+// ==========================================
 
+// --- 1. التعامل مع القائمة المنسدلة (المنيو) ---
+if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
+    const clanIdx = parseInt(interaction.customId.split('_')[2]);
+    const action = interaction.values[0];
 
-// =========================
-// ⚙️ تنفيذ مودال إدارة الكلان
-// =========================
+    // جلب بيانات الكلان
+    const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+    if (!clan) return interaction.reply({ content: "❌ لم يتم العثور على الكلان.", ephemeral: true });
+
+    // أ. أوامر العرض المباشر (إحصائيات ونقاط)
+    if (action === 'show_stats' || action === 'show_points') {
+        await interaction.deferReply({ ephemeral: true });
+
+        if (action === 'show_stats') {
+            const assistants = clan.assistantIds?.map(id => `<@${id}>`).join(', ') || 'لا يوجد';
+            const members = clan.members?.map(id => `<@${id}>`).join(', ') || 'لا يوجد';
+            const embed = new EmbedBuilder()
+                .setTitle(`🚩 إحصائيات كلان: ${clan.clanName}`)
+                .setColor('#00d2ff')
+                .addFields(
+                    { name: '👑 القائد', value: `<@${clan.leaderId}>`, inline: true },
+                    { name: '🥈 المساعدين', value: assistants, inline: false },
+                    { name: '👥 الأعضاء', value: `${clan.members?.length || 0}/10`, inline: true },
+                    { name: '📍 قائمة المنشن', value: members }
+                );
+            return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (action === 'show_points') {
+            const membersData = await ClanMember.find({ guildId: interaction.guild.id, clanIndex: clanIdx }).sort({ points: -1 });
+            let list = membersData.map((m, i) => `**#${i+1}** <@${m.userId}> — \`${m.points}\` نقطة`).join('\n') || 'لا توجد نقاط.';
+            const embed = new EmbedBuilder()
+                .setTitle(`🏆 ترتيب نقاط: ${clan.clanName}`)
+                .setDescription(`**إجمالي النقاط:** \`${clan.points}\`\n\n${list}`)
+                .setColor('Gold');
+            return interaction.editReply({ embeds: [embed] });
+        }
+    }
+
+    // ب. أوامر الإدارة (تحتاج Modal لإدخال ID)
+    const modal = new ModalBuilder()
+        .setCustomId(`modal_clan:${action}:${clanIdx}`)
+        .setTitle('إدارة الكلان');
+
+    const idInput = new TextInputBuilder()
+        .setCustomId('user_id')
+        .setLabel('أدخل ID العضو:')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(idInput));
+    return interaction.showModal(modal);
+}
+
+// --- 2. تنفيذ أوامر المودال (إضافة/طرد/مساعد) ---
 if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_clan:')) {
-
     try {
         await interaction.deferReply({ ephemeral: true });
-        // ➕ إضافة مساعد (بحد أقصى 3)
-if (action === 'add_assist') {
-    if (clan.assistantIds.length >= 3) return interaction.editReply("❌ لا يمكنك إضافة أكثر من 3 مساعدين.");
-    if (!clan.assistantIds.includes(targetId)) {
-        clan.assistantIds.push(targetId);
-        await clan.save();
-        return interaction.editReply(`✅ تم تعيين <@${targetId}> كمساعد جديد.`);
-    }
-    return interaction.editReply("⚠️ هذا العضو مساعد بالفعل.");
-}
-
-// 📊 إحصائيات الكلان
-if (action === 'show_stats') {
-    const membersList = clan.members.map(id => `<@${id}>`).join(', ') || 'لا يوجد أعضاء';
-    const assistantsList = clan.assistantIds.map(id => `<@${id}>`).join(', ') || 'لا يوجد مساعدين';
-    
-    const statsEmbed = new EmbedBuilder()
-        .setTitle(`🚩 إحصائيات كلان: ${clan.clanName}`)
-        .setColor('Blue')
-        .addFields(
-            { name: '👑 القائد', value: `<@${clan.leaderId}>`, inline: true },
-            { name: '🥈 المساعدين', value: assistantsList, inline: false },
-            { name: '👥 عدد الأعضاء', value: `${clan.members.length} / 10`, inline: true },
-            { name: '📍 الأعضاء حالياً', value: membersList }
-        );
-    return interaction.editReply({ embeds: [statsEmbed] });
-}
-
-// 🏆 نقاط الأعضاء (تفصيلي)
-if (action === 'show_points') {
-    const membersData = await ClanMember.find({ guildId: interaction.guild.id, clanIndex: clanIdx }).sort({ points: -1 });
-    
-    let pointsList = membersData.map((m, i) => `${i+1}. <@${m.userId}> — \`${m.points}\` نقطة`).join('\n') || 'لا توجد نقاط مسجلة بعد.';
-
-    const pointsEmbed = new EmbedBuilder()
-        .setTitle(`🏆 ترتيب نقاط كلان: ${clan.clanName}`)
-        .setDescription(`**إجمالي نقاط الكلان:** \`${clan.points}\`\n\n${pointsList}`)
-        .setColor('Gold');
-    return interaction.editReply({ embeds: [pointsEmbed] });
-}
-
-
         const [_, action, clanIdx] = interaction.customId.split(':');
         const targetId = interaction.fields.getTextInputValue('user_id')?.trim();
 
-        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: parseInt(clanIdx) });
         if (!clan) return interaction.editReply("❌ الكلان غير موجود.");
 
-        if (!targetId) return interaction.editReply("❌ ID غير صحيح.");
+        // تأمين المصفوفات
+        if (!Array.isArray(clan.members)) clan.members = [];
+        if (!Array.isArray(clan.assistantIds)) clan.assistantIds = [];
 
-        // ➕ إضافة عضو
+        // ✅ إضافة عضو
         if (action === 'add_mem') {
-
-            if (clan.members.length >= 10)
-                return interaction.editReply("❌ الكلان ممتلئ.");
-
-            if (!clan.members.includes(targetId)) {
-                clan.members.push(targetId);
-                await clan.save();
-            }
-
-            const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
-            if (textCh) {
-                await textCh.permissionOverwrites.edit(targetId, {
-                    ViewChannel: true,
-                    SendMessages: true
-                }).catch(() => {});
-            }
-
-            return interaction.editReply(`✅ تم إضافة <@${targetId}>.`);
+            if (clan.members.length >= 10) return interaction.editReply("❌ الكلان ممتلئ.");
+            if (clan.members.includes(targetId)) return interaction.editReply("⚠️ العضو موجود بالفعل.");
+            clan.members.push(targetId);
+            await clan.save();
+            return interaction.editReply(`✅ تمت إضافة <@${targetId}> للكلان.`);
         }
 
         // ❌ طرد عضو
         if (action === 'kick_mem') {
-
             clan.members = clan.members.filter(id => id !== targetId);
             await clan.save();
+            return interaction.editReply(`❌ تم طرد <@${targetId}> من الكلان.`);
+        }
 
-            const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
-            if (textCh) {
-                await textCh.permissionOverwrites.delete(targetId).catch(() => {});
-            }
-
-            return interaction.editReply(`❌ تم طرد <@${targetId}>.`);
+        // 🥈 إضافة مساعد
+        if (action === 'add_assist') {
+            if (clan.assistantIds.length >= 3) return interaction.editReply("❌ الحد الأقصى 3 مساعدين.");
+            if (clan.assistantIds.includes(targetId)) return interaction.editReply("⚠️ العضو مساعد بالفعل.");
+            clan.assistantIds.push(targetId);
+            await clan.save();
+            return interaction.editReply(`✅ تم تعيين <@${targetId}> كمساعد للكلان.`);
         }
 
     } catch (err) {
         console.error(err);
-if (!interaction.replied && !interaction.deferred) {
-    return interaction.reply({ content: "❌ حدث خطأ فني بالداتابيز.", ephemeral: true });
-} else {
-    return interaction.editReply("❌ حدث خطأ فني بالداتابيز.");
-}
+        return interaction.editReply("❌ حدث خطأ فني، تأكد من صحة البيانات.");
     }
 }
+
+
+
     try {
         if (!interaction.guild) return;
 
@@ -2965,7 +2966,7 @@ if (!interaction.replied && !interaction.deferred) {
             const questions = [
                 "ما هو اسمك وعمرك؟",
                 "كم ساعة تقريباً تتواجد في الرومات الصوتية يومياً؟",
-                "كم مده تفاعلك؟"
+                "كم مدهتواجدك؟"
             ];
 
             let answers = [];
