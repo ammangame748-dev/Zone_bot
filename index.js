@@ -2878,6 +2878,7 @@ if (
      interaction.customId.startsWith('reject_member:'))
 ) {
     try {
+                await interaction.deferUpdate(); // 🔥 مهم جداً
         const [action, targetUserId, clanIdx] = interaction.customId.split(':');
 
         const clan = await Clan.findOne({ clanIndex: parseInt(clanIdx) });
