@@ -1546,11 +1546,13 @@ app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
                         ${g.channels.cache.filter(ch => ch.type === 0).map(ch => `<option value="${ch.id}" ${c.applyChannel==ch.id?'selected':''}># ${ch.name}</option>`).join('')}
                     </select>
 
-                    <label>📍 قناة نتائج القبول/الرفض:</label>
-                    <select name="resultsChannelId">
-                        <option value="">-- اختر القناة --</option>
-                        ${g.channels.cache.filter(ch => ch.type === 0).map(ch => `<option value="${ch.id}" ${c.resultsChannelId==ch.id?'selected':''}># ${ch.name}</option>`).join('')}
-                    </select>
+<label>📍 قناة نتائج القبول/الرفض:</label>
+<select name="resultsChannelId"> <!-- تأكد من هذا الاسم حرفياً -->
+    <option value="">-- اختر القناة --</option>
+    ${g.channels.cache.filter(ch => ch.type === 0).map(ch => 
+        `<option value="${ch.id}" ${c.resultsChannelId == ch.id ? 'selected' : ''}># ${ch.name}</option>`
+    ).join('')}
+</select>
                 </div>
 
                 <button class="btn-save" style="margin-top:15px;">💾 حفظ وإرسال بنل التقديم</button>
@@ -1617,29 +1619,33 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
 app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
     try {
         const { guildId, index } = req.params;
+        
+        // 1. جلب البيانات من الفورم والتأكد من مطابقة أسماء الحقول
         const { 
             clanName, roleId, leaderId, applyMsg, 
             applyChannel, textChannelId, voiceChannelId, 
-            resultsChannelId 
+            resultsChannelId // التأكد من وصول قناة النتائج
         } = req.body;
 
-        // 1. تحديث كافة البيانات في الداتابيز بما فيها قناة النتائج الجديدة
+        // 2. التحديث في الداتابيز باستخدام parseInt لضمان تطابق أنواع البيانات
         await Clan.findOneAndUpdate(
-            { guildId, clanIndex: index },
+            { guildId: guildId, clanIndex: parseInt(index) },
             { 
-                clanName, 
-                roleId, 
-                leaderId, 
-                applyMessage: applyMsg, 
-                applyChannel, // قناة إرسال البنل
-                textChannelId, 
-                voiceChannelId, 
-                resultsChannelId // القناة التي سيصلها القبول والرفض
+                $set: {
+                    clanName, 
+                    roleId, 
+                    leaderId, 
+                    applyMessage: applyMsg, 
+                    applyChannel, 
+                    textChannelId, 
+                    voiceChannelId, 
+                    resultsChannelId // حفظ قناة النتائج هنا
+                }
             },
-            { upsert: true }
+            { upsert: true, new: true }
         );
 
-        // 2. إرسال بنل التقديم للقناة المحددة (إذا تم اختيار قناة)
+        // 3. إرسال بنل التقديم (الذي يحتوي على زر المقابلة التلقائية)
         if (applyChannel) {
             const channel = client.channels.cache.get(applyChannel);
             if (channel) {
@@ -1651,7 +1657,7 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`apply_clan_${index}`)
+                        .setCustomId(`apply_clan_${index}`) // ربط الزر بالمقابلة
                         .setLabel('📝 ابدأ المقابلة الآن')
                         .setStyle(ButtonStyle.Primary)
                 );
@@ -1662,10 +1668,11 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
 
         res.redirect(`/manage/${guildId}/clans`);
     } catch (err) { 
-        console.error("Save Clan Error:", err);
-        res.status(500).send("خطأ في حفظ بيانات الكلان"); 
+        console.error("❌ Save Clan Error:", err);
+        res.status(500).send("حدث خطأ أثناء حفظ بيانات الكلان، تأكد من ملء الحقول المطلوبة."); 
     }
 });
+
 
 
 
