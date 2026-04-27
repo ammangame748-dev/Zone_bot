@@ -2200,6 +2200,85 @@ if (msg.content.startsWith ('!توب') || msg.content.startsWith('!top-streak'))
         return msg.channel.send({ embeds: [embed], components: components, files: files });
     
     }
+if (msg.content.startsWith('!profile')) {
+    const target = msg.mentions.users.first() || msg.author;
+    await msg.channel.sendTyping(); // حركة عشان يبين إن البوت قاعد بصمم
+
+    const uData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id }) || { level: 1, xp: 0, streakCount: 0 };
+    const clanData = await Clan.findOne({ guildId: msg.guild.id, members: target.id });
+
+    const canvas = createCanvas(850, 500);
+    const ctx = canvas.getContext('2d');
+
+    // 1. خلفية بتدرج نيون فخم
+    const bgGradient = ctx.createLinearGradient(0, 0, 850, 500);
+    bgGradient.addColorStop(0, '#0f0c29');
+    bgGradient.addColorStop(0.5, '#302b63');
+    bgGradient.addColorStop(1, '#24243e');
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, 850, 500);
+
+    // 2. رسم برواز نيون مضيء
+    ctx.strokeStyle = '#00d2ff';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, 830, 480);
+
+    // 3. رسم صورة العضو مع برواز دائري
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(150, 150, 90, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.clip();
+    const avatar = await loadImage(target.displayAvatarURL({ extension: 'png', size: 512 }));
+    ctx.drawImage(avatar, 60, 60, 180, 180);
+    ctx.restore();
+
+    // 4. اسم العضو
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 45px "Arial Arabic", Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(target.username, 270, 130);
+
+    // 5. نظام الكلان (تحديث تلقائي)
+    ctx.font = '30px Arial';
+    if (clanData) {
+        ctx.fillStyle = '#00ff88'; // لون أخضر للكلان
+        ctx.fillText(`🚩 Clan: ${clanData.clanName}`, 270, 180);
+    } else {
+        ctx.fillStyle = '#ff4757'; // لون أحمر إذا ما في كلان
+        ctx.fillText(`🚫 No Clan Joined`, 270, 180);
+    }
+
+    // 6. رسم مربعات البيانات (شكل زجاجي)
+    function drawStatBox(x, y, label, value, icon) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, 240, 160, 20);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 210, 255, 0.3)';
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#00d2ff';
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText(label, x + 120, y + 50);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 50px Arial';
+        ctx.fillText(value, x + 120, y + 120);
+    }
+
+    drawStatBox(50, 300, 'LEVEL', uData.level);
+    drawStatBox(305, 300, 'STREAK', `🔥 ${uData.streakCount}`);
+    drawStatBox(560, 300, 'MESSAGES', uData.msgCount || 0);
+
+    // 7. إرسال الصورة النهائية
+    const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'zone-profile.png' });
+    msg.reply({ files: [attachment] });
+}
+
 
     // ==========================================
     // 🛡️ نظام السجن المطور (للأدمن فقط)
