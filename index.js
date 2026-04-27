@@ -1547,12 +1547,13 @@ app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
                     </select>
 
 <label>📍 قناة نتائج القبول/الرفض:</label>
-<select name="resultsChannelId"> <!-- تأكد من هذا الاسم حرفياً -->
+<select name="resultsChannelId"> <!-- تأكد إن الاسم resultsChannelId -->
     <option value="">-- اختر القناة --</option>
     ${g.channels.cache.filter(ch => ch.type === 0).map(ch => 
         `<option value="${ch.id}" ${c.resultsChannelId == ch.id ? 'selected' : ''}># ${ch.name}</option>`
     ).join('')}
 </select>
+
                 </div>
 
                 <button class="btn-save" style="margin-top:15px;">💾 حفظ وإرسال بنل التقديم</button>
@@ -1620,58 +1621,64 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
     try {
         const { guildId, index } = req.params;
         
-        // 1. جلب البيانات من الفورم والتأكد من مطابقة أسماء الحقول
+        // 1. جلب البيانات (تأكدنا من مطابقة أسماء الحقول للداشبورد)
         const { 
             clanName, roleId, leaderId, applyMsg, 
             applyChannel, textChannelId, voiceChannelId, 
-            resultsChannelId // التأكد من وصول قناة النتائج
+            resultsChannelId // هذا الحقل اللي كان يسبب المشكلة
         } = req.body;
 
-        // 2. التحديث في الداتابيز باستخدام parseInt لضمان تطابق أنواع البيانات
-        await Clan.findOneAndUpdate(
+        // 2. تحديث الداتابيز مع التأكد من حفظ قناة النتائج
+        const updatedClan = await Clan.findOneAndUpdate(
             { guildId: guildId, clanIndex: parseInt(index) },
             { 
                 $set: {
-                    clanName, 
-                    roleId, 
-                    leaderId, 
-                    applyMessage: applyMsg, 
-                    applyChannel, 
-                    textChannelId, 
-                    voiceChannelId, 
-                    resultsChannelId // حفظ قناة النتائج هنا
+                    clanName: clanName || "بدون اسم", 
+                    roleId: roleId || null, 
+                    leaderId: leaderId || null, 
+                    applyMessage: applyMsg || "اضغط للتقديم", 
+                    applyChannel: applyChannel || null, 
+                    textChannelId: textChannelId || null, 
+                    voiceChannelId: voiceChannelId || null, 
+                    resultsChannelId: resultsChannelId || null // الحفظ الأكيد هنا
                 }
             },
             { upsert: true, new: true }
         );
 
-        // 3. إرسال بنل التقديم (الذي يحتوي على زر المقابلة التلقائية)
-        if (applyChannel) {
-            const channel = client.channels.cache.get(applyChannel);
+        // 3. إرسال أو تحديث بنل التقديم في القناة المحددة
+        if (updatedClan.applyChannel) {
+            const channel = client.channels.cache.get(updatedClan.applyChannel) || 
+                            await client.channels.fetch(updatedClan.applyChannel).catch(() => null);
+            
             if (channel) {
                 const embed = new EmbedBuilder()
-                    .setTitle(`📢 تقديم لكلان: ${clanName || 'جديد'}`)
-                    .setDescription(applyMsg || 'اضغط على الزر أدناه لبدء المقابلة التلقائية')
+                    .setTitle(`📢 تقديم لكلان: ${updatedClan.clanName}`)
+                    .setDescription(updatedClan.applyMessage)
                     .setColor('#00d2ff')
-                    .setFooter({ text: 'نظام المقابلة الذكي • Zone System' });
+                    .addFields({ name: '⚠️ ملاحظة', value: 'يرجى التأكد من فتح الخاص لاستلام النتائج.' })
+                    .setFooter({ text: 'نظام المقابلات التلقائي • Zone System' });
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`apply_clan_${index}`) // ربط الزر بالمقابلة
+                        .setCustomId(`apply_clan_${index}`)
                         .setLabel('📝 ابدأ المقابلة الآن')
                         .setStyle(ButtonStyle.Primary)
                 );
 
-                await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
+                await channel.send({ embeds: [embed], components: [row] }).catch(e => console.log("Error sending apply panel:", e.message));
             }
         }
 
+        // إعادة التوجيه لصفحة الكلانات
         res.redirect(`/manage/${guildId}/clans`);
+
     } catch (err) { 
         console.error("❌ Save Clan Error:", err);
-        res.status(500).send("حدث خطأ أثناء حفظ بيانات الكلان، تأكد من ملء الحقول المطلوبة."); 
+        res.status(500).send("حدث خطأ أثناء الحفظ، تأكد من اختيار قناة النتائج بشكل صحيح."); 
     }
 });
+
 
 
 
