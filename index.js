@@ -2747,7 +2747,7 @@ if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
         const clanIndex = interaction.customId.split('_')[2];
 
         const modal = new ModalBuilder()
-            .setCustomId(`modal_apply_${clanIndex}`)
+            .setCustomId(`modal_apply:${clanIndex}`)
             .setTitle('📝 طلب انضمام للكلان');
 
         const q1 = new TextInputBuilder()
