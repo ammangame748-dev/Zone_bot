@@ -1922,6 +1922,21 @@ if (memberClan) {
     const hasBypass = msg.member.roles.cache.some(role => s.security?.bypassRoles?.includes(role.id));
 
     if (!hasBypass) {
+        // --- [ نظام الكلمات الممنوعة ] ---
+        if (s.security?.badWords && s.security.badWords.trim().length > 0) {
+            // تحويل الكلمات لمصفوفة (بناءً على الفاصلة) وتنظيف الفراغات
+            const forbiddenWords = s.security.badWords.split(',').map(w => w.trim().toLowerCase());
+            
+            // فحص إذا كانت الرسالة تحتوي على أي كلمة ممنوعة
+            const hasBadWord = forbiddenWords.some(word => word !== "" && msg.content.toLowerCase().includes(word));
+
+            if (hasBadWord) {
+                await msg.delete().catch(() => {});
+                return msg.channel.send(`⚠️ ${msg.author}، جملتك تحتوي على كلمات غير مسموح بها هنا!`)
+                    .then(m => setTimeout(() => m.delete(), 3000));
+            }
+        }
+
         // --- [ نظام الإيموجي الممنوع ] ---
         if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
             const forbiddenEmojis = s.security.badEmojis.split(',').map(e => e.trim());
@@ -1929,20 +1944,19 @@ if (memberClan) {
 
             if (hasBadEmoji) {
                 await msg.delete().catch(() => {});
-                try {
-                    await msg.member.timeout(5 * 60 * 1000, 'استخدام إيموجي ممنوع');
-                    return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي غير مسموح به هنا!`);
-                } catch (e) { console.log("خطأ في التايم آوت"); }
-                return;
+                return msg.channel.send(`⚠️ ${msg.author}، هذا الإيموجي ممنوع!`)
+                    .then(m => setTimeout(() => m.delete(), 3000));
             }
         }
 
         // --- [ نظام منع الروابط ] ---
         if (s.security?.antiLinks && /(https?:\/\/)/.test(msg.content)) {
             await msg.delete().catch(() => {});
-            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`).then(m => setTimeout(() => m.delete(), 3000));
+            return msg.channel.send(`⚠️ ${msg.author}، الروابط ممنوعة هنا!`)
+                .then(m => setTimeout(() => m.delete(), 3000));
         }
-    } // إغلاق شرط hasBypass
+    }
+
 if (msg.content === '!rolespanel') {
 
     const config = await GuildConfig.findOne({ guildId: msg.guild.id });
