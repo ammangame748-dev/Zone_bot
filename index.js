@@ -2886,11 +2886,12 @@ if (!interaction.replied && !interaction.deferred) {
             const questions = [
                 "ما هو اسمك وعمرك؟",
                 "كم ساعة تقريباً تتواجد في الرومات الصوتية يومياً؟",
-                "كم تقدر تتفاعل في الشات العام (عدد رسائل تقريبي)؟"
+                "كم مده تفاعلك؟"
             ];
 
             let answers = [];
             let currentStep = 0;
+            const currentClanIdx = clanIdx; // تثبيت الأيدي هنا عشان ما يضيع
 
             await thread.send(`مرحباً ${interaction.user}، بدأت المقابلة.\n\n**السؤال الأول:** ${questions[currentStep]}`);
 
@@ -2909,76 +2910,64 @@ if (!interaction.replied && !interaction.deferred) {
                 }
             });
 
-collector.on('end', async (collected, reason) => {
-    try {
+            collector.on('end', async (collected, reason) => {
+                if (reason === 'finished') {
+                    try {
+                        // 1. إشعار أولي بالنجاح
+                        await thread.send("✅ **يعطيك العافية، انتهت المقابلة. جارٍ إرسال طلبك وإغلاق الروم...**");
 
-        console.log("Collector ended with:", reason);
+                        // 2. جلب بيانات الكلان باستخدام الأيدي المثبت
+                        const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: currentClanIdx });
 
-        if (reason !== 'finished' && reason !== 'time') return;
-        await thread.send("✅ يعطيك العافية، انتهت المقابلة. سيتم إرسال طلبك للقائد وإغلاق الروم.");
+                        if (clan && clan.resultsChannelId) {
+                            const resChannel = interaction.guild.channels.cache.get(clan.resultsChannelId) || 
+                                             await interaction.guild.channels.fetch(clan.resultsChannelId).catch(() => null);
 
-        const parts = interaction.customId.split('_');
-        const clanIdxNum = parseInt(parts[parts.length - 1]);
+                            if (resChannel) {
+                                const embed = new EmbedBuilder()
+                                    .setTitle(`📩 طلب انضمام جديد - كلان: ${clan.clanName || 'غير محدد'}`)
+                                    .setColor('#00d2ff')
+                                    .setThumbnail(interaction.user.displayAvatarURL())
+                                    .addFields(
+                                        { name: '👤 المتقدم', value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: true },
+                                        { name: '📝 الأجوبة', value: answers.map((a, i) => `**${i + 1}-** ${a}`).join('\n') }
+                                    )
+                                    .setTimestamp();
 
-        const clan = await Clan.findOne({
-            guildId: interaction.guild.id,
-            clanIndex: clanIdxNum
-        });
+                                const row = new ActionRowBuilder().addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId(`accept_member:${interaction.user.id}:${currentClanIdx}`)
+                                        .setLabel('✅ قبول')
+                                        .setStyle(ButtonStyle.Success),
+                                    new ButtonBuilder()
+                                        .setCustomId(`reject_member:${interaction.user.id}:${currentClanIdx}`)
+                                        .setLabel('❌ رفض')
+                                        .setStyle(ButtonStyle.Danger)
+                                );
 
-        if (!clan?.resultsChannelId) return;
-console.log("RESULTS CHANNEL ID:", clan.resultsChannelId);
-       const resChannel = await interaction.guild.channels.fetch(clan.resultsChannelId).catch(() => null);
+                                await resChannel.send({
+                                    content: `🔔 تقديم جديد للقائد: <@${clan.leaderId}>`,
+                                    embeds: [embed],
+                                    components: [row]
+                                });
+                            }
+                        }
 
-if (!resChannel) {
-    console.log("❌ resultsChannelId غلط أو الروم مش موجود:", clan.resultsChannelId);
-    return;
-}
+                        // 3. الحذف بعد التأكد من كل شيء
+                        setTimeout(() => {
+                            thread.delete().catch(() => {});
+                        }, 3000);
 
-        const embed = new EmbedBuilder()
-            .setTitle(`📩 طلب انضمام جديد - كلان: ${clan.clanName}`)
-            .setColor('#00d2ff')
-            .setThumbnail(interaction.user.displayAvatarURL())
-            .addFields(
-                { name: '👤 المتقدم', value: `${interaction.user}`, inline: true },
-                { name: '📝 الأجوبة', value: answers.map((a, i) => `**${i + 1}-** ${a}`).join('\n') }
-            )
-            .setTimestamp();
+                    } catch (err) {
+                        console.error("❌ Error sending clan application:", err);
+                    }
+                } else if (reason === 'time') {
+                    await thread.send("⚠️ انتهى الوقت المخصص للمقابلة، سيتم إغلاق الروم.");
+                    setTimeout(() => thread.delete().catch(() => {}), 5000);
+                }
+            });
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`accept_member:${interaction.user.id}:${clanIdxNum}`)
-                .setLabel('✅ قبول')
-                .setStyle(ButtonStyle.Success),
 
-            new ButtonBuilder()
-                .setCustomId(`reject_member:${interaction.user.id}:${clanIdxNum}`)
-                .setLabel('❌ رفض')
-                .setStyle(ButtonStyle.Danger)
-        );
-
-        await resChannel.send({
-            content: `🔔 تقديم جديد للقائد: <@${clan.leaderId}>`,
-            embeds: [embed],
-            components: [row]
-        });
-setTimeout(async () => {
-    try {
-        await thread.setArchived(true).catch(() => {});
-        await thread.setLocked(true).catch(() => {});
-
-        await thread.delete().catch((err) => {
-            console.log("❌ ما قدر يحذف الثريد:", err.message);
-        });
-
-    } catch (err) {
-        console.log("thread error:", err.message);
-    }
-}, 3000);
-
-    } catch (err) {
-        console.error("❌ Error in collector end:", err);
-    }
-});
             return;
         }
 
