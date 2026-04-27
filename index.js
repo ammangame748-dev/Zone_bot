@@ -2870,98 +2870,62 @@ if (!interaction.replied && !interaction.deferred) {
 }
 
 // ==========================================
-// ✅ الإصلاح النهائي والشامل لقبول ورفض الكلانات
+// ✅ الإصلاح النهائي والمضمون 100% لقبول ورفض الكلانات
 // ==========================================
-if (
-    interaction.isButton() &&
-    (interaction.customId.startsWith('accept_member:') ||
-     interaction.customId.startsWith('reject_member:'))
-) {
+if (interaction.isButton() && (interaction.customId.startsWith('accept_member:') || interaction.customId.startsWith('reject_member:'))) {
+    
+    // 1️⃣ أهم سطر: الرد الفوري على ديسكورد لمنع رسالة "فشل التفاعل"
+    if (!interaction.deferred && !interaction.replied) await interaction.deferUpdate(); 
+
     try {
-                await interaction.deferUpdate(); // 🔥 مهم جداً
         const [action, targetUserId, clanIdx] = interaction.customId.split(':');
 
-        const clan = await Clan.findOne({ clanIndex: parseInt(clanIdx) });
-        if (!clan) {
-            return interaction.reply({ content: "❌ الكلان غير موجود.", ephemeral: true });
-        }
-
-        const guild = client.guilds.cache.get(clan.guildId);
-        if (!guild) {
-            return interaction.reply({ content: "❌ السيرفر غير موجود.", ephemeral: true });
-        }
+        // جلب البيانات من الداتابيز
+        const clan = await Clan.findOne({ clanIndex: parseInt(clanIdx), guildId: interaction.guild.id });
+        
+        if (!clan) return console.log("❌ الكلان غير موجود في قاعدة البيانات لهذا السيرفر.");
 
         const targetUser = await client.users.fetch(targetUserId).catch(() => null);
 
-        // =========================
-        // ✅ قبول
-        // =========================
+        // --- تنفيذ القبول ---
         if (action === 'accept_member') {
-
-            if (clan.members.length >= 10) {
-                return interaction.reply({ content: "❌ الكلان ممتلئ.", ephemeral: true });
-            }
+            if (clan.members.length >= 10) return interaction.followUp({ content: "❌ الكلان ممتلئ!", ephemeral: true });
 
             if (!clan.members.includes(targetUserId)) {
                 clan.members.push(targetUserId);
                 await clan.save();
             }
 
-            const textCh = guild.channels.cache.get(clan.textChannelId);
-            const voiceCh = guild.channels.cache.get(clan.voiceChannelId);
-
+            // تحديث الرومات (تأكد أن رتبة البوت فوق رتبة الكلان)
+            const textCh = interaction.guild.channels.cache.get(clan.textChannelId);
             if (textCh) {
-                await textCh.permissionOverwrites.edit(targetUserId, {
-                    ViewChannel: true,
-                    SendMessages: true
-                }).catch(() => {});
+                await textCh.permissionOverwrites.edit(targetUserId, { ViewChannel: true, SendMessages: true }).catch(e => console.log("خطأ صلاحيات رروم الكتابة"));
             }
 
-            if (voiceCh) {
-                await voiceCh.permissionOverwrites.edit(targetUserId, {
-                    ViewChannel: true,
-                    Connect: true
-                }).catch(() => {});
-            }
+            if (targetUser) targetUser.send(`✅ تم قبولك في كلان **${clan.clanName}**`).catch(() => {});
 
-            if (targetUser) {
-                targetUser.send(`✅ تم قبولك في كلان **${clan.clanName}**`).catch(() => {});
-            }
-
-            return interaction.update({
-                content: `✅ تم قبول <@${targetUserId}>`,
-                components: [],
-                embeds: []
+            // تحديث رسالة الإدارة لإخفاء الأزرار
+            return await interaction.editReply({
+                content: `✅ تم قبول <@${targetUserId}> بواسطة ${interaction.user}`,
+                components: [], embeds: []
             });
         }
 
-        // =========================
-        // ❌ رفض
-        // =========================
+        // --- تنفيذ الرفض ---
         if (action === 'reject_member') {
+            if (targetUser) targetUser.send(`❌ تم رفض طلبك للكلان **${clan.clanName}**`).catch(() => {});
 
-            if (targetUser) {
-                targetUser.send(`❌ تم رفض طلبك للكلان **${clan.clanName}**`).catch(() => {});
-            }
-
-            return interaction.update({
-                content: `❌ تم رفض <@${targetUserId}>`,
-                components: [],
-                embeds: []
+            return await interaction.editReply({
+                content: `❌ تم رفض <@${targetUserId}> بواسطة ${interaction.user}`,
+                components: [], embeds: []
             });
         }
 
     } catch (err) {
-        console.error("ACCEPT/REJECT ERROR:", err);
-
-        if (!interaction.replied && !interaction.deferred) {
-            return interaction.reply({
-                content: "❌ صار خطأ تقني.",
-                ephemeral: true
-            });
-        }
+        console.error("❌ ERROR IN CLAN INTERACTION:", err);
     }
 }
+
 
 // =========================
 // 📩 تقديم الطلب للكلان
