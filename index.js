@@ -1,5 +1,6 @@
 let bannerURL = null;
 
+
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -88,31 +89,9 @@ const client = new Client({
 const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const commands = [
-    new SlashCommandBuilder()
-        .setName('setbanner')
-        .setDescription('رفع صورة البنر')
-        .addAttachmentOption(option =>
-            option.setName('image')
-                .setDescription('ارفع الصورة')
-                .setRequired(true)
-        )
-        .toJSON()
-];
-
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-
-(async () => {
-    try {
-        console.log('🔄 تسجيل أوامر السلاش...');
-        await rest.put(
-            Routes.applicationCommands('1467056575717048322'), // حط آيدي البوت
-            { body: commands }
-        );
-        console.log('✅ تم تسجيل السلاش');
-    } catch (error) {
-        console.error(error);
-    }
-})();
+    new SlashCommandBuilder().setName('setbanner').setDescription('رفع صورة الخط').addAttachmentOption(o => o.setName('image').setDescription('صورة البنر').setRequired(true)),
+    new SlashCommandBuilder().setName('rename_panel').setDescription('لوحة تغيير الاسم').addStringOption(o => o.setName('name').setRequired(true).setDescription('الاسم')).addAttachmentOption(o => o.setName('image').setDescription('صورة اختيارية'))
+].map(c => c.toJSON());
 
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     guildId: String,
@@ -1918,6 +1897,15 @@ client.on('messageCreate', async (msg) => {
             return msg.reply({ embeds: [embed] });
         }
     }
+    if (message.content === '-خط') {
+    const s = await GuildConfig.findOne({ guildId: message.guild.id });
+    const savedBanner = s?.welcome?.bannerURL;
+
+    if (!savedBanner) return message.reply("⚠️ لم يتم ضبط بنر لهذا السيرفر بعد. استخدم `/setbanner` أولاً.");
+
+    await message.delete().catch(() => {});
+    return message.channel.send({ files: [savedBanner] });
+}
     // --- [ نظام نقاط الكلان التلقائي ] ---
     const memberClan = await Clan.findOne({ guildId: msg.guild.id, members: msg.author.id });
     if (memberClan) {
@@ -1980,15 +1968,7 @@ client.on('messageCreate', async (msg) => {
             }
         }
 
-if (message.content === '-خط') {
-    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-    const savedBanner = s?.welcome?.bannerURL;
 
-    if (!savedBanner) return message.reply("⚠️ لم يتم ضبط بنر لهذا السيرفر بعد. استخدم `/setbanner` أولاً.");
-
-    await message.delete().catch(() => {});
-    return message.channel.send({ files: [savedBanner] });
-}
 
         // --- [ نظام الإيموجي الممنوع ] ---
         if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
