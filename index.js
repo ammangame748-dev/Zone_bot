@@ -105,7 +105,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         console.log('🔄 تسجيل أوامر السلاش...');
         await rest.put(
-            Routes.applicationCommands('YOUR_BOT_ID'), // حط آيدي البوت
+            Routes.applicationCommands('1467056575717048322'), // حط آيدي البوت
             { body: commands }
         );
         console.log('✅ تم تسجيل السلاش');
