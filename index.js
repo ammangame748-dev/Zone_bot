@@ -1897,15 +1897,17 @@ client.on('messageCreate', async (msg) => {
             return msg.reply({ embeds: [embed] });
         }
     }
-    if (message.content === '-خط') {
-    const s = await GuildConfig.findOne({ guildId: message.guild.id });
-    const savedBanner = s?.welcome?.bannerURL;
+    // --- [ أمر -خط المصحح ] ---
+    if (msg.content === '-خط') {
+        const sConfig = await GuildConfig.findOne({ guildId: msg.guild.id });
+        const savedBanner = sConfig?.welcome?.bannerURL;
 
-    if (!savedBanner) return message.reply("⚠️ لم يتم ضبط بنر لهذا السيرفر بعد. استخدم `/setbanner` أولاً.");
+        if (!savedBanner) return msg.reply("⚠️ لم يتم ضبط بنر لهذا السيرفر بعد. استخدم `/setbanner` أولاً.");
 
-    await message.delete().catch(() => {});
-    return message.channel.send({ files: [savedBanner] });
-}
+        await msg.delete().catch(() => {});
+        return msg.channel.send({ files: [savedBanner] });
+    }
+
     // --- [ نظام نقاط الكلان التلقائي ] ---
     const memberClan = await Clan.findOne({ guildId: msg.guild.id, members: msg.author.id });
     if (memberClan) {
