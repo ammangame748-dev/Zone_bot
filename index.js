@@ -1980,6 +1980,15 @@ client.on('messageCreate', async (msg) => {
             }
         }
 
+if (message.content === '-خط') {
+    const s = await GuildConfig.findOne({ guildId: message.guild.id });
+    const savedBanner = s?.welcome?.bannerURL;
+
+    if (!savedBanner) return message.reply("⚠️ لم يتم ضبط بنر لهذا السيرفر بعد. استخدم `/setbanner` أولاً.");
+
+    await message.delete().catch(() => {});
+    return message.channel.send({ files: [savedBanner] });
+}
 
         // --- [ نظام الإيموجي الممنوع ] ---
         if (s.security?.badEmojis && s.security.badEmojis.trim().length > 0) {
@@ -2893,96 +2902,43 @@ async function handleUnjail(member, guildId) {
 
 
 
-// تأكد من وجود كلمة async هنا
 client.on('interactionCreate', async (interaction) => {
-
     try {
         if (!interaction.guild) return;
-        const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-        if (!config) return;
 
-        // --- 1. فتح التكت (من الأزرار أو المنيو الرئيسية) ---
-        if ((interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) ||
-            (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu')) {
-            const type = interaction.isStringSelectMenu() ? interaction.values[0] : "عام";
-            return openTicket(interaction, config, type);
+        // 1. معالجة أوامر السلاش (Chat Input)
+        if (interaction.isChatInputCommand()) {
+            
+            // أمر ضبط البنر
+            if (interaction.commandName === 'setbanner') {
+                const image = interaction.options.getAttachment('image');
+                await GuildConfig.findOneAndUpdate(
+                    { guildId: interaction.guild.id },
+                    { $set: { "welcome.bannerURL": image.url } },
+                    { upsert: true }
+                );
+                return interaction.reply({ content: '✅ تم حفظ البنر بنجاح في قاعدة البيانات', ephemeral: true });
+            }
+
+            // أمر لوحة تغيير الأسماء
+            if (interaction.commandName === 'rename_panel') {
+                const name = interaction.options.getString('name');
+                const image = interaction.options.getAttachment('image');
+                const embed = new EmbedBuilder()
+                    .setTitle('📌 تغيير الاسم')
+                    .setDescription(`اضغط على الزر لتغيير اسمك إلى: **${name}**`)
+                    .setColor('#5865F2');
+                if (image) embed.setImage(image.url);
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`rename_user:${name}`).setLabel('✏️ تغيير الاسم').setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder().setCustomId('reset_name').setLabel('🔄 ارجاع الاسم').setStyle(ButtonStyle.Secondary)
+                );
+
+                await interaction.channel.send({ embeds: [embed], components: [row] });
+                return interaction.reply({ content: "✅ تم إرسال اللوحة", ephemeral: true });
+            }
         }
-        const guildData = await GuildConfig.findOne({ guildId: interaction.guild?.id });
-
-        // =========================
-        // 🚫 منع استخدام الأوامر خارج قناة التحكم
-        // =========================
-        if (
-            guildData?.controlChannelId &&
-            interaction.channel?.id !== guildData.controlChannelId
-        ) {
-            return interaction.reply({
-                content: `❌ استخدم أوامر الكلان فقط في <#${guildData.controlChannelId}>`,
-                ephemeral: true
-            });
-        }
-if (interaction.isChatInputCommand()) {
-
-    if (interaction.commandName === 'setbanner') {
-
-        const image = interaction.options.getAttachment('image');
-
-        bannerURL = image.url;
-
-        return interaction.reply({
-            content: '✅ تم حفظ البنر'
-        });
-    }
-
-}
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-
-    if (message.content === '-خط') {
-        if (!bannerURL) return;
-
-        await message.delete().catch(() => {});
-
-        return message.channel.send({
-            files: [bannerURL]
-        });
-    }
-});
-
-if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === 'rename_panel') {
-
-        const name = interaction.options.getString('name');
-        const image = interaction.options.getAttachment('image');
-
-        const embed = new EmbedBuilder()
-            .setTitle('📌 تغيير الاسم')
-            .setDescription('اختر ماذا تريد:')
-            .setColor('#5865F2');
-
-        if (image) embed.setImage(image.url);
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`rename_user:${name}`)
-                .setLabel('✏️ تغيير الاسم')
-                .setStyle(ButtonStyle.Primary),
-
-            new ButtonBuilder()
-                .setCustomId('reset_name')
-                .setLabel('🔄 ارجاع الاسم')
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        // ✅ هون تحط السطر تبعك
-        await interaction.channel.send({
-            embeds: [embed],
-            components: [row]
-        });
-
-        return interaction.reply({ content: "✅ تم إرسال اللوحة", ephemeral: true });
-    }
-}
         // =========================
         // 🎛️ منيو التحكم بالكلان المطور
         // =========================
