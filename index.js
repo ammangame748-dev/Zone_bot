@@ -669,20 +669,19 @@ function ui(guild, active, content) {
         <div class="sidebar">
             <h2>ZONE SYSTEM</h2>
             <div class="nav">
-                <a class="${active == 'home' ? 'active' : ''}" href="/dashboard">📊 الإحصائيات</a>
-                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
-                // أضف هذا السطر مع باقي الروابط في دالة ui
-<a class="${active == 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">🟢 تنبيهات Kick</a>
-                <a class="${active == 'streaks' ? 'active' : ''}" href="/manage/${guild.id}/streaks">🔥 الستريك المطور</a>
-                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">📜 اللوج</a>
-                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
-                <a class="${active == 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply">💬 الرد الآلي</a>
-                <a class="${active == 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">🏆 المستويات</a>
-                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
-                <a class="${active == 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway">🎉 القيف اواي</a>
-                <a class="${active == 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles">🎭 الرتب</a>
-                <a class="${active == 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">🛡️ أوامر الإشراف</a>
-                <a class="${active == 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans">🚩 نظام الكلانات</a>
+                <a class="${active == 'home' ? 'active' : ''}" href="/dashboard"> الإحصائيات</a>
+                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security"> الحماية</a>
+<a class="${active == 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick"> تنبيهات Kick</a>
+                <a class="${active == 'streaks' ? 'active' : ''}" href="/manage/${guild.id}/streaks"> الستريك المطور</a>
+                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs"> اللوق</a>
+                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets"> التذاكر</a>
+                <a class="${active == 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply"> الرد الآلي</a>
+                <a class="${active == 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels"> المستويات</a>
+                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome"> الترحيب</a>
+                <a class="${active == 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway"> القيف اواي</a>
+                <a class="${active == 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles"> الرتب</a>
+                <a class="${active == 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod"> أوامر الإشراف</a>
+                <a class="${active == 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans"> نظام الكلانات</a>
 
             </div>
         </div>
