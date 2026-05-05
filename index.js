@@ -2928,6 +2928,15 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
      
+        // --- [ معالجة فتح التكت من المنيو ] ---
+        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') {
+            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+            if (!tConfig) return interaction.reply({ content: "⚠️ لم يتم العثور على إعدادات التذاكر.", ephemeral: true });
+
+            // استدعاء دالة فتح التكت (تأكد إنها موجودة تحت في الكود عندك)
+            await openTicket(interaction, tConfig, interaction.values[0]);
+            return; // عشان يوقف تنفيذ باقي الكود
+        }
 
         // ==========================================
         // 🚩 نظام إدارة الكلانات المتكامل (المنيو والمودال)
