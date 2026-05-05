@@ -3229,8 +3229,7 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // --- 3. أزرار التحكم داخل التكت ---
-        if (interaction.isButton()) {
+         if (interaction.isButton()) {
             if (interaction.customId.startsWith('rename_user:')) {
     const newName = interaction.customId.split(':')[1];
 
@@ -3248,15 +3247,22 @@ if (interaction.customId === 'reset_name') {
 
     return interaction.reply({ content: "🔄 تم ارجاع اسمك", ephemeral: true });
 }
+                        // 1. جلب بيانات التكت الحالية من القناة
             const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
             if (!ticket) return;
 
-            const isAdmin = interaction.member.roles.cache.has(config.adminRole);
+            // 2. جلب إعدادات التكت من الداتابيز لمعرفة رتبة الإدارة (هذا السطر هو المفتاح)
+            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+            if (!tConfig) return;
+
+            // 3. التحقق من صلاحية العضو (استخدمنا tConfig بدل config)
+            const isAdmin = interaction.member.roles.cache.has(tConfig.adminRole);
             const adminPermissions = ['claim_ticket', 'close_ticket', 'add_member', 'remove_member', 'summon_member'];
 
             if (!isAdmin && adminPermissions.includes(interaction.customId)) {
                 return interaction.reply({ content: "❌ هذه الأزرار مخصصة للإدارة فقط!", ephemeral: true });
             }
+
 
             // [ زر الاستلام ]
             if (interaction.customId === 'claim_ticket') {
