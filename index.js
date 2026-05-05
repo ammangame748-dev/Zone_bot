@@ -1674,7 +1674,7 @@ app.post('/save/:guildId/clan/:index', checkAuth, async (req, res) => {
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setCustomId(`apply_clan_${index}`)
-                        .setLabel('📝 ابدأ المقابلة الآن')
+                        .setLabel('📝 ابدأ التقديم الآن')
                         .setStyle(ButtonStyle.Primary)
                 );
 
@@ -2427,11 +2427,11 @@ ${dailyMsgs} رسالة
             .setCustomId(`clan_control_${myClan.clanIndex}`)
             .setPlaceholder('⚙️ لوحة إدارة الكلان')
             .addOptions([
-                { label: 'إضافة عضو', value: 'add_mem', emoji: '➕' },
-                { label: 'طرد عضو', value: 'kick_mem', emoji: '❌' },
-                { label: 'إضافة مساعد', value: 'add_assist', emoji: '🥈' },
-                { label: 'إحصائيات الكلان', value: 'show_stats', emoji: '📊' },
-                { label: 'نقاط الأعضاء', value: 'show_points', emoji: '🏆' }
+                { label: 'إضافة عضو', value: 'add_mem', emoji: '' },
+                { label: 'طرد عضو', value: 'kick_mem', emoji: '' },
+                { label: 'إضافة مساعد', value: 'add_assist', emoji: '' },
+                { label: 'إحصائيات الكلان', value: 'show_stats', emoji: '' },
+                { label: 'نقاط الأعضاء', value: 'show_points', emoji: '' }
             ]);
 
         msg.reply({ components: [new ActionRowBuilder().addComponents(menu)] });
