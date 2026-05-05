@@ -2423,16 +2423,17 @@ ${dailyMsgs} رسالة
 
         if (!myClan) return msg.reply("❌ هذا الأمر مخصص لقادة الكلان ومساعديهم فقط.");
 
-        const menu = new StringSelectMenuBuilder()
+                const menu = new StringSelectMenuBuilder()
             .setCustomId(`clan_control_${myClan.clanIndex}`)
             .setPlaceholder('⚙️ لوحة إدارة الكلان')
             .addOptions([
-                { label: 'إضافة عضو', value: 'add_mem', emoji: '' },
-                { label: 'طرد عضو', value: 'kick_mem', emoji: '' },
-                { label: 'إضافة مساعد', value: 'add_assist', emoji: '' },
-                { label: 'إحصائيات الكلان', value: 'show_stats', emoji: '' },
-                { label: 'نقاط الأعضاء', value: 'show_points', emoji: '' }
+                { label: 'إضافة عضو', value: 'add_mem' },
+                { label: 'طرد عضو', value: 'kick_mem' },
+                { label: 'إضافة مساعد', value: 'add_assist' },
+                { label: 'إحصائيات الكلان', value: 'show_stats' },
+                { label: 'نقاط الأعضاء', value: 'show_points' }
             ]);
+
 
         msg.reply({ components: [new ActionRowBuilder().addComponents(menu)] });
     }
