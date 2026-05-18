@@ -3284,7 +3284,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control
 
         if (ticket.claimedBy) {
             return interaction.reply({
-                content: "⚠️ التكت مستلم بالفعل!",
+                content: " التكت مستلم بالفعل!",
                 ephemeral: true
             });
         }
@@ -3293,11 +3293,11 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control
         await ticket.save();
 
         return interaction.reply({
-            content: `✅ تم استلام التكت بواسطة ${interaction.user}`
+            content: ` تم استلام التكت بواسطة ${interaction.user}`
         });
     }
 
-    // 🔒 إغلاق
+    //  إغلاق
     if (selected === 'close_ticket') {
 
         ticket.closedAt = new Date();
@@ -3305,7 +3305,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control
         await ticket.save();
 
         await interaction.reply({
-            content: "🔒 سيتم حذف التكت خلال 5 ثوانٍ..."
+            content: " سيتم حذف التكت خلال 5 ثوانٍ..."
         });
 
         setTimeout(() => {
@@ -3315,7 +3315,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control
         return;
     }
 
-    // ➕ إضافة عضو
+    //  إضافة عضو
     if (selected === 'add_member') {
 
         const userSelect = new UserSelectMenuBuilder()
@@ -3331,7 +3331,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control
         });
     }
 
-    // ➖ إزالة عضو
+    //  إزالة عضو
     if (selected === 'remove_member') {
 
         const userSelect = new UserSelectMenuBuilder()
@@ -3351,7 +3351,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control
     if (selected === 'summon_member') {
 
         return interaction.channel.send(
-            `📣 <@${ticket.ownerId}> الإداري ${interaction.user} يحتاجك هنا`
+            ` <@${ticket.ownerId}> الادمن ${interaction.user} تم استدعاءك بواسطه `
         );
     }
 }
