@@ -2748,14 +2748,37 @@ client.on('guildBanAdd', async (ban) => {
     sendLog(ban.guild, "moderation", embed);
 });
 client.on('guildMemberAdd', async (member) => {
-    const embed = new EmbedBuilder()
-        .setTitle("📥 Member Joined")
-        .setColor("Green")
-        .setDescription(`<@${member.id}> joined`)
+    // 1. جلب إعدادات الترحيب من الداتابيز
+    const s = await GuildConfig.findOne({ guildId: member.guild.id });
+    
+    // تأكد إن نظام الترحيب شغال والقناة موجودة
+    if (!s?.welcome?.enabled || !s.welcome.channel) return;
+
+    const welcomeChannel = member.guild.channels.cache.get(s.welcome.channel);
+    if (!welcomeChannel) return;
+
+    // 2. بناء الإيمباد بنفس تنسيق الصورة اللي طلبتها
+    const welcomeEmbed = new EmbedBuilder()
+        .setAuthor({ name: `Welcome Server ${member.guild.name}`, iconURL: member.guild.iconURL() })
+        .setTitle(`Welcome to ${member.guild.name} 🚀`)
+        .setDescription(
+            `**مرحباً بك بسيرفر ${member.guild.name}**\n\n` +
+            `• **أرجو قراءة القوانين من هنا لتجنب مشاكل و محاسبات**\n` +
+            `📜 | <#123456789012345678> (روم القوانين)\n\n` + // غير الرقم لأيدي روم قوانينك
+            `• **Please read the rules here to avoid problems and penalties**\n` +
+            `📜 | <#123456789012345678> (RULES)\n\n` +
+            `👤 **اسم العضو:** ${member}\n` +
+            `🆔 **رقم العضو:** ${member.guild.memberCount}`
+        )
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setImage(s.welcome.imagePath ? `https://onrender.com{path.basename(s.welcome.imagePath)}` : 'رابط_صورة_افتراضي') 
+        .setColor('#FF4500') // لون برتقالي ناري
         .setTimestamp();
 
-    sendLog(member.guild, "members", embed);
+    // 3. إرسال الترحيب النهائي
+    welcomeChannel.send({ content: `مرحباً بك ${member} في سيرفرنا!`, embeds: [welcomeEmbed] });
 });
+
 
 
 client.on('channelDelete', async (channel) => {
@@ -3228,7 +3251,110 @@ client.on('interactionCreate', async (interaction) => {
                 if (!interaction.replied) interaction.reply({ content: "❌ حدث خطأ، جرب مرة أخرى.", ephemeral: true });
             }
         }
+if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
 
+    const selected = interaction.values[0];
+
+    // جلب بيانات التكت
+    const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+    if (!ticket) return;
+
+    const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+    if (!tConfig) return;
+
+    const isAdmin = interaction.member.roles.cache.has(tConfig.adminRole);
+
+    const adminPermissions = [
+        'claim_ticket',
+        'close_ticket',
+        'add_member',
+        'remove_member',
+        'summon_member'
+    ];
+
+    if (!isAdmin && adminPermissions.includes(selected)) {
+        return interaction.reply({
+            content: "❌ هذه القائمة للإدارة فقط!",
+            ephemeral: true
+        });
+    }
+
+    // 📌 استلام
+    if (selected === 'claim_ticket') {
+
+        if (ticket.claimedBy) {
+            return interaction.reply({
+                content: "⚠️ التكت مستلم بالفعل!",
+                ephemeral: true
+            });
+        }
+
+        ticket.claimedBy = interaction.user.id;
+        await ticket.save();
+
+        return interaction.reply({
+            content: `✅ تم استلام التكت بواسطة ${interaction.user}`
+        });
+    }
+
+    // 🔒 إغلاق
+    if (selected === 'close_ticket') {
+
+        ticket.closedAt = new Date();
+        ticket.closedBy = interaction.user.id;
+        await ticket.save();
+
+        await interaction.reply({
+            content: "🔒 سيتم حذف التكت خلال 5 ثوانٍ..."
+        });
+
+        setTimeout(() => {
+            interaction.channel.delete().catch(() => {});
+        }, 5000);
+
+        return;
+    }
+
+    // ➕ إضافة عضو
+    if (selected === 'add_member') {
+
+        const userSelect = new UserSelectMenuBuilder()
+            .setCustomId('add_user_menu')
+            .setPlaceholder('اختر الشخص')
+            .setMaxValues(1);
+
+        return interaction.reply({
+            components: [
+                new ActionRowBuilder().addComponents(userSelect)
+            ],
+            ephemeral: true
+        });
+    }
+
+    // ➖ إزالة عضو
+    if (selected === 'remove_member') {
+
+        const userSelect = new UserSelectMenuBuilder()
+            .setCustomId('remove_user_menu')
+            .setPlaceholder('اختر الشخص')
+            .setMaxValues(1);
+
+        return interaction.reply({
+            components: [
+                new ActionRowBuilder().addComponents(userSelect)
+            ],
+            ephemeral: true
+        });
+    }
+
+    // 📣 استدعاء
+    if (selected === 'summon_member') {
+
+        return interaction.channel.send(
+            `📣 <@${ticket.ownerId}> الإداري ${interaction.user} يحتاجك هنا`
+        );
+    }
+}
          if (interaction.isButton()) {
             if (interaction.customId.startsWith('rename_user:')) {
     const newName = interaction.customId.split(':')[1];
@@ -3248,7 +3374,7 @@ if (interaction.customId === 'reset_name') {
     return interaction.reply({ content: "🔄 تم ارجاع اسمك", ephemeral: true });
 }
                         // 1. جلب بيانات التكت الحالية من القناة
-            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+            
             if (!ticket) return;
 
             // 2. جلب إعدادات التكت من الداتابيز لمعرفة رتبة الإدارة (هذا السطر هو المفتاح)
@@ -3264,30 +3390,7 @@ if (interaction.customId === 'reset_name') {
             }
 
 
-            // [ زر الاستلام ]
-            if (interaction.customId === 'claim_ticket') {
-                if (ticket.claimedBy) return interaction.reply({ content: "⚠️ التكت مستلم بالفعل!", ephemeral: true });
-                ticket.claimedBy = interaction.user.id;
-                await ticket.save();
-                return interaction.reply({ content: `✅ تم استلام التكت بواسطة: ${interaction.user}\n👤 صاحب التكت: <@${ticket.ownerId}>` });
-            }
-
-            // [ زر الاستدعاء ]
-            if (interaction.customId === 'summon_member') {
-                return interaction.channel.send(`📣 <@${ticket.ownerId}>، تعال الإداري ${interaction.user} يحتاجك هنا!`);
-            }
-
-            // [ زر إضافة عضو ]
-            if (interaction.customId === 'add_member') {
-                const userSelect = new UserSelectMenuBuilder().setCustomId('add_user_menu').setPlaceholder('اختر الشخص المراد إضافته').setMaxValues(1);
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
-            }
-
-            // [ زر إزالة عضو ]
-            if (interaction.customId === 'remove_member') {
-                const userSelect = new UserSelectMenuBuilder().setCustomId('remove_user_menu').setPlaceholder('اختر الشخص المراد إزالته').setMaxValues(1);
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
-            }
+           
 
             // [ زر حذف التكت مع إرسال الفاتورة ]
             if (interaction.customId === 'close_ticket') {
@@ -3366,11 +3469,37 @@ async function openTicket(interaction, config, type) {
 
         // 4. أزرار التحكم (استلام، إغلاق، إضافة، استدعاء)
         const controlRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('claim_ticket').setLabel('📌 استلام').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 إغلاق').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('add_member').setLabel('➕ إضافة').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('summon_member').setLabel('📣 استدعاء').setStyle(ButtonStyle.Secondary)
-        );
+    new StringSelectMenuBuilder()
+        .setCustomId('ticket_control_menu')
+        .setPlaceholder('🎫 اختر إجراء التكت')
+        .addOptions([
+            {
+                label: 'استلام التكت',
+                value: 'claim_ticket',
+                emoji: '📌'
+            },
+            {
+                label: 'إغلاق التكت',
+                value: 'close_ticket',
+                emoji: '🔒'
+            },
+            {
+                label: 'إضافة عضو',
+                value: 'add_member',
+                emoji: '➕'
+            },
+            {
+                label: 'إزالة عضو',
+                value: 'remove_member',
+                emoji: '➖'
+            },
+            {
+                label: 'استدعاء صاحب التكت',
+                value: 'summon_member',
+                emoji: '📣'
+            }
+        ])
+);
 
         // 5. الإرسال في الروم مع منشن الإدارة وصاحب التكت
         await channel.send({
