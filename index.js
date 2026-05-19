@@ -118,7 +118,7 @@ const JailData = mongoose.model('JailData', new mongoose.Schema({
 // ==========================================
 // 3️⃣ اتصال قاعدة البيانات (MongoDB)
 // ==========================================
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_CONNECTION_STRING)
     .then(() => console.log('✅ Connected to MongoDB Database'))
     .catch(err => console.log("❌ DB Connection Error:", err));
 
