@@ -3476,27 +3476,27 @@ async function openTicket(interaction, config, type) {
             {
                 label: 'استلام التكت',
                 value: 'claim_ticket',
-                emoji: '📌'
+                
             },
             {
                 label: 'إغلاق التكت',
                 value: 'close_ticket',
-                emoji: '🔒'
+                
             },
             {
                 label: 'إضافة عضو',
                 value: 'add_member',
-                emoji: '➕'
+                
             },
             {
                 label: 'إزالة عضو',
                 value: 'remove_member',
-                emoji: '➖'
+                
             },
             {
                 label: 'استدعاء صاحب التكت',
                 value: 'summon_member',
-                emoji: '📣'
+                
             }
         ])
 );
@@ -3551,8 +3551,8 @@ setInterval(async () => {
 
                 if (member) {
                     const embed = new EmbedBuilder()
-                        .setTitle("⚠️ تنبيه التفاعل اليومي")
-                        .setDescription(`👋 أهلاً بك! متبقي **7 ساعات** فقط لتجديد تفاعلك اليومي.\n\n🔥 الستريك الحالي: **${u.streakCount}** يوم.\n\n💬 اكتب رسالة الآن لرفع مستواك والحفاظ على نشاطك!`)
+                        .setTitle(" تنبيه التفاعل اليومي")
+                        .setDescription(` أهلاً بك! متبقي **7 ساعات** فقط لتجديد تفاعلك اليومي.\n\n🔥 الستريك الحالي: **${u.streakCount}** يوم.\n\n💬 اكتب رسالة الآن لرفع مستواك والحفاظ على نشاطك!`)
                         .setColor('#5865F2')
                         .setFooter({ text: 'نظام التفاعل التلقائي • Zone System' })
                         .setTimestamp();
