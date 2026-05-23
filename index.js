@@ -161,15 +161,13 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         voice: { channel: String, enabled: Boolean }
     },
     welcome: {
-        enabled: Boolean,
+        enabled: { type: Boolean, default: false },
         channel: String,
-        message: String,
-        imagePath: String,
-        customText: { type: String, default: 'Welcome' },
-        textX: { type: Number, default: 250 },
-        textY: { type: Number, default: 150 },
-        fontSize: { type: Number, default: 40 }
+        embedMessage: { type: String, default: "مرحباً بك {member} في سيرفر {guild}! ✨" }, // رسالة الايمباد التي تقبل المنشن
+        imagePath: String, // الخلفية المرفوعة أو المولدة بالذكاء الاصطناعي
+        aiPrompt: String   // لحفظ آخر وصف كتبته لتوليد الصورة
     },
+
     autoReply: [{ trigger: String, reply: String }]
 }));
 
@@ -1182,110 +1180,70 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     if (!g) return res.redirect('/dashboard');
 
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
-
-    let img = s.welcome?.imagePath ? `/uploads/${path.basename(s.welcome.imagePath)}` : 'https://placeholder.com';
+    let img = s.welcome?.imagePath ? (s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `/uploads/${path.basename(s.welcome.imagePath)}`) : 'https://placehold.co';
 
     let content = `
-    <div class="card">
-        <h3 style="text-align:center">🖼️ معاينة الترحيب الحية</h3>
-        <div id="preview-container" style="position: relative; width: 100%; max-width: 800px; margin: 0 auto; border: 3px solid var(--p); border-radius: 20px; overflow: hidden; background: #000;">
-            <img id="welcome-img" src="${img}" style="width: 100%; display: block;">
-            <div id="welcome-text-preview" style="position: absolute; top: ${s.welcome?.textY || 150}px; left: ${s.welcome?.textX || 250}px; font-size: ${s.welcome?.fontSize || 40}px; color: white; white-space: nowrap; font-weight: bold; text-shadow: 2px 2px 8px #000; pointer-events: none;">
-                ${s.welcome?.customText || 'Welcome Member'}
-            </div>
-        </div>
+    <div class="card" style="border-right: 4px solid var(--accent);">
+        <h3>🎨 نظام الترحيب الذكي والمطور</h3>
+        <p style="color: #aaa; font-size: 13px;">نظام ترحيب آلي يقوم بدمج صورة العضو دائرية تلقائياً فوق الخلفية، مع إمكانية توليد خلفيات بالذكاء الاصطناعي وكتابة رسائل مخصصة تدعم المنشن.</p>
     </div>
 
     <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
         <div class="card">
-            <h3>⚙️ إعدادات الإرسال</h3>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div>
                     <label>📍 قناة الترحيب:</label>
-                    <select name="channel" required style="border: 1px solid var(--p);">
-                        <option value="">-- اختر القناة --</option>
+                    <select name="channel" required>
+                        <option value="">-- اختر روم الترحيب --</option>
                         ${g.channels.cache.filter(c => c.type === 0).map(c =>
-        `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
-    ).join('')}
+                            `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
+                        ).join('')}
                     </select>
                 </div>
                 <div>
-                    <label>🔔 تفعيل النظام:</label>
-                    <div style="margin-top:10px">
-                        <input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''} style="width: 25px; height: 25px; cursor:pointer;">
-                    </div>
+                    <label>🔔 تشغيل النظام:</label>
+                    <select name="enabled" style="margin-top: 10px;">
+                        <option value="on" ${s.welcome?.enabled ? 'selected' : ''}>🟢 مشغل</option>
+                        <option value="off" ${!s.welcome?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
+                    </select>
                 </div>
             </div>
 
-            <label>💬 النص المكتوب (على الصورة):</label>
-            <input type="text" id="text-input" name="customText" value="${s.welcome?.customText || 'Welcome'}" oninput="updatePreview()" placeholder="مثال: Welcome {user}">
-            <small style="color: #aaa;">* استخدم {user} ليظهر اسم العضو تلقائياً.</small>
+            <label>💬 رسالة الترحيب داخل الإيمباد:</label>
+            <textarea name="embedMessage" rows="3" placeholder="اكتب رسالة الترحيب هنا...">${s.welcome?.embedMessage || ''}</textarea>
+            <small style="color: #00d2ff; display:block; margin-top:-5px; margin-bottom:15px;">
+                * اختصارات ذكية: استخدم <b>{member}</b> لمنشن العضو، و <b>{guild}</b> لاسم السيرفر، و <b>{count}</b> لعدد الأعضاء.
+            </small>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-                <div>
-                    <label>📏 حجم الخط:</label>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <button type="button" onclick="changeSize(-4)" class="btn-save" style="padding: 10px 20px; width: auto;">-</button>
-                        <input type="number" id="font-size" name="fontSize" value="${s.welcome?.fontSize || 40}" readonly style="text-align: center; font-size: 20px;">
-                        <button type="button" onclick="changeSize(4)" class="btn-save" style="padding: 10px 20px; width: auto;">+</button>
-                    </div>
-                </div>
-        // ابحث عن الحقول في صفحة الـ welcome واستبدلها بهذا الجزء:
-<div>
-    <label>🎯 موقع النص (أفقي - عمودي):</label>
-    <div style="display: flex; gap: 10px;">
-        <!-- تأكد أن الـ name هو textX و textY -->
-        <input type="number" id="posX" name="textX" value="${s.welcome?.textX || 250}" oninput="updatePreview()" placeholder="X">
-        <input type="number" id="posY" name="textY" value="${s.welcome?.textY || 150}" oninput="updatePreview()" placeholder="Y">
-    </div>
-</div>
+            <label>🖼️ خيار 1: رفع صورة خلفية مخصصة من جهازك (سيتم دمج دائرة العضو فوقها تلقائياً):</label>
+            <input type="file" name="welcomeImage" style="background: rgba(88, 101, 242, 0.05); border: 1px dashed var(--p);">
 
+            <div style="text-align: center; margin-top: 25px;">
+                <p style="color: #aaa; font-size: 14px;">🖼️ معاينة الخلفية الحالية المستخدمة للتصميم الآلي:</p>
+                <img src="${img}" style="width: 100%; max-width: 500px; border-radius: 15px; border: 2px solid var(--p); box-shadow: 0 0 15px rgba(0,210,255,0.2);">
             </div>
 
-            <label style="margin-top: 20px;">🖼️ تحميل صورة الترحيب:</label>
-            <input type="file" name="welcomeImage" onchange="previewImage(this)" style="background: rgba(88, 101, 242, 0.1); border: 1px dashed var(--p);">
-            
-            <button type="submit" class="btn-save" style="margin-top: 30px; font-size: 18px;">💾 حفظ الإعدادات والبدء</button>
+            <button type="submit" class="btn-save" style="margin-top: 25px;">💾 حفظ إعدادات الترحيب والرسالة</button>
         </div>
     </form>
 
-    <script>
-        function updatePreview() {
-            const text = document.getElementById('text-input').value;
-            const x = document.getElementById('posX').value;
-            const y = document.getElementById('posY').value;
-            const size = document.getElementById('font-size').value;
+    <!-- ✨ ميزة الذكاء الاصطناعي الذكية لتوليد الصور تذكر طلبك -->
+    <div class="card" style="border-top: 3px solid #f1c40f;">
+        <h3 style="color:#f1c40f;">🤖 خيار 2: ابتكار خلفية ترحيب بالذكاء الاصطناعي</h3>
+        <p style="color:#aaa; font-size:13px;">اكتب مواصفات الصورة التي تتخيلها، وسيقوم الذكاء الاصطناعي بتوليد صورة فخمة متناسقة ووضعها كخلفية لترحيب سيرفرك فوراً!</p>
+        
+        <form method="POST" action="/generate-welcome-ai/${g.id}">
+            <label>📝 اكتب مواصفات وتفاصيل الصورة (يفضل بالإنجليزية لأفضل نتيجة):</label>
+            <input type="text" name="aiPrompt" value="${s.welcome?.aiPrompt || ''}" placeholder="مثال: Cyberpunk gaming room neon purple and cyan styling, clean background, ultra HD" required>
             
-            const preview = document.getElementById('welcome-text-preview');
-            preview.innerText = text;
-            preview.style.left = x + 'px'; // استخدمنا left للسهولة في المعاينة
-            preview.style.top = y + 'px';
-            preview.style.fontSize = size + 'px';
-        }
-
-        function changeSize(amt) {
-            const input = document.getElementById('font-size');
-            let newSize = parseInt(input.value) + amt;
-            if(newSize < 10) newSize = 10;
-            input.value = newSize;
-            updatePreview();
-        }
-
-        function previewImage(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('welcome-img').src = e.target.result;
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-    </script>
+            <button type="submit" class="btn-save" style="background: linear-gradient(45deg, #f1c40f, #f39c12); margin-top: 10px;">🎨 توليد وتركيب الصورة بالذكاء الاصطناعي الآن</button>
+        </form>
+    </div>
     `;
 
     res.send(ui(g, 'welcome', content));
 });
+
 
 app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
@@ -1314,41 +1272,55 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     res.send(ui(g, 'autoreply', content));
 });
 
+// 1. مسار حفظ الإعدادات العادية والملفات المرفوعة
 app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
     try {
         const { guildId } = req.params;
         const b = req.body;
 
-        // تجهيز البيانات مع تحويلها لأرقام (Number) لضمان عمل الـ Canvas
         let updateData = {
             'welcome.enabled': b.enabled === 'on',
             'welcome.channel': b.channel,
-            'welcome.customText': b.customText || 'Welcome {user}',
-            'welcome.textX': Number(b.textX) || 250, // تحويل لـ Number
-            'welcome.textY': Number(b.textY) || 150, // تحويل لـ Number
-            'welcome.fontSize': Number(b.fontSize) || 40, // تحويل لـ Number
-            'welcome.message': b.message || ''
+            'welcome.embedMessage': b.embedMessage
         };
 
-        // تحديث مسار الصورة إذا تم رفع ملف جديد
         if (req.file) {
             updateData['welcome.imagePath'] = req.file.path;
         }
 
-        // الحفظ في قاعدة البيانات
+        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
+        res.redirect(`/manage/${guildId}/welcome`);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("خطأ في حفظ الإعدادات");
+    }
+});
+
+// 2. 🤖 مسار توليد الصور بالذكاء الاصطناعي الذكي (مبني على الـ Prompt المكتوب)
+app.post('/generate-welcome-ai/:guildId', checkAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { aiPrompt } = req.body;
+
+        // تنظيف النص وتشفيره للرابط بأمان لـ Pollinations AI (توليد مجاني وسريع جداً وبدون مفاتيح)
+        const encodedPrompt = encodeURIComponent(aiPrompt.trim());
+        const generatedImageUrl = `https://pollinations.ai{encodedPrompt}?width=800&height=400&enhance=true&seed=${Math.floor(Math.random() * 100000)}`;
+
         await GuildConfig.findOneAndUpdate(
             { guildId },
-            { $set: updateData },
-            { upsert: true, new: true }
+            { 
+                $set: { 
+                    'welcome.imagePath': generatedImageUrl,
+                    'welcome.aiPrompt': aiPrompt
+                } 
+            },
+            { upsert: true }
         );
 
-        console.log(`✅ Welcome settings updated for ${guildId}: X=${b.textX}, Y=${b.textY}`);
-
         res.redirect(`/manage/${guildId}/welcome`);
-
     } catch (err) {
-        console.error("❌ Welcome Save Error:", err);
-        res.status(500).send("خطأ في حفظ إعدادات الترحيب");
+        console.error("AI Generation Error:", err);
+        res.status(500).send("فشل توليد الصورة بالذكاء الاصطناعي.");
     }
 });
 
@@ -2748,36 +2720,82 @@ client.on('guildBanAdd', async (ban) => {
     sendLog(ban.guild, "moderation", embed);
 });
 client.on('guildMemberAdd', async (member) => {
-    // 1. جلب إعدادات الترحيب من الداتابيز
-    const s = await GuildConfig.findOne({ guildId: member.guild.id });
-    
-    // تأكد إن نظام الترحيب شغال والقناة موجودة
-    if (!s?.welcome?.enabled || !s.welcome.channel) return;
+    try {
+        const s = await GuildConfig.findOne({ guildId: member.guild.id });
+        if (!s?.welcome?.enabled || !s.welcome.channel) return;
 
-    const welcomeChannel = member.guild.channels.cache.get(s.welcome.channel);
-    if (!welcomeChannel) return;
+        const welcomeChannel = member.guild.channels.cache.get(s.welcome.channel);
+        if (!welcomeChannel) return;
 
-    // 2. بناء الإيمباد بنفس تنسيق الصورة اللي طلبتها
-    const welcomeEmbed = new EmbedBuilder()
-        .setAuthor({ name: `Welcome Server ${member.guild.name}`, iconURL: member.guild.iconURL() })
-        .setTitle(`Welcome to ${member.guild.name} 🚀`)
-        .setDescription(
-            `**مرحباً بك بسيرفر ${member.guild.name}**\n\n` +
-            `• **أرجو قراءة القوانين من هنا لتجنب مشاكل و محاسبات**\n` +
-            `📜 | <#123456789012345678> (روم القوانين)\n\n` + // غير الرقم لأيدي روم قوانينك
-            `• **Please read the rules here to avoid problems and penalties**\n` +
-            `📜 | <#123456789012345678> (RULES)\n\n` +
-            `👤 **اسم العضو:** ${member}\n` +
-            `🆔 **رقم العضو:** ${member.guild.memberCount}`
-        )
-        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        .setImage(s.welcome.imagePath ? `https://onrender.com{path.basename(s.welcome.imagePath)}` : 'رابط_صورة_افتراضي') 
-        .setColor('#FF4500') // لون برتقالي ناري
-        .setTimestamp();
+        // 1. معالجة وتجهيز نصوص الاختصارات الذكية داخل الرسالة والايمباد
+        let rawMsg = s.welcome.embedMessage || "مرحباً بك {member} في سيرفر {guild}! ✨";
+        let formattedMsg = rawMsg
+            .replace(/{member}/g, `${member}`)
+            .replace(/{guild}/g, `${member.guild.name}`)
+            .replace(/{count}/g, `${member.guild.memberCount}`);
 
-    // 3. إرسال الترحيب النهائي
-    welcomeChannel.send({ content: `مرحباً بك ${member} في سيرفرنا!`, embeds: [welcomeEmbed] });
+        // 2. تشغيل كود كافانا (Canvas) لإنشاء وتجهيز الصورة المدمجة تلقائياً
+        const canvas = createCanvas(800, 400); // المقاسات القياسية لصور الترحيب
+        const ctx = canvas.getContext('2d');
+
+        // جلب الخلفية (سواء مرفوعة محلياً أو رابط مولد بالذكاء الاصطناعي)
+        let bgSource = 'https://placehold.co'; // احتياطية في حال الفشل
+        if (s.welcome.imagePath) {
+            bgSource = s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `./${s.welcome.imagePath}`;
+        }
+
+        const background = await loadImage(bgSource).catch(() => loadImage('https://placehold.co'));
+        ctx.drawImage(background, 0, 0, 800, 400);
+
+        // إضافة طبقة تظليل خفيفة وجميلة فوق الخلفية لإبراز التصميم والاسم
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(0, 0, 800, 400);
+
+        // 🎯 تصميم وتطبيق الدائرة الفخمة المخصصة لصورة العضو (تلقائية بالمنتصف)
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(400, 150, 85, 0, Math.PI * 2); // دائرة بالمنتصف تماماً
+        ctx.strokeStyle = '#00d2ff'; // إطار نيون مضيء
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.clip(); // قص كل ما بداخله
+
+        // جلب وقص افتار الشخص بصيغة png واضحة
+        const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
+        const avatar = await loadImage(avatarURL);
+        ctx.drawImage(avatar, 315, 65, 170, 170); // مطابقة أبعاد الدائرة بدقة
+        ctx.restore();
+
+        // كتابة اسم الشخص والترحيب تحت صورته بشكل ثابت وفخم متناسق آلياً
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(member.user.username, 400, 280);
+
+        ctx.fillStyle = '#00d2ff';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText(`MEMBER #${member.guild.memberCount}`, 400, 325);
+
+        // تحويل لوحة التصميم لبافر وإرفاقها
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-zone.png' });
+
+        // 3. بناء وإرسال الإيمباد المحتوي على المنشن والصورة الجاهزة
+        const welcomeEmbed = new EmbedBuilder()
+            .setDescription(formattedMsg)
+            .setImage('attachment://welcome-zone.png')
+            .setColor('#00d2ff')
+            .setTimestamp();
+
+        // بث الترحيب في القناة النصية مع منشن العضو الفعلي بالخارج ليلفت انتباهه فوراً
+        await welcomeChannel.send({ content: `${member}`, embeds: [welcomeEmbed], files: [attachment] });
+
+    } catch (err) {
+        console.error("❌ Welcome System Processing Error:", err);
+    }
 });
+
 
 
 
