@@ -1179,12 +1179,13 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
 app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
-
-        let img = 'https://placehold.co';
+    let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
+    
+    let img = 'https://placehold.co';
     if (s.welcome?.imagePath) {
         img = s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `/uploads/${path.basename(s.welcome.imagePath)}`;
     }
+
 
 
        let content = `
@@ -1286,6 +1287,14 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         const { guildId } = req.params;
         const b = req.body;
 
+        console.log("📥 [WELCOME LOG] تم استقبال بيانات الحفظ من الداشبورد بنجاح!");
+        console.log("📊 [WELCOME LOG] البيانات المرسلة:", {
+            enabled: b.enabled,
+            channel: b.channel,
+            use_ai: b.use_ai,
+            aiPrompt: b.aiPrompt
+        });
+
         let updateData = {
             'welcome.enabled': b.enabled === 'on',
             'welcome.channel': b.channel,
@@ -1293,34 +1302,31 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
             'welcome.aiPrompt': b.aiPrompt
         };
 
-        // إذا قام المستخدم برفع صورة مخصصة من جهازه
+        // فحص حالة رفع الملف من الجهاز
         if (req.file) {
+            console.log(`📁 [WELCOME LOG] تم كشف ملف مرفوع من الجهاز بمسار: ${req.file.path}`);
             updateData['welcome.imagePath'] = req.file.path;
         } 
-        // إذا اختار توليد الصورة باستخدام الذكاء الاصطناعي
-                // إذا اختار توليد الصورة باستخدام الذكاء الاصطناعي
-        else if (b.aiPrompt && b.aiPrompt.trim().length > 0 && b.use_ai === 'true') {
-            // تنظيف النص من أي فراغات زائدة أو رموز مسببة للمشاكل
-            const cleanPrompt = b.aiPrompt.trim().replace(/[^a-zA-Z0-9\s,]/g, '');
-            const encodedPrompt = encodeURIComponent(cleanPrompt);
-            
-            // الصيغة الرسمية والمباشرة لتوليد الصور بنقاوة عالية
-            updateData['welcome.imagePath'] = `https://pollinations.ai{encodedPrompt}?width=800&height=400&nologo=true&enhance=true`;
+        // فحص حالة اختيار التوليد التلقائي
+        else if (b.use_ai === 'true') {
+            console.log("🤖 [WELCOME LOG] تم تفعيل خيار تركيب صورة الجيمنج الاحترافية المباشرة.");
+            updateData['welcome.imagePath'] = "https://unsplash.com";
+        } else {
+            console.log("⚠️ [WELCOME LOG] لم يتم رفع صورة ولم يتم تفعيل خيار الـ AI، سيتم الإبقاء على الصورة الحالية إن وجدت.");
         }
 
-
-        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
+        console.log("💾 [WELCOME LOG] جارٍ محاولة تحديث قاعدة البيانات المونجو...");
+        const result = await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true, new: true });
+        
+        console.log(`✅ [WELCOME LOG] تم الحفظ في قاعدة البيانات بنجاح! المسار الحالي المحفوظ هو: ${result?.welcome?.imagePath}`);
+        
         res.redirect(`/manage/${guildId}/welcome`);
     } catch (err) {
-        console.error("❌ Welcome Save Error:", err);
-        res.status(500).send("خطأ في حفظ إعدادات الترحيب");
+        console.error("❌❌❌ [WELCOME CRITICAL ERROR] حدث خطأ فادح أثناء عملية الحفظ:");
+        console.error(err); // سيطبع تفاصيل الخطأ كاملة بداخل لوق ريندر
+        res.status(500).send(`حدث خطأ داخلي بداخل السيرفر: ${err.message}`);
     }
 });
-
-
-
-
-
 
 
 app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
