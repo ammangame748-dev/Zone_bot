@@ -11,6 +11,7 @@ const { createCanvas, loadImage } = require('canvas');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const ms = require('ms');
 const {
     Client, GatewayIntentBits, Partials, EmbedBuilder, AuditLogEvent,
@@ -1182,10 +1183,10 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
     let img = s.welcome?.imagePath ? (s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `/uploads/${path.basename(s.welcome.imagePath)}`) : 'https://placehold.co';
 
-    let content = `
+       let content = `
     <div class="card" style="border-right: 4px solid var(--accent);">
-        <h3>🎨 نظام الترحيب الذكي والمطور</h3>
-        <p style="color: #aaa; font-size: 13px;">نظام ترحيب آلي يقوم بدمج صورة العضو دائرية تلقائياً فوق الخلفية، مع إمكانية توليد خلفيات بالذكاء الاصطناعي وكتابة رسائل مخصصة تدعم المنشن.</p>
+        <h3>🎨 لوحة تحكم الترحيب الذكي (برو ستايل)</h3>
+        <p style="color: #aaa; font-size: 13px;">اختر إما رفع صورة مخصصة أو تفعيل خيار الذكاء الاصطناعي، وسيقوم النظام بدمج كرت العضو تلقائياً.</p>
     </div>
 
     <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
@@ -1202,7 +1203,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                 </div>
                 <div>
                     <label>🔔 تشغيل النظام:</label>
-                    <select name="enabled" style="margin-top: 10px;">
+                    <select name="enabled">
                         <option value="on" ${s.welcome?.enabled ? 'selected' : ''}>🟢 مشغل</option>
                         <option value="off" ${!s.welcome?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
                     </select>
@@ -1211,33 +1212,37 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
             <label>💬 رسالة الترحيب داخل الإيمباد:</label>
             <textarea name="embedMessage" rows="3" placeholder="اكتب رسالة الترحيب هنا...">${s.welcome?.embedMessage || ''}</textarea>
-            <small style="color: #00d2ff; display:block; margin-top:-5px; margin-bottom:15px;">
+            <small style="color: #00d2ff; display:block; margin-top:-5px; margin-bottom:20px;">
                 * اختصارات ذكية: استخدم <b>{member}</b> لمنشن العضو، و <b>{guild}</b> لاسم السيرفر، و <b>{count}</b> لعدد الأعضاء.
             </small>
 
-            <label>🖼️ خيار 1: رفع صورة خلفية مخصصة من جهازك (سيتم دمج دائرة العضو فوقها تلقائياً):</label>
-            <input type="file" name="welcomeImage" style="background: rgba(88, 101, 242, 0.05); border: 1px dashed var(--p);">
+            <hr style="opacity: 0.1; margin: 20px 0;">
 
-            <div style="text-align: center; margin-top: 25px;">
-                <p style="color: #aaa; font-size: 14px;">🖼️ معاينة الخلفية الحالية المستخدمة للتصميم الآلي:</p>
-                <img src="${img}" style="width: 100%; max-width: 500px; border-radius: 15px; border: 2px solid var(--p); box-shadow: 0 0 15px rgba(0,210,255,0.2);">
+            <!-- الخيار الأول: رفع ملف -->
+            <label>📁 الخيار الأول: رفع صورة خلفية من جهازك:</label>
+            <input type="file" name="welcomeImage" style="background: rgba(255,255,255,0.03); border: 1px dashed #333; margin-bottom: 20px;">
+
+            <!-- الخيار الثاني: الذكاء الاصطناعي -->
+            <div style="background: rgba(241, 196, 15, 0.05); padding: 15px; border-radius: 12px; border: 1px solid rgba(241, 196, 15, 0.2); margin-bottom: 25px;">
+                <h4 style="color:#f1c40f; margin:0 0 10px 0;">🤖 الخيار الثاني: ابتكار خلفية بالذكاء الاصطناعي</h4>
+                <label>تفعيل توليد الصورة بالذكاء الاصطناعي عند الحفظ؟</label>
+                <select name="use_ai" style="margin-bottom: 15px; border-color: #f1c40f;">
+                    <option value="false">❌ لا، سأستخدم الصورة المرفوعة/الحالية</option>
+                    <option value="true">✨ نعم، ولد لي صورة جديدة بناءً على الوصف بالأسفل</option>
+                </select>
+
+                <label>📝 اكتب مواصفات الصورة بالتفصيل (بالإنجليزية):</label>
+                <input type="text" name="aiPrompt" value="${s.welcome?.aiPrompt || 'Cyberpunk futuristic gaming room background, empty central space, glowing neon purple and cyan led lighting strips'}" placeholder="اكتب الوصف هنا...">
             </div>
 
-            <button type="submit" class="btn-save" style="margin-top: 25px;">💾 حفظ إعدادات الترحيب والرسالة</button>
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="color: #aaa; font-size: 14px;">🖼️ المعاينة الحالية للخلفية المحفوظة في قاعدة البيانات:</p>
+                <img src="${img}" style="width: 100%; max-width: 480px; border-radius: 12px; border: 2px solid var(--p);">
+            </div>
+
+            <button type="submit" class="btn-save" style="margin-top: 30px; background: linear-gradient(45deg, var(--p), #f1c40f);">💾 حفظ كل الإعدادات وتطبيق الترحيب</button>
         </div>
     </form>
-
-    <!-- ✨ ميزة الذكاء الاصطناعي الذكية لتوليد الصور تذكر طلبك -->
-    <div class="card" style="border-top: 3px solid #f1c40f;">
-        <h3 style="color:#f1c40f;">🤖 خيار 2: ابتكار خلفية ترحيب بالذكاء الاصطناعي</h3>
-        <p style="color:#aaa; font-size:13px;">اكتب مواصفات الصورة التي تتخيلها، وسيقوم الذكاء الاصطناعي بتوليد صورة فخمة متناسقة ووضعها كخلفية لترحيب سيرفرك فوراً!</p>
-        
-        <form method="POST" action="/generate-welcome-ai/${g.id}">
-            <label>📝 اكتب مواصفات وتفاصيل الصورة (يفضل بالإنجليزية لأفضل نتيجة):</label>
-            <input type="text" name="aiPrompt" value="${s.welcome?.aiPrompt || ''}" placeholder="مثال: Cyberpunk gaming room neon purple and cyan styling, clean background, ultra HD" required>
-            
-            <button type="submit" class="btn-save" style="background: linear-gradient(45deg, #f1c40f, #f39c12); margin-top: 10px;">🎨 توليد وتركيب الصورة بالذكاء الاصطناعي الآن</button>
-        </form>
     </div>
     `;
 
@@ -1271,8 +1276,8 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'autoreply', content));
 });
+const axios = require('axios'); // تأكد أن أكسيوس مستدعى في أعلى الملف
 
-// 1. مسار حفظ الإعدادات العادية والملفات المرفوعة
 app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
     try {
         const { guildId } = req.params;
@@ -1281,48 +1286,57 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         let updateData = {
             'welcome.enabled': b.enabled === 'on',
             'welcome.channel': b.channel,
-            'welcome.embedMessage': b.embedMessage
+            'welcome.embedMessage': b.embedMessage,
+            'welcome.aiPrompt': b.aiPrompt
         };
 
+        // الحالة الأولى: إذا قام المستخدم برفع صورة من جهازه
         if (req.file) {
             updateData['welcome.imagePath'] = req.file.path;
+        } 
+        // الحالة الثانية: إذا اختار توليد خلفية بالذكاء الاصطناعي بناءً على الوصف
+        else if (b.aiPrompt && b.aiPrompt.trim().length > 0 && b.use_ai === 'true') {
+            console.log(`🤖 Generating AI Image for Guild ${guildId}...`);
+            const encodedPrompt = encodeURIComponent(b.aiPrompt.trim());
+            const generatedImageUrl = `https://pollinations.ai{encodedPrompt}?width=800&height=400&enhance=true&seed=${Math.floor(Math.random() * 100000)}`;
+
+            // تحميل صورة الذكاء الاصطناعي وحفظها محلياً في السيرفر لمنع أي مشاكل بروابط ديسكورد
+            const response = await axios({
+                method: 'get',
+                url: generatedImageUrl,
+                responseType: 'stream'
+            }).catch(err => {
+                console.error("❌ Failed to fetch AI Image from API:", err.message);
+                return null;
+            });
+
+            if (response && response.data) {
+                const fileName = `ai-${Date.now()}.png`;
+                const localPath = path.join('./uploads', fileName);
+                const writer = fs.createWriteStream(localPath);
+
+                response.data.pipe(writer);
+
+                await new Promise((resolve, reject) => {
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+
+                updateData['welcome.imagePath'] = localPath; // حفظ المسار المحلي الجديد
+                console.log(`✅ AI Image successfully saved locally to: ${localPath}`);
+            }
         }
 
         await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
         res.redirect(`/manage/${guildId}/welcome`);
     } catch (err) {
-        console.error(err);
-        res.status(500).send("خطأ في حفظ الإعدادات");
+        console.error("❌ Welcome Save Error:", err);
+        res.status(500).send("خطأ في حفظ إعدادات الترحيب والذكاء الاصطناعي");
     }
 });
 
-// 2. 🤖 مسار توليد الصور بالذكاء الاصطناعي الذكي (مبني على الـ Prompt المكتوب)
-app.post('/generate-welcome-ai/:guildId', checkAuth, async (req, res) => {
-    try {
-        const { guildId } = req.params;
-        const { aiPrompt } = req.body;
 
-        // تنظيف النص وتشفيره للرابط بأمان لـ Pollinations AI (توليد مجاني وسريع جداً وبدون مفاتيح)
-        const encodedPrompt = encodeURIComponent(aiPrompt.trim());
-        const generatedImageUrl = `https://pollinations.ai{encodedPrompt}?width=800&height=400&enhance=true&seed=${Math.floor(Math.random() * 100000)}`;
 
-        await GuildConfig.findOneAndUpdate(
-            { guildId },
-            { 
-                $set: { 
-                    'welcome.imagePath': generatedImageUrl,
-                    'welcome.aiPrompt': aiPrompt
-                } 
-            },
-            { upsert: true }
-        );
-
-        res.redirect(`/manage/${guildId}/welcome`);
-    } catch (err) {
-        console.error("AI Generation Error:", err);
-        res.status(500).send("فشل توليد الصورة بالذكاء الاصطناعي.");
-    }
-});
 
 
 
@@ -2739,10 +2753,13 @@ client.on('guildMemberAdd', async (member) => {
         const ctx = canvas.getContext('2d');
 
         // جلب الخلفية (سواء مرفوعة محلياً أو رابط مولد بالذكاء الاصطناعي)
-        let bgSource = 'https://placehold.co'; // احتياطية في حال الفشل
+                // تحديد مصدر الخلفية بدقة
+        let bgSource = 'https://placehold.co'; 
         if (s.welcome.imagePath) {
+            // التعديل: إذا كان المسار يبدأ بـ http نأخذه مباشرة، وإلا نقرأه كملف محلي من مجلد الاستضافة
             bgSource = s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `./${s.welcome.imagePath}`;
         }
+
 
         const background = await loadImage(bgSource).catch(() => loadImage('https://placehold.co'));
         ctx.drawImage(background, 0, 0, 800, 400);
@@ -3543,7 +3560,7 @@ async function openTicket(interaction, config, type) {
 }
 
 
-const axios = require('axios');
+
 setInterval(async () => {
     // 1. جلب جميع المستخدمين بدون استثناء (حتى لو الستريك 0)
     const allUsers = await UserLevel.find({});
