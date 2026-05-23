@@ -1298,11 +1298,16 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
             updateData['welcome.imagePath'] = req.file.path;
         } 
         // إذا اختار توليد الصورة باستخدام الذكاء الاصطناعي
+                // إذا اختار توليد الصورة باستخدام الذكاء الاصطناعي
         else if (b.aiPrompt && b.aiPrompt.trim().length > 0 && b.use_ai === 'true') {
-            const encodedPrompt = encodeURIComponent(b.aiPrompt.trim());
-            // حفظ الرابط المباشر بداخل الداتابيز لتفادي مشاكل الصور المكسورة
-            updateData['welcome.imagePath'] = `https://pollinations.ai{encodedPrompt}?width=800&height=400&enhance=true&seed=${Math.floor(Math.random() * 100000)}`;
+            // تنظيف النص من أي فراغات زائدة أو رموز مسببة للمشاكل
+            const cleanPrompt = b.aiPrompt.trim().replace(/[^a-zA-Z0-9\s,]/g, '');
+            const encodedPrompt = encodeURIComponent(cleanPrompt);
+            
+            // الصيغة الرسمية والمباشرة لتوليد الصور بنقاوة عالية
+            updateData['welcome.imagePath'] = `https://pollinations.ai{encodedPrompt}?width=800&height=400&nologo=true&enhance=true`;
         }
+
 
         await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
         res.redirect(`/manage/${guildId}/welcome`);
