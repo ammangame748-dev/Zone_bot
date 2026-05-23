@@ -1179,9 +1179,13 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
 app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
+let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
 
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
-    let img = s.welcome?.imagePath ? (s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `/uploads/${path.basename(s.welcome.imagePath)}`) : 'https://placehold.co';
+        let img = 'https://placehold.co';
+    if (s.welcome?.imagePath) {
+        img = s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `/uploads/${path.basename(s.welcome.imagePath)}`;
+    }
+
 
        let content = `
     <div class="card" style="border-right: 4px solid var(--accent);">
@@ -1289,50 +1293,25 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
             'welcome.aiPrompt': b.aiPrompt
         };
 
-        // الحالة الأولى: إذا قام المستخدم برفع صورة من جهازه
+        // إذا قام المستخدم برفع صورة مخصصة من جهازه
         if (req.file) {
             updateData['welcome.imagePath'] = req.file.path;
         } 
-        // الحالة الثانية: إذا اختار توليد خلفية بالذكاء الاصطناعي بناءً على الوصف
+        // إذا اختار توليد الصورة باستخدام الذكاء الاصطناعي
         else if (b.aiPrompt && b.aiPrompt.trim().length > 0 && b.use_ai === 'true') {
-            console.log(`🤖 Generating AI Image for Guild ${guildId}...`);
             const encodedPrompt = encodeURIComponent(b.aiPrompt.trim());
-            const generatedImageUrl = `https://pollinations.ai{encodedPrompt}?width=800&height=400&enhance=true&seed=${Math.floor(Math.random() * 100000)}`;
-
-            // تحميل صورة الذكاء الاصطناعي وحفظها محلياً في السيرفر لمنع أي مشاكل بروابط ديسكورد
-            const response = await axios({
-                method: 'get',
-                url: generatedImageUrl,
-                responseType: 'stream'
-            }).catch(err => {
-                console.error("❌ Failed to fetch AI Image from API:", err.message);
-                return null;
-            });
-
-            if (response && response.data) {
-                const fileName = `ai-${Date.now()}.png`;
-                const localPath = path.join('./uploads', fileName);
-                const writer = fs.createWriteStream(localPath);
-
-                response.data.pipe(writer);
-
-                await new Promise((resolve, reject) => {
-                    writer.on('finish', resolve);
-                    writer.on('error', reject);
-                });
-
-                updateData['welcome.imagePath'] = localPath; // حفظ المسار المحلي الجديد
-                console.log(`✅ AI Image successfully saved locally to: ${localPath}`);
-            }
+            // حفظ الرابط المباشر بداخل الداتابيز لتفادي مشاكل الصور المكسورة
+            updateData['welcome.imagePath'] = `https://pollinations.ai{encodedPrompt}?width=800&height=400&enhance=true&seed=${Math.floor(Math.random() * 100000)}`;
         }
 
         await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
         res.redirect(`/manage/${guildId}/welcome`);
     } catch (err) {
         console.error("❌ Welcome Save Error:", err);
-        res.status(500).send("خطأ في حفظ إعدادات الترحيب والذكاء الاصطناعي");
+        res.status(500).send("خطأ في حفظ إعدادات الترحيب");
     }
 });
+
 
 
 
