@@ -1276,7 +1276,6 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'autoreply', content));
 });
-const axios = require('axios'); // تأكد أن أكسيوس مستدعى في أعلى الملف
 
 app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
     try {
