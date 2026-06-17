@@ -324,7 +324,7 @@ console.log("- CLIENT_ID:", process.env.CLIENT_ID ? "✅ موجود" : "❌ مف
 console.log("- CLIENT_SECRET:", process.env.CLIENT_SECRET ? "✅ موجود" : "❌ مفقود");
 console.log("- CALLBACK_URL:", process.env.CALLBACK_URL || "❌ مفقود");
 
-passport.use(new Strategy({
+const strategy = new Strategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
     callbackURL: process.env.CALLBACK_URL,
@@ -332,7 +332,16 @@ passport.use(new Strategy({
     scope: ['identify', 'guilds']
 }, (accessToken, refreshToken, profile, done) => {
     return done(null, profile);
-}));
+});
+
+// FIX: إضافة User-Agent مخصص لتجنب حظر Cloudflare (Error 1015) على سيرفرات Render
+strategy._oauth2.setAgent(null); // نلغي الوكيل الافتراضي
+strategy._oauth2.useAuthorizationHeaderforGET(true);
+strategy._oauth2._customHeaders = {
+    'User-Agent': 'ZoneBot/1.0 (DiscordBot; +https://github.com/ammangame748-dev/Zone_bot)'
+};
+
+passport.use(strategy);
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'zone-ultra-secret-123',  // FIX: استخدام متغير بيئة للـ secret
