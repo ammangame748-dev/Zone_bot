@@ -318,13 +318,21 @@ app.use(express.json());
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
+// --- [ تشخيص إعدادات الربط عند التشغيل ] ---
+console.log("🔍 Checking OAuth Config...");
+console.log("- CLIENT_ID:", process.env.CLIENT_ID ? "✅ موجود" : "❌ مفقود");
+console.log("- CLIENT_SECRET:", process.env.CLIENT_SECRET ? "✅ موجود" : "❌ مفقود");
+console.log("- CALLBACK_URL:", process.env.CALLBACK_URL || "❌ مفقود");
+
 passport.use(new Strategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
     callbackURL: process.env.CALLBACK_URL,
     proxy: true,
     scope: ['identify', 'guilds']
-}, (accessToken, refreshToken, profile, done) => done(null, profile)));
+}, (accessToken, refreshToken, profile, done) => {
+    return done(null, profile);
+}));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'zone-ultra-secret-123',  // FIX: استخدام متغير بيئة للـ secret
@@ -342,13 +350,47 @@ const checkAuth = (req, res, next) => {
 
 // FIX: تم حذف المسار المكرر /auth/discord (كان موجود مرتين)
 app.get('/auth/discord', passport.authenticate('discord'));
-app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
-    res.redirect('/dashboard');
+app.get('/callback', (req, res, next) => {
+    passport.authenticate('discord', (err, user, info) => {
+        if (err) {
+            console.error("❌ OAuth Detailed Error:", JSON.stringify(err, null, 2));
+            if (err.oauthError) console.error("❌ OAuth Server Error Body:", err.oauthError.data);
+            
+            let errorMsg = err.message || 'خطأ غير معروف';
+            if (err.oauthError && err.oauthError.data) {
+                try {
+                    const parsed = JSON.parse(err.oauthError.data);
+                    errorMsg = `${parsed.error}: ${parsed.error_description || ''}`;
+                } catch(e) {
+                    errorMsg = err.oauthError.data;
+                }
+            }
+
+            return res.send(`
+                <div style="background:#1a1a2e; color:white; padding:20px; font-family:Arial; direction:rtl; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center;">
+                    <h1 style="color:#ff4757;">❌ فشل تسجيل الدخول</h1>
+                    <p>السبب التقني: <code style="color:#ff4757;">${errorMsg}</code></p>
+                    <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin:20px auto; max-width:500px; text-align:right;">
+                        <p>💡 <b>حلول مقترحة:</b></p>
+                        <ul>
+                            <li>تأكد أن الـ <b>Client Secret</b> في Render صحيح.</li>
+                            <li>تأكد أن الـ <b>CALLBACK_URL</b> في Render هو: <br><code style="color:#00d2ff;">https://zone-bot-8b27.onrender.com/callback</code></li>
+                            <li>تأكد أنك أضفت نفس الرابط أعلاه في <b>Discord Developer Portal</b> تحت قسم OAuth2 -> Redirects.</li>
+                        </ul>
+                    </div>
+                    <a href="/login" style="color:#5865F2; text-decoration:none; font-weight:bold;">🔄 حاول مرة أخرى</a>
+                </div>
+            `);
+        }
+        if (!user) return res.redirect('/login');
+        req.logIn(user, (err) => {
+            if (err) return next(err);
+            res.redirect('/dashboard');
+        });
+    })(req, res, next);
 });
-// FIX: إضافة مسار /auth/discord/callback الصحيح
-app.get('/auth/discord/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
-    res.redirect('/dashboard');
-});
+
+app.get('/auth/discord/callback', (req, res) => res.redirect('/callback'));
 
 app.get('/logout', (req, res) => {
     req.logout(() => {
