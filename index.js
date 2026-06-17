@@ -1,11 +1,7 @@
 let bannerURL = null;
 
 
-// ✅ ضع هذا السطر البديل والمصحح
-if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config();
-}
-
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
@@ -327,7 +323,9 @@ const checkAuth = (req, res, next) => {
     res.redirect('/login');
 };
 app.get('/auth/discord', passport.authenticate('discord'));
-
+app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
+    res.redirect('/dashboard');
+});
 
 app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
@@ -2594,19 +2592,20 @@ setInterval(async () => {
 // 1. الرابط الذي يوجه المستخدم لصفحة تسجيل دخول ديسكورد
 app.get('/auth/discord', passport.authenticate('discord'));
 
-// ✅ تعديل المسار ليتوافق مع ريندر وديسكورد
-app.get('/callback', passport.authenticate('discord', {
-    failureRedirect: '/login' 
+// 2. الرابط الذي يستقبل المستخدم بعد موافقته في ديسكورد
+app.get('/auth/discord/callback', passport.authenticate('discord', {
+    failureRedirect: '/login' // إذا فشل يرجعه لصفحة اللوجن
 }), (req, res) => {
-    res.redirect('/dashboard'); 
+    res.redirect('/dashboard'); // إذا نجح يوديه للداشبورد
 });
 
-// رابط تسجيل الخروج (اتركه كما هو)
+// 3. رابط تسجيل الخروج
 app.get('/logout', (req, res) => {
     req.logout(() => {
         res.redirect('/login');
     });
 });
+
 
 
 client.on('messageDelete', async (message) => {
