@@ -65,6 +65,7 @@ const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
 }));
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
 // التأكد من وجود مجلد الصور لضمان عدم توقف البوت
@@ -306,6 +307,7 @@ passport.use(new Strategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
     callbackURL: process.env.CALLBACK_URL,
+    proxy: true,
     scope: ['identify', 'guilds']
 }, (accessToken, refreshToken, profile, done) => done(null, profile)));
 
