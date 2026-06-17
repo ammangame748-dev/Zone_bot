@@ -1,7 +1,11 @@
 let bannerURL = null;
 
 
-require('dotenv').config();
+// ✅ ضع هذا السطر البديل والمصحح
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
+
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
