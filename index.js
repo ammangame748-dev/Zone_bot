@@ -791,7 +791,15 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     <div class="card">
         <h3>🎨 صانع الترحيب الذكي (سحب ومط مباشر)</h3>
     </div>
-    
+    <!-- خانة رسالة الترحيب -->
+<div style="margin-bottom: 20px;">
+    <label>💬 رسالة الترحيب (نص الإيمباد):</label>
+    <textarea name="embedMessage" rows="3" placeholder="مثلاً: مرحباً بك {member} في سيرفر {guild}! أنت العضو رقم {count}" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px;">${s.welcome?.embedMessage || ''}</textarea>
+    <p style="font-size: 10px; color: #aaa; margin-top: 5px;">
+        متغيرات متاحة: <b>{member}</b> (منشن العضو)، <b>{guild}</b> (اسم السيرفر)، <b>{count}</b> (عدد الأعضاء).
+    </p>
+</div>
+
     <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" id="mainForm">
         <div class="card">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
