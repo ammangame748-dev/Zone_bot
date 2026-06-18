@@ -968,11 +968,11 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         res.status(500).send("خطأ في حفظ الإعدادات");
     }
 });
+// --- [ 1. عرض صفحة الرد الآلي - 15 حقل ] ---
 app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
-    // ✅ إصلاح: التأكد من وجود مصفوفة حتى لو لم تكن موجودة في قاعدة البيانات
     let s = await GuildConfig.findOne({ guildId: g.id });
     if (!s) s = { autoReply: [] };
     if (!s.autoReply) s.autoReply = [];
@@ -980,57 +980,58 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     let content = `
     <form method="POST" action="/save/${g.id}/autoreply">
         <div class="card">
-            <h3>🤖 نظام الرد الآلي</h3>
-            <p style="color: #aaa; font-size: 13px;">ملاحظة: اترك الحقول فارغة لحذف الرد.</p>
+            <h3>🤖 نظام الرد الآلي (15 رد)</h3>
+            <p style="color: #aaa; font-size: 13px;">اكتب الكلمة والرد، واترك الحقول فارغة لحذف الرد.</p>
             
             <div id="reply-list">
-                ${[...Array(Math.max(s.autoReply.length + 2, 5))].map((_, i) => {
-                    const data = (s.autoReply && s.autoReply[i]) ? s.autoReply[i] : { trigger: '', reply: '' };
+                ${[...Array(15)].map((_, i) => {
+                    const data = s.autoReply[i] || { trigger: '', reply: '' };
                     return `
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-                        <input name="trigger" value="${data.trigger || ''}" placeholder="الكلمة (مثلاً: هلا)" style="flex: 1;">
-                        <input name="reply" value="${data.reply || ''}" placeholder="رد البوت (مثلاً: هلا بك نورت)" style="flex: 2;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 5px;">
+                        <span style="color: #5865F2; font-weight: bold; padding-top: 10px;">${i + 1}</span>
+                        <input name="trigger[]" value="${data.trigger || ''}" placeholder="الكلمة" style="flex: 1;">
+                        <input name="reply[]" value="${data.reply || ''}" placeholder="الرد" style="flex: 2;">
                     </div>`;
                 }).join('')}
             </div>
             
-            <button class="btn-save">💾 حفظ كل الردود</button>
+            <button type="submit" class="btn-save" style="width: 100%; margin-top: 20px;">💾 حفظ كافة الردود</button>
         </div>
     </form>`;
 
     res.send(ui(g, 'autoreply', content));
 });
 
+// --- [ 2. حفظ الردود - معالجة المصفوفة ] ---
 app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         let { trigger, reply } = req.body;
 
-        // تحويل المدخلات إلى مصفوفة إذا كانت كلمة واحدة فقط
-        if (!Array.isArray(trigger)) trigger = trigger ? [trigger] : [];
-        if (!Array.isArray(reply)) reply = reply ? [reply] : [];
+        // التأكد أن البيانات تصل كمصفوفة دائماً
+        const triggers = Array.isArray(trigger) ? trigger : [trigger];
+        const replies = Array.isArray(reply) ? reply : [reply];
 
-        let finalData = [];
-        // دمج الكلمات مع ردودها وتصفية الحقول الفارغة
-        for (let i = 0; i < trigger.length; i++) {
-            const t = trigger[i]?.trim();
-            const r = reply[i]?.trim();
+        const finalData = [];
+        for (let i = 0; i < triggers.length; i++) {
+            const t = triggers[i]?.trim();
+            const r = replies[i]?.trim();
+            // حفظ فقط إذا كان الحقلين (الكلمة والرد) غير فارغين
             if (t && r) {
                 finalData.push({ trigger: t, reply: r });
             }
         }
 
-        // تحديث قاعدة البيانات
         await GuildConfig.findOneAndUpdate(
-            { guildId }, 
-            { $set: { autoReply: finalData } }, 
+            { guildId },
+            { $set: { autoReply: finalData } },
             { upsert: true }
         );
 
         res.redirect(`/manage/${guildId}/autoreply`);
     } catch (err) {
-        console.error("❌ Error saving autoreply:", err);
-        res.status(500).send("خطأ داخلي في حفظ البيانات");
+        console.error("❌ Autoreply Save Error:", err);
+        res.status(500).send("خطأ في حفظ الردود الآلية");
     }
 });
 
