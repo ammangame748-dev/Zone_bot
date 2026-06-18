@@ -1568,6 +1568,12 @@ const nextIndex = lastClan ? lastClan.clanIndex + 1 : 0;
             <label>رتبة الكلان:</label>
             <select name="roleId">
                 <option value="">-- بدون رتبة --</option>
+                <div style="margin-top: 20px;">
+    <label style="display:block; margin-bottom: 10px; font-weight: bold; color: #00d2ff;">📝 أسئلة التقديم (سؤال في كل سطر):</label>
+    <textarea name="questions" rows="5" placeholder="مثلاً:&#10;ما هو اسمك؟&#10;كم عمرك؟&#10;لماذا تريد الانضمام؟" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px;"></textarea>
+    <p style="font-size: 11px; color: #aaa; margin-top: 5px;">اكتب كل سؤال في سطر جديد. سيقوم البوت بسؤالها للمتقدم واحداً تلو الآخر.</p>
+</div>
+
                 ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
             </select>
             <label>قناة النتائج:</label>
