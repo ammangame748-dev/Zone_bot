@@ -975,30 +975,32 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         res.status(500).send("خطأ في حفظ الإعدادات");
     }
 });
-
-
-// --- [ Auto Reply ] ---
 app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
+
     let s = await GuildConfig.findOne({ guildId: g.id }) || { autoReply: [] };
-
-    let rows = '';
-    for (let i = 0; i < 15; i++) {
-        const data = s.autoReply && s.autoReply[i] ? s.autoReply[i] : { trigger: '', reply: '' };
-        rows += `
-        <div class="card" style="margin-bottom:10px;">
-            <h4 style="color: var(--accent);">الرد #${i + 1}</h4>
-            <input type="text" name="trigger" value="${data.trigger || ''}" placeholder="الكلمة (Trigger)">
-            <textarea name="reply" placeholder="رد البوت (Reply)">${data.reply || ''}</textarea>
-        </div>`;
-    }
-
-    const content = `
+    
+    // نجهز 5 حقول فارغة دائماً لسهولة الإضافة
+    let content = `
     <form method="POST" action="/save/${g.id}/autoreply">
-        <h3>💬 إعدادات الرد الآلي</h3>
-        ${rows}
-        <button class="btn-save">💾 حفظ الردود</button>
+        <div class="card">
+            <h3>🤖 نظام الرد الآلي</h3>
+            <p style="color: #aaa; font-size: 13px;">ملاحظة: اترك الحقول فارغة لحذف الرد.</p>
+            
+            <div id="reply-list">
+                ${[...Array(Math.max(s.autoReply.length + 2, 5))].map((_, i) => {
+                    const data = s.autoReply && s.autoReply[i] ? s.autoReply[i] : { trigger: '', reply: '' };
+                    return `
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
+                        <input name="trigger" value="${data.trigger}" placeholder="الكلمة (مثلاً: هلا)" style="flex: 1;">
+                        <input name="reply" value="${data.reply}" placeholder="رد البوت (مثلاً: هلا بك نورت)" style="flex: 2;">
+                    </div>`;
+                }).join('')}
+            </div>
+            
+            <button class="btn-save">💾 حفظ كل الردود</button>
+        </div>
     </form>`;
 
     res.send(ui(g, 'autoreply', content));
@@ -1009,23 +1011,34 @@ app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
         const { guildId } = req.params;
         let { trigger, reply } = req.body;
 
+        // تحويل المدخلات إلى مصفوفة إذا كانت كلمة واحدة فقط
         if (!Array.isArray(trigger)) trigger = trigger ? [trigger] : [];
         if (!Array.isArray(reply)) reply = reply ? [reply] : [];
 
         let finalData = [];
+        // دمج الكلمات مع ردودها وتصفية الحقول الفارغة
         for (let i = 0; i < trigger.length; i++) {
             const t = trigger[i]?.trim();
             const r = reply[i]?.trim();
-            if (t && r) finalData.push({ trigger: t, reply: r });
+            if (t && r) {
+                finalData.push({ trigger: t, reply: r });
+            }
         }
 
-        await GuildConfig.findOneAndUpdate({ guildId }, { $set: { autoReply: finalData } }, { upsert: true });
+        // تحديث قاعدة البيانات
+        await GuildConfig.findOneAndUpdate(
+            { guildId }, 
+            { $set: { autoReply: finalData } }, 
+            { upsert: true }
+        );
+
         res.redirect(`/manage/${guildId}/autoreply`);
     } catch (err) {
-        console.error("Error saving autoreply:", err);
+        console.error("❌ Error saving autoreply:", err);
         res.status(500).send("خطأ داخلي في حفظ البيانات");
     }
 });
+
 
 // --- [ Giveaway ] ---
 app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
@@ -1540,18 +1553,47 @@ app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
 app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { clanName, leaderId, roleId, resultsChannelId } = req.body;
-const questionsArray = req.body.questions ? req.body.questions.split('\n').filter(q => q.trim() !== "") : [];
+        const { clanName, leaderId, roleId, resultsChannelId, clanIndex, questions, applyChannelId } = req.body;
 
-        // ✅ FIX: احسب الـ index من السيرفر مباشرة لتجنب أي تلاعب أو تكرار
-        const lastClan = await Clan.findOne({ guildId }).sort({ clanIndex: -1 });
-        const clanIndex = lastClan ? lastClan.clanIndex + 1 : 0;
+        // 1. تجهيز الأسئلة
+        const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== "") : [];
 
-        await Clan.create({ questions: questionsArray,
-guildId, clanName, leaderId, roleId, resultsChannelId, clanIndex, members: [], assistantIds: [] });
+        // 2. إنشاء الكلان في قاعدة البيانات
+        const newClan = await Clan.create({ 
+            guildId, 
+            clanName, 
+            leaderId, 
+            roleId, 
+            resultsChannelId, 
+            clanIndex: parseInt(clanIndex), 
+            questions: questionsArray,
+            members: [], 
+            assistantIds: [] 
+        });
+
+        // 3. إرسال لوحة التقديم تلقائياً (إذا تم اختيار قناة)
+        // ملاحظة: تأكد أنك أضفت حقل applyChannelId في صفحة الـ HTML (سأعطيك الكود أدناه)
+        const targetChannel = client.channels.cache.get(resultsChannelId); // أو استخدم قناة مخصصة للتقديم
+        if (targetChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle(`🛡️ نظام التقديم | ${clanName}`)
+                .setDescription("اضغط على الزر أدناه لفتح تذكرة تقديم والإجابة على الأسئلة.")
+                .setColor('#5865F2')
+                .setFooter({ text: 'Zone System • Clans Management' });
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`apply_clan_${newClan._id}`) // استخدام الـ ID الحقيقي من قاعدة البيانات
+                    .setLabel('تقديم الآن')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            await targetChannel.send({ embeds: [embed], components: [row] }).catch(e => console.error("Error sending clan embed:", e));
+        }
+
         res.redirect(`/manage/${guildId}/clans`);
     } catch (err) {
-        console.error("Clan Save Error:", err);
+        console.error("❌ Clan Save Error:", err);
         res.status(500).send("خطأ في إضافة الكلان");
     }
 });
@@ -1559,7 +1601,6 @@ app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
-    // حساب الـ Index القادم تلقائياً
     const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
     const nextIndex = lastClan ? lastClan.clanIndex + 1 : 0;
 
@@ -1567,7 +1608,6 @@ app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
     <form method="POST" action="/save/${g.id}/clans">
         <div class="card">
             <h3 style="color: var(--accent); margin-bottom: 20px;">🚩 إضافة كلان جديد</h3>
-            
             <input type="hidden" name="clanIndex" value="${nextIndex}">
             
             <label>اسم الكلان:</label>
@@ -1582,7 +1622,13 @@ app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
                 ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
             </select>
 
-            <label>قناة النتائج (الروم اللي يوصل فيه التقديم):</label>
+            <label>📢 قناة إرسال "لوحة التقديم":</label>
+            <select name="applyChannelId" required>
+                <option value="">-- اختر القناة --</option>
+                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+            </select>
+
+            <label>📥 قناة وصول "نتائج التقديم":</label>
             <select name="resultsChannelId" required>
                 <option value="">-- اختر القناة --</option>
                 ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
@@ -1590,11 +1636,10 @@ app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
 
             <div style="margin-top: 20px; padding: 15px; background: rgba(88, 101, 242, 0.05); border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2);">
                 <label style="display:block; margin-bottom: 10px; font-weight: bold; color: #00d2ff;">📝 أسئلة التقديم (سؤال في كل سطر):</label>
-                <textarea name="questions" rows="5" placeholder="مثلاً:&#10;ما هو اسمك؟&#10;كم عمرك؟&#10;لماذا تريد الانضمام؟" style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px;"></textarea>
-                <p style="font-size: 11px; color: #aaa; margin-top: 5px;">⚠️ اكتب كل سؤال في سطر جديد. سيقوم البوت بسؤالها للمتقدم واحداً تلو الآخر.</p>
+                <textarea name="questions" rows="5" placeholder="ما هو اسمك؟&#10;كم عمرك؟" style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px;"></textarea>
             </div>
 
-            <button type="submit" class="btn-save" style="margin-top: 20px; background: linear-gradient(45deg, #5865F2, #7289da);">💾 حفظ وإضافة الكلان</button>
+            <button type="submit" class="btn-save" style="margin-top: 20px;">💾 حفظ وإرسال التقديم</button>
         </div>
     </form>`;
 
@@ -1603,29 +1648,50 @@ app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
 app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { clanName, leaderId, roleId, resultsChannelId, clanIndex, questions } = req.body;
+        const { clanName, leaderId, roleId, resultsChannelId, applyChannelId, clanIndex, questions } = req.body;
 
-        // تحويل الأسئلة من نص طويل إلى قائمة (Array) مع تنظيف السطور الفارغة
         const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== "") : [];
 
-        await Clan.create({ 
+        // 1. حفظ الكلان مع قناة النتائج
+        const newClan = await Clan.create({ 
             guildId, 
             clanName, 
             leaderId, 
             roleId, 
             resultsChannelId, 
             clanIndex: parseInt(clanIndex), 
-            questions: questionsArray, // ✅ حفظ الأسئلة هنا
+            questions: questionsArray,
             members: [], 
             assistantIds: [] 
         });
 
+        // 2. إرسال لوحة التقديم في "قناة التقديم" المخصصة
+        const applyChannel = client.channels.cache.get(applyChannelId);
+        if (applyChannel) {
+            const embed = new EmbedBuilder()
+                .setTitle(`🛡️ نظام التقديم | ${clanName}`)
+                .setDescription("اضغط على الزر أدناه لفتح تذكرة تقديم والإجابة على الأسئلة.\n\nسيتم مراجعة طلبك من قبل الإدارة.")
+                .setColor('#00ff88')
+                .setThumbnail(applyChannel.guild.iconURL())
+                .setFooter({ text: 'Zone System • Clans' });
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`apply_clan_${newClan._id}`)
+                    .setLabel('تقديم الآن 📝')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            await applyChannel.send({ embeds: [embed], components: [row] });
+        }
+
         res.redirect(`/manage/${guildId}/clans`);
     } catch (err) {
         console.error("❌ Clan Save Error:", err);
-        res.status(500).send("خطأ في إضافة الكلان، تأكد من إدخال البيانات بشكل صحيح");
+        res.status(500).send("خطأ في إضافة الكلان");
     }
 });
+
 
 
 app.get('/manage/:guildId/clans/delete/:index', checkAuth, async (req, res) => {
