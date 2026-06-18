@@ -2074,16 +2074,12 @@ client.on('guildMemberAdd', async (member) => {
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
 
-        // تحميل الخلفية (سواء كانت مرفوعة أو مولدة بالـ AI)
+        // تحميل الخلفية
         let bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400?text=Welcome';
         const background = await loadImage(bgUrl );
         ctx.drawImage(background, 0, 0, 800, 400);
 
-        // تظليل خفيف للخلفية عشان تبرز صورة العضو
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.fillRect(0, 0, 800, 400);
-
-              // إحداثيات وأبعاد صورة العضو
+        // إحداثيات وأبعاد صورة العضو
         const avW = config.welcome.avatarWidth || 150;
         const avH = config.welcome.avatarHeight || 150;
         const x = (config.welcome.avatarX / 100) * 800;
@@ -2091,7 +2087,6 @@ client.on('guildMemberAdd', async (member) => {
 
         ctx.save();
         ctx.beginPath();
-        // استخدام ellipse لرسم شكل بيضاوي (يدعم المط)
         ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
@@ -2107,17 +2102,29 @@ client.on('guildMemberAdd', async (member) => {
         ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
         ctx.stroke();
 
-        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
+        // تحويل الصورة لـ Attachment
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
         
-        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member}!")
+        // تجهيز نص الرسالة
+        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!")
             .replace('{member}', `<@${member.id}>`)
             .replace('{guild}', member.guild.name)
             .replace('{count}', member.guild.memberCount);
 
-        welcomeChannel.send({ content: welcomeMsg, files: [attachment] });
+        // --- [ إنشاء الـ Embed ] ---
+        const welcomeEmbed = new EmbedBuilder()
+            .setTitle(`✨ عضو جديد انضم إلينا!`)
+            .setDescription(welcomeMsg)
+            .setColor('#5865F2')
+            .setImage('attachment://welcome-image.png') // وضع الصورة داخل الإيمباد
+            .setTimestamp()
+            .setFooter({ text: `Zone System • العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+
+        // إرسال الإيمباد مع الصورة
+        welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
 
     } catch (err) {
-        console.error("Canvas Error:", err);
+        console.error("Welcome Error:", err);
     }
 });
 
