@@ -754,10 +754,45 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     let img = s.welcome?.imagePath || 'https://placehold.co/800x400?text=No+Background';
 
     let content = `
+    <style>
+        .preview-container {
+            position: relative; 
+            border: 2px solid #5865F2; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            background: #000; 
+            width: 100%;
+            aspect-ratio: 2/1;
+            user-select: none;
+        }
+        #previewAvatar {
+            position: absolute; 
+            border: 3px solid #fff; 
+            border-radius: 50%; 
+            background: url('${client.user.displayAvatarURL( )}'); 
+            background-size: 100% 100%; 
+            cursor: move;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        /* مقابض المط */
+        .resizer {
+            width: 12px;
+            height: 12px;
+            background: #5865F2;
+            position: absolute;
+            border: 2px solid #fff;
+            border-radius: 2px;
+        }
+        .resizer.br { right: -6px; bottom: -6px; cursor: nwse-resize; }
+        .resizer.tr { right: -6px; top: -6px; cursor: nesw-resize; }
+        .resizer.bl { left: -6px; bottom: -6px; cursor: nesw-resize; }
+    </style>
+
     <div class="card">
-        <h3>🎨 صانع صور الترحيب الاحترافي (AI + مط )</h3>
+        <h3>🎨 صانع الترحيب الذكي (سحب ومط مباشر)</h3>
     </div>
-    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
+    
+    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" id="mainForm">
         <div class="card">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div>
@@ -775,100 +810,116 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                 </div>
             </div>
 
-            <label>💬 وصف صورة الـ AI (اكتب وصفك هنا):</label>
+            <label>💬 وصف الـ AI للخلفية:</label>
             <div style="display: flex; gap: 10px; margin-bottom:20px;">
-                <input type="text" id="aiPromptInput" name="aiPrompt" value="${s.welcome?.aiPrompt || ''}" placeholder="مثلاً: Dark background with blue energy flames" style="flex:1;">
+                <input type="text" id="aiPromptInput" name="aiPrompt" value="${s.welcome?.aiPrompt || ''}" placeholder="مثلاً: Galaxy background, blue stars" style="flex:1;">
                 <button type="button" onclick="generateAIImage()" class="btn-save" style="width:auto; background:#7b2ff7;">🚀 توليد</button>
             </div>
             <input type="hidden" name="remoteBg" id="remoteBg">
 
-            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px;">
-                <!-- المعاينة -->
-                <div style="position: relative; border: 2px solid #5865F2; border-radius: 10px; overflow: hidden; background: #000; aspect-ratio: 2/1;">
-                    <img src="${img}" id="previewBg" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.7;">
-                    <div id="previewAvatar" style="position: absolute; width: ${s.welcome?.avatarWidth || 150}px; height: ${s.welcome?.avatarHeight || 150}px; border: 3px solid #fff; border-radius: 50%; background: url('${client.user.displayAvatarURL()}'); background-size: cover; left: ${s.welcome?.avatarX || 50}%; top: ${s.welcome?.avatarY || 50}%; transform: translate(-50%, -50%); cursor: move;"></div>
-                </div>
-                
-                <!-- أزرار التحكم -->
-                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; text-align: center;">
-                    <p style="color: #00d2ff; font-weight: bold; margin-bottom:15px;">🎮 تحكم بالمكان والمط</p>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 120px; margin: 0 auto 15px;">
-                        <div></div><button type="button" onclick="move('up')" class="btn-save" style="padding:5px;">⬆️</button><div></div>
-                        <button type="button" onclick="move('left')" class="btn-save" style="padding:5px;">⬅️</button>
-                        <button type="button" onclick="move('center')" class="btn-save" style="padding:5px; background:#5865F2;">🎯</button>
-                        <button type="button" onclick="move('right')" class="btn-save" style="padding:5px;">➡️</button>
-                        <div></div><button type="button" onclick="move('down')" class="btn-save" style="padding:5px;">⬇️</button><div></div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <label style="font-size:10px;">↔️ مط عرض</label>
-                            <div style="display: flex; gap: 20px; justify-content: center;">
-                                <button type="button" onclick="resize('w', -10)" class="btn-save" style="padding:5px;">-</button>
-                                <button type="button" onclick="resize('w', 10)" class="btn-save" style="padding:5px;">+</button>
-                            </div>
-                        </div>
-                        <div>
-                            <label style="font-size:10px;">↕️ مط طول</label>
-                            <div style="display: flex; gap: 20px; justify-content: center;">
-                                <button type="button" onclick="resize('h', -10)" class="btn-save" style="padding:5px;">-</button>
-                                <button type="button" onclick="resize('h', 10)" class="btn-save" style="padding:5px;">+</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
-                    <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
-                    <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
-                    <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
+            <div class="preview-container" id="container">
+                <img src="${img}" id="previewBg" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0.7;">
+                <div id="previewAvatar" style="
+                    width: ${s.welcome?.avatarWidth || 150}px; 
+                    height: ${s.welcome?.avatarHeight || 150}px; 
+                    left: ${s.welcome?.avatarX || 50}%; 
+                    top: ${s.welcome?.avatarY || 50}%; 
+                    transform: translate(-50%, -50%);">
+                    <div class="resizer br"></div>
+                    <div class="resizer tr"></div>
+                    <div class="resizer bl"></div>
                 </div>
             </div>
 
-            <button type="submit" class="btn-save" style="margin-top: 30px;">💾 حفظ الإعدادات</button>
+            <p style="color: #aaa; font-size: 12px; margin-top: 10px; text-align: center;">
+                💡 اسحب الصورة لتحريكها، واستخدم المربعات الزرقاء في الزوايا لمطها وتغيير حجمها.
+            </p>
+
+            <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
+            <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
+            <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
+            <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
+
+            <button type="submit" class="btn-save" style="margin-top: 20px;">💾 حفظ التصميم النهائي</button>
         </div>
     </form>
 
     <script>
-        function move(dir) {
-            let x = parseInt(document.getElementById('avatarX').value);
-            let y = parseInt(document.getElementById('avatarY').value);
-            if(dir === 'up') y -= 2; if(dir === 'down') y += 2;
-            if(dir === 'left') x -= 2; if(dir === 'right') x += 2;
-            if(dir === 'center') { x = 50; y = 50; }
-            document.getElementById('avatarX').value = x;
-            document.getElementById('avatarY').value = y;
-            updatePreview();
-        }
-        function resize(type, amt) {
-            let w = parseInt(document.getElementById('avatarWidth').value);
-            let h = parseInt(document.getElementById('avatarHeight').value);
-            if(type === 'w') w += amt; if(type === 'h') h += amt;
-            document.getElementById('avatarWidth').value = Math.max(20, w);
-            document.getElementById('avatarHeight').value = Math.max(20, h);
-            updatePreview();
-        }
-        function updatePreview() {
-            const av = document.getElementById('previewAvatar');
-            av.style.left = document.getElementById('avatarX').value + '%';
-            av.style.top = document.getElementById('avatarY').value + '%';
-            av.style.width = document.getElementById('avatarWidth').value + 'px';
-            av.style.height = document.getElementById('avatarHeight').value + 'px';
-        }
+        const avatar = document.getElementById('previewAvatar');
+        const container = document.getElementById('container');
+        let isDragging = false;
+        let isResizing = false;
+        let currentResizer = null;
+
+        // --- نظام التحريك (Drag) ---
+        avatar.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('resizer')) return;
+            isDragging = true;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            if (isDragging) {
+                let x = ((e.clientX - rect.left) / rect.width) * 100;
+                let y = ((e.clientY - rect.top) / rect.height) * 100;
+                x = Math.max(0, Math.min(100, x));
+                y = Math.max(0, Math.min(100, y));
+                avatar.style.left = x + '%';
+                avatar.style.top = y + '%';
+                document.getElementById('avatarX').value = Math.round(x);
+                document.getElementById('avatarY').value = Math.round(y);
+            }
+
+            if (isResizing) {
+                const avatarRect = avatar.getBoundingClientRect();
+                if (currentResizer.classList.contains('br')) {
+                    const newWidth = e.clientX - avatarRect.left;
+                    const newHeight = e.clientY - avatarRect.top;
+                    avatar.style.width = newWidth + 'px';
+                    avatar.style.height = newHeight + 'px';
+                } else if (currentResizer.classList.contains('tr')) {
+                    const newWidth = e.clientX - avatarRect.left;
+                    const newHeight = avatarRect.bottom - e.clientY;
+                    avatar.style.width = newWidth + 'px';
+                    avatar.style.height = newHeight + 'px';
+                } else if (currentResizer.classList.contains('bl')) {
+                    const newWidth = avatarRect.right - e.clientX;
+                    const newHeight = e.clientY - avatarRect.top;
+                    avatar.style.width = newWidth + 'px';
+                    avatar.style.height = newHeight + 'px';
+                }
+                document.getElementById('avatarWidth').value = Math.round(avatar.offsetWidth);
+                document.getElementById('avatarHeight').value = Math.round(avatar.offsetHeight);
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            isResizing = false;
+        });
+
+        // --- نظام المط (Resize) ---
+        document.querySelectorAll('.resizer').forEach(resizer => {
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                currentResizer = e.target;
+                e.stopPropagation();
+                e.preventDefault();
+            });
+        });
+
         async function generateAIImage() {
             const prompt = document.getElementById('aiPromptInput').value;
             if(!prompt) return alert('اكتب وصفاً!');
-            const btn = event.target;
-            btn.innerText = '...';
             const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt + ", no text, high quality" ) + '?width=800&height=400&nologo=true';
             document.getElementById('previewBg').src = url;
             document.getElementById('remoteBg').value = url;
-            btn.innerText = '🚀 توليد';
         }
     </script>
     `;
     res.send(ui(g, 'welcome', content));
 });
+
 
 
 app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
