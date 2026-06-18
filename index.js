@@ -2122,23 +2122,22 @@ client.on('guildMemberAdd', async (member) => {
         // تحويل الصورة لـ Attachment
         const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
         
-        // --- [ إصلاح تبديل النصوص ] ---
-        let welcomeMsg = config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!";
         
-        // نستخدم RegExp مع 'g' لتبديل كل الكلمات المتكررة
-        welcomeMsg = welcomeMsg
+        // 1. تجهيز النص (تأكد إن هاد السطر موجود فوق الـ Embed)
+        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!")
             .replace(/{member}/g, `<@${member.id}>`)
             .replace(/{guild}/g, member.guild.name)
             .replace(/{count}/g, member.guild.memberCount.toString());
 
-        // --- [ إنشاء الـ Embed ] ---
+        // 2. إنشاء الـ Embed (اللي أنت لقيته)
         const welcomeEmbed = new EmbedBuilder()
             .setTitle(`✨ عضو جديد انضم إلينا!`)
-            .setDescription(welcomeMsg)
+            .setDescription(welcomeMsg) // ✅ هسا صار يقرأ من المتغير اللي فوق
             .setColor('#5865F2')
             .setImage('attachment://welcome-image.png') 
             .setTimestamp()
             .setFooter({ text: `Zone System • العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+
 
         // إرسال الإيمباد مع الصورة
         welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
