@@ -968,14 +968,15 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         res.status(500).send("خطأ في حفظ الإعدادات");
     }
 });
-
 app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { autoReply: [] };
+    // ✅ إصلاح: التأكد من وجود مصفوفة حتى لو لم تكن موجودة في قاعدة البيانات
+    let s = await GuildConfig.findOne({ guildId: g.id });
+    if (!s) s = { autoReply: [] };
+    if (!s.autoReply) s.autoReply = [];
     
-    // نجهز 5 حقول فارغة دائماً لسهولة الإضافة
     let content = `
     <form method="POST" action="/save/${g.id}/autoreply">
         <div class="card">
@@ -984,11 +985,11 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
             
             <div id="reply-list">
                 ${[...Array(Math.max(s.autoReply.length + 2, 5))].map((_, i) => {
-                    const data = s.autoReply && s.autoReply[i] ? s.autoReply[i] : { trigger: '', reply: '' };
+                    const data = (s.autoReply && s.autoReply[i]) ? s.autoReply[i] : { trigger: '', reply: '' };
                     return `
                     <div style="display: flex; gap: 10px; margin-bottom: 15px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-                        <input name="trigger" value="${data.trigger}" placeholder="الكلمة (مثلاً: هلا)" style="flex: 1;">
-                        <input name="reply" value="${data.reply}" placeholder="رد البوت (مثلاً: هلا بك نورت)" style="flex: 2;">
+                        <input name="trigger" value="${data.trigger || ''}" placeholder="الكلمة (مثلاً: هلا)" style="flex: 1;">
+                        <input name="reply" value="${data.reply || ''}" placeholder="رد البوت (مثلاً: هلا بك نورت)" style="flex: 2;">
                     </div>`;
                 }).join('')}
             </div>
@@ -999,6 +1000,7 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'autoreply', content));
 });
+
 app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
