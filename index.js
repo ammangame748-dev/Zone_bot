@@ -133,6 +133,7 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
     },
 
 }));
+const Clan = mongoose.model('Clan', clanSchema); // ✅ تأكد إن الحرف الأول C كبير
 
 const Stats = mongoose.model('Stats', new mongoose.Schema({
     guildId: String,
