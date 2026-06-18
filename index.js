@@ -789,7 +789,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     </style>
 
     <div class="card">
-        <h3>🎨 صانع الترحيب الذكي (سحب ومط مباشر)</h3>
+        <h3>الترحيب </h3>
     </div>
 
 
