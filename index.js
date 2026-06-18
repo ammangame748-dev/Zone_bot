@@ -133,7 +133,6 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
     },
 
 }));
-const Clan = mongoose.model('Clan', clanSchema); // ✅ تأكد إن الحرف الأول C كبير
 
 const Stats = mongoose.model('Stats', new mongoose.Schema({
     guildId: String,
@@ -180,6 +179,24 @@ const clanSchema = new mongoose.Schema({
         default: ["ما هو اسمك؟", "كم عمرك؟", "لماذا تريد الانضمام؟"]
     }
 });
+const Clan = mongoose.model('Clan', new mongoose.Schema({
+    assistantIds: [String],
+    guildId: String,
+    clanIndex: Number,
+    clanName: String,
+    roleId: String,
+    leaderId: String,
+    assistantId: String,
+    points: { type: Number, default: 0 },
+    applyChannel: String,
+    applyMessage: String,
+    textChannelId: String,
+    voiceChannelId: String,
+    resultsChannelId: String,
+    members: [String],
+    // ✅ أضفنا حقل الأسئلة هون
+    questions: { type: [String], default: [] }
+}));
 
 const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     guildId: String,
