@@ -817,6 +817,8 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                     </select>
                 </div>
             </div>
+<label>💬 رسالة الترحيب (نص الإيمباد):</label>
+<textarea name="embedMessage" rows="5" placeholder="اكتب رسالة الترحيب هنا... يمكنك استخدام {member} و {guild} و {count}" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px;">${s.welcome?.embedMessage || ''}</textarea>
 
             <label>💬 وصف الـ AI للخلفية:</label>
             <div style="display: flex; gap: 10px; margin-bottom:20px;">
