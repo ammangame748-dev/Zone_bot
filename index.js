@@ -165,7 +165,6 @@ const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
     description: String,
     ended: { type: Boolean, default: false }
 }));
-
 const clanSchema = new mongoose.Schema({
     guildId: String,
     clanName: String,
@@ -173,21 +172,13 @@ const clanSchema = new mongoose.Schema({
     leaderId: String,
     roleId: String,
     resultsChannelId: String,
-    members: Array,
-    assistantIds: Array,
-    // ✅ ضف هذا الحقل للأسئلة
-    questions: { type: [String], default: ["ما هو اسمك؟", "كم عمرك؟", "لماذا تريد الانضمام؟"] }
+    members: [String], // 👈 تغييرها إلى مصفوفة نصوص لتخزين الـ IDs الخاصة بالأعضاء
+    assistantIds: [String], // 👈 تغييرها إلى مصفوفة نصوص لتخزين الـ IDs الخاصة بالمساعدين
+    questions: {
+        type: [String],
+        default: ["ما هو اسمك؟", "كم عمرك؟", "لماذا تريد الانضمام؟"]
+    }
 });
-
-
-const ClanMember = mongoose.model('ClanMember', new mongoose.Schema({
-    guildId: String,
-    userId: String,
-    clanIndex: Number,
-    points: { type: Number, default: 0 },
-    msgCountForPoints: { type: Number, default: 0 },
-    voiceMinutes: { type: Number, default: 0 }
-}));
 
 const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     guildId: String,
