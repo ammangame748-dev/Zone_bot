@@ -935,10 +935,11 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         const { guildId } = req.params;
         const b = req.body;
 
-                let updateData = {
+        // ✅ ركز هون: لازم نأخذ embedMessage من req.body
+        let updateData = {
             'welcome.enabled': b.enabled === 'on',
             'welcome.channel': b.channel,
-            'welcome.embedMessage': b.embedMessage,
+            'welcome.embedMessage': b.embedMessage, // هاض السطر اللي كان ناقص أو فيه مشكلة
             'welcome.avatarX': parseInt(b.avatarX) || 50,
             'welcome.avatarY': parseInt(b.avatarY) || 50,
             'welcome.avatarWidth': parseInt(b.avatarWidth) || 150,
@@ -946,20 +947,25 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
             'welcome.aiPrompt': b.aiPrompt
         };
 
-
         if (req.file) {
             updateData['welcome.imagePath'] = req.file.path;
         } else if (b.remoteBg) {
             updateData['welcome.imagePath'] = b.remoteBg;
         }
 
-        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
+        // تحديث قاعدة البيانات
+        await GuildConfig.findOneAndUpdate(
+            { guildId }, 
+            { $set: updateData }, 
+            { upsert: true, new: true }
+        );
+
         res.redirect(`/manage/${guildId}/welcome`);
     } catch (err) {
-        res.status(500).send("خطأ في الحفظ");
+        console.error("Save Error:", err);
+        res.status(500).send("خطأ في حفظ الإعدادات");
     }
 });
-
 
 
 // --- [ Auto Reply ] ---
