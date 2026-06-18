@@ -211,7 +211,14 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     buttons: [{ label: String, emoji: String }],
     menuOptions: [{ label: String, emoji: String }]
 }));
-
+const ClanMember = mongoose.model('ClanMember', new mongoose.Schema({
+    guildId: String,
+    userId: String,
+    clanIndex: Number,
+    msgCountForPoints: { type: Number, default: 0 },
+    points: { type: Number, default: 0 },
+    voiceMinutes: { type: Number, default: 0 }
+}));
 // ==========================================
 // 2️⃣ Express App Setup
 // ==========================================
@@ -848,8 +855,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
             <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
             <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
             <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
-<label style="display:block; margin-top:10px;">📝 أسئلة التقديم (سؤال في كل سطر):</label>
-<textarea name="questions" rows="5" placeholder="ما هو اسمك؟&#10;كم عمرك؟" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px;"></textarea>
+
 
             <button type="submit" class="btn-save" style="margin-top: 20px;">💾 حفظ التصميم النهائي</button>
         </div>
@@ -1549,56 +1555,78 @@ guildId, clanName, leaderId, roleId, resultsChannelId, clanIndex, members: [], a
         res.status(500).send("خطأ في إضافة الكلان");
     }
 });
-
 app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
+
+    // حساب الـ Index القادم تلقائياً
     const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
-const nextIndex = lastClan ? lastClan.clanIndex + 1 : 0;
+    const nextIndex = lastClan ? lastClan.clanIndex + 1 : 0;
 
     const content = `
     <form method="POST" action="/save/${g.id}/clans">
         <div class="card">
-            <h3>🚩 إضافة كلان جديد</h3>
+            <h3 style="color: var(--accent); margin-bottom: 20px;">🚩 إضافة كلان جديد</h3>
+            
             <input type="hidden" name="clanIndex" value="${nextIndex}">
+            
             <label>اسم الكلان:</label>
-            <input name="clanName" required placeholder="اسم الكلان">
+            <input name="clanName" required placeholder="مثلاً: ZONE TEAM">
+            
             <label>القائد (ID):</label>
-            <input name="leaderId" required placeholder="ID القائد">
+            <input name="leaderId" required placeholder="ايدي صاحب الكلان">
+            
             <label>رتبة الكلان:</label>
             <select name="roleId">
                 <option value="">-- بدون رتبة --</option>
-                <div style="margin-top: 20px;">
-    <label style="display:block; margin-bottom: 10px; font-weight: bold; color: #00d2ff;">📝 أسئلة التقديم (سؤال في كل سطر):</label>
-    <textarea name="questions" rows="5" placeholder="مثلاً:&#10;ما هو اسمك؟&#10;كم عمرك؟&#10;لماذا تريد الانضمام؟" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px;"></textarea>
-    <p style="font-size: 11px; color: #aaa; margin-top: 5px;">اكتب كل سؤال في سطر جديد. سيقوم البوت بسؤالها للمتقدم واحداً تلو الآخر.</p>
-</div>
-
                 ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
             </select>
-            <label>قناة النتائج:</label>
-            <select name="resultsChannelId">
+
+            <label>قناة النتائج (الروم اللي يوصل فيه التقديم):</label>
+            <select name="resultsChannelId" required>
                 <option value="">-- اختر القناة --</option>
                 ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
             </select>
-            <button class="btn-save">💾 إضافة الكلان</button>
+
+            <div style="margin-top: 20px; padding: 15px; background: rgba(88, 101, 242, 0.05); border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2);">
+                <label style="display:block; margin-bottom: 10px; font-weight: bold; color: #00d2ff;">📝 أسئلة التقديم (سؤال في كل سطر):</label>
+                <textarea name="questions" rows="5" placeholder="مثلاً:&#10;ما هو اسمك؟&#10;كم عمرك؟&#10;لماذا تريد الانضمام؟" style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px;"></textarea>
+                <p style="font-size: 11px; color: #aaa; margin-top: 5px;">⚠️ اكتب كل سؤال في سطر جديد. سيقوم البوت بسؤالها للمتقدم واحداً تلو الآخر.</p>
+            </div>
+
+            <button type="submit" class="btn-save" style="margin-top: 20px; background: linear-gradient(45deg, #5865F2, #7289da);">💾 حفظ وإضافة الكلان</button>
         </div>
     </form>`;
 
     res.send(ui(g, 'clans', content));
 });
-
 app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { clanName, leaderId, roleId, resultsChannelId, clanIndex } = req.body;
-        await Clan.create({ guildId, clanName, leaderId, roleId, resultsChannelId, clanIndex: parseInt(clanIndex), members: [], assistantIds: [] });
+        const { clanName, leaderId, roleId, resultsChannelId, clanIndex, questions } = req.body;
+
+        // تحويل الأسئلة من نص طويل إلى قائمة (Array) مع تنظيف السطور الفارغة
+        const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== "") : [];
+
+        await Clan.create({ 
+            guildId, 
+            clanName, 
+            leaderId, 
+            roleId, 
+            resultsChannelId, 
+            clanIndex: parseInt(clanIndex), 
+            questions: questionsArray, // ✅ حفظ الأسئلة هنا
+            members: [], 
+            assistantIds: [] 
+        });
+
         res.redirect(`/manage/${guildId}/clans`);
     } catch (err) {
-        console.error("Clan Save Error:", err);
-        res.status(500).send("خطأ في إضافة الكلان");
+        console.error("❌ Clan Save Error:", err);
+        res.status(500).send("خطأ في إضافة الكلان، تأكد من إدخال البيانات بشكل صحيح");
     }
 });
+
 
 app.get('/manage/:guildId/clans/delete/:index', checkAuth, async (req, res) => {
     await Clan.deleteOne({ guildId: req.params.guildId, clanIndex: parseInt(req.params.index) });
