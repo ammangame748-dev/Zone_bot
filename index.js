@@ -166,22 +166,19 @@ const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
     ended: { type: Boolean, default: false }
 }));
 
-const Clan = mongoose.model('Clan', new mongoose.Schema({
-    assistantIds: [String],
+const clanSchema = new mongoose.Schema({
     guildId: String,
-    clanIndex: Number,
     clanName: String,
-    roleId: String,
+    clanIndex: Number,
     leaderId: String,
-    assistantId: String,
-    points: { type: Number, default: 0 },
-    applyChannel: String,
-    applyMessage: String,
-    textChannelId: String,
-    voiceChannelId: String,
-    resultsChannelId: String,  // FIX: إزالة التكرار (كان موجود مرتين)
-    members: [String]
-}));
+    roleId: String,
+    resultsChannelId: String,
+    members: Array,
+    assistantIds: Array,
+    // ✅ ضف هذا الحقل للأسئلة
+    questions: { type: [String], default: ["ما هو اسمك؟", "كم عمرك؟", "لماذا تريد الانضمام؟"] }
+});
+
 
 const ClanMember = mongoose.model('ClanMember', new mongoose.Schema({
     guildId: String,
@@ -842,6 +839,8 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
             <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
             <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
             <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
+<label style="display:block; margin-top:10px;">📝 أسئلة التقديم (سؤال في كل سطر):</label>
+<textarea name="questions" rows="5" placeholder="ما هو اسمك؟&#10;كم عمرك؟" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid #5865F2; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px;"></textarea>
 
             <button type="submit" class="btn-save" style="margin-top: 20px;">💾 حفظ التصميم النهائي</button>
         </div>
@@ -1527,12 +1526,14 @@ app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { clanName, leaderId, roleId, resultsChannelId } = req.body;
+const questionsArray = req.body.questions ? req.body.questions.split('\n').filter(q => q.trim() !== "") : [];
 
         // ✅ FIX: احسب الـ index من السيرفر مباشرة لتجنب أي تلاعب أو تكرار
         const lastClan = await Clan.findOne({ guildId }).sort({ clanIndex: -1 });
         const clanIndex = lastClan ? lastClan.clanIndex + 1 : 0;
 
-        await Clan.create({ guildId, clanName, leaderId, roleId, resultsChannelId, clanIndex, members: [], assistantIds: [] });
+        await Clan.create({ questions: questionsArray,
+guildId, clanName, leaderId, roleId, resultsChannelId, clanIndex, members: [], assistantIds: [] });
         res.redirect(`/manage/${guildId}/clans`);
     } catch (err) {
         console.error("Clan Save Error:", err);
@@ -2876,6 +2877,52 @@ setInterval(async () => {
         });
     });
 }, 60000);
+async function sendClanApplyEmbed(channel, clan) {
+    const embed = new EmbedBuilder()
+        .setTitle(`🛡️ نظام التقديم | ${clan.clanName}`)
+        .setDescription("اضغط على الزر أدناه لفتح تذكرة تقديم والإجابة على الأسئلة.")
+        .setColor('#5865F2');
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`apply_clan_${clan._id}`).setLabel('تقديم الآن').setStyle(ButtonStyle.Success)
+    );
+    await channel.send({ embeds: [embed], components: [row] });
+}
+
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton()) return;
+    if (interaction.customId.startsWith('apply_clan_')) {
+        const clanId = interaction.customId.replace('apply_clan_', '');
+        const clan = await Clan.findById(clanId);
+        const thread = await interaction.channel.threads.create({
+            name: `تقديم-${clan.clanName}-${interaction.user.username}`,
+            autoArchiveDuration: 60,
+            type: 11,
+        });
+        await thread.members.add(interaction.user.id);
+        await interaction.reply({ content: `تم فتح قناة التقديم: ${thread}`, ephemeral: true });
+        askNextQuestion(thread, interaction.user, clan, 0);
+    }
+    if (interaction.customId.startsWith('conf_')) {
+        const [_, status, clanId, qIndex] = interaction.customId.split('_');
+        const clan = await Clan.findById(clanId);
+        await interaction.message.delete();
+        if (status === 'yes') askNextQuestion(interaction.channel, interaction.user, clan, parseInt(qIndex) + 1);
+        else askNextQuestion(interaction.channel, interaction.user, clan, parseInt(qIndex));
+    }
+});
+
+async function askNextQuestion(thread, user, clan, index) {
+    if (index >= clan.questions.length) return thread.send(`✅ تم الانتهاء!`);
+    await thread.send(`**السؤال (${index + 1}):** ${clan.questions[index]}`);
+    const collector = thread.createMessageCollector({ filter: m => m.author.id === user.id, max: 1, time: 300000 });
+    collector.on('collect', async m => {
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`conf_yes_${clan._id}_${index}`).setLabel('✅ تأكيد').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`conf_no_${clan._id}_${index}`).setLabel('❌ إعادة').setStyle(ButtonStyle.Danger)
+        );
+        await thread.send({ content: `إجابتك: **${m.content}**\nهل تريد التأكيد؟`, components: [row] });
+    });
+}
 
 // ==========================================
 // 1️⃣8️⃣ Startup
