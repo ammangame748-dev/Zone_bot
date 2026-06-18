@@ -91,6 +91,10 @@ const JailData = mongoose.model('JailData', new mongoose.Schema({
 // FIX: تم إضافة الحقول الناقصة (rolesPanel, rolesChannel, bannerURL) للـ Schema
 const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
     guildId: String,
+    autoReply: [{
+    trigger: String,
+    reply: String
+}],
     security: {
         antiLinks: Boolean,
         badWords: String,
@@ -216,6 +220,8 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
 // 2️⃣ Express App Setup
 // ==========================================
 const app = express();
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
