@@ -2711,11 +2711,23 @@ async function openTicket(interaction, config, type) {
             ],
         });
 
-        const embed = new EmbedBuilder()
-            .setTitle("🎫 تذكرتك الجديدة")
-            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: **${type}**`)
-            .setColor(config.color || "#5865F2")
-            .setTimestamp();
+// 1. تجهيز وتنظيف كود اللون أولاً
+let embedColor = config.color || "#5865F2";
+if (typeof embedColor === 'string') {
+    embedColor = embedColor.trim();
+    // إصلاح مشكلة الهاشتاج إذا كان في النهاية
+    if (embedColor.endsWith('#')) embedColor = '#' + embedColor.slice(0, -1);
+    // التأكد أن اللون يبدأ بهاشتاج واحد فقط
+    if (!embedColor.startsWith('#')) embedColor = '#' + embedColor;
+}
+
+// 2. بناء الإيمباد باستخدام اللون الجاهز
+const embed = new EmbedBuilder()
+    .setTitle("🎫 تذكرتك الجديدة")
+    .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: **${type}**`)
+    .setColor(embedColor) // استخدام اللون بعد تنظيفه
+    .setTimestamp();
+
 
         const controlRow = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
