@@ -2095,6 +2095,7 @@ client.on('guildMemberAdd', async (member) => {
 
         ctx.save();
         ctx.beginPath();
+        // استخدام ellipse لرسم شكل بيضاوي (يدعم المط)
         ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
@@ -2113,18 +2114,21 @@ client.on('guildMemberAdd', async (member) => {
         // تحويل الصورة لـ Attachment
         const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
         
-        // تجهيز نص الرسالة
-        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!")
-            .replace('{member}', `<@${member.id}>`)
-            .replace('{guild}', member.guild.name)
-            .replace('{count}', member.guild.memberCount);
+        // --- [ إصلاح تبديل النصوص ] ---
+        let welcomeMsg = config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!";
+        
+        // نستخدم RegExp مع 'g' لتبديل كل الكلمات المتكررة
+        welcomeMsg = welcomeMsg
+            .replace(/{member}/g, `<@${member.id}>`)
+            .replace(/{guild}/g, member.guild.name)
+            .replace(/{count}/g, member.guild.memberCount.toString());
 
         // --- [ إنشاء الـ Embed ] ---
         const welcomeEmbed = new EmbedBuilder()
             .setTitle(`✨ عضو جديد انضم إلينا!`)
             .setDescription(welcomeMsg)
             .setColor('#5865F2')
-            .setImage('attachment://welcome-image.png') // وضع الصورة داخل الإيمباد
+            .setImage('attachment://welcome-image.png') 
             .setTimestamp()
             .setFooter({ text: `Zone System • العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
@@ -2135,6 +2139,7 @@ client.on('guildMemberAdd', async (member) => {
         console.error("Welcome Error:", err);
     }
 });
+
 
 
 client.on('guildMemberRemove', async (member) => {
