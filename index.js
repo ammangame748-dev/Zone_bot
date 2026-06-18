@@ -124,10 +124,11 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         channel: String,
         embedMessage: { type: String, default: "مرحباً بك {member} في سيرفر {guild}! ✨" },
         imagePath: String,
-        aiPrompt: String,
-        bannerURL: String  // FIX: إضافة bannerURL اللي كانت ناقصة
+        avatarX: { type: Number, default: 50 }, // الإحداثي الأفقي
+        avatarY: { type: Number, default: 50 }, // الإحداثي الرأسي
+        avatarSize: { type: Number, default: 150 }, // حجم الدائرة
+        bannerURL: String
     },
-    autoReply: [{ trigger: String, reply: String }]
 }));
 
 const Stats = mongoose.model('Stats', new mongoose.Schema({
@@ -749,50 +750,94 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
 
-    let img = 'https://placehold.co/480x200?text=No+Image';
-    if (s.welcome?.imagePath) {
-        img = s.welcome.imagePath.startsWith('http') ? s.welcome.imagePath : `/uploads/${path.basename(s.welcome.imagePath)}`;
-    }
+    let img = s.welcome?.imagePath || 'https://placehold.co/800x400?text=No+Background';
 
     let content = `
     <div class="card">
-        <h3>🎨 لوحة تحكم الترحيب الذكي</h3>
+        <h3>🎨 لوحة تحكم الترحيب الاحترافية</h3>
     </div>
-    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
+    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" id="welcomeForm">
         <div class="card">
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
                     <label>📍 قناة الترحيب:</label>
                     <select name="channel" required>
-                        <option value="">-- اختر روم الترحيب --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                            `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
-                        ).join('')}
+                        ${g.channels.cache.filter(c => c.type === 0 ).map(c => `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
                     </select>
                 </div>
                 <div>
-                    <label>🔔 تشغيل النظام:</label>
+                    <label>🔔 الحالة:</label>
                     <select name="enabled">
                         <option value="on" ${s.welcome?.enabled ? 'selected' : ''}>🟢 مشغل</option>
                         <option value="off" ${!s.welcome?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
                     </select>
                 </div>
             </div>
-            <label>💬 رسالة الترحيب:</label>
-            <textarea name="embedMessage" rows="3">${s.welcome?.embedMessage || ''}</textarea>
-            <small style="color: #00d2ff; display:block; margin-top:-5px; margin-bottom:20px;">
-                * اختصارات: <b>{member}</b> لمنشن العضو، <b>{guild}</b> لاسم السيرفر، <b>{count}</b> لعدد الأعضاء.
-            </small>
-            <label>📁 رفع صورة خلفية:</label>
-            <input type="file" name="welcomeImage" accept="image/*">
-            <div style="text-align: center; margin-top: 20px;">
-                <p style="color: #aaa; font-size: 14px;">🖼️ الصورة الحالية:</p>
-                <img src="${img}" style="width: 100%; max-width: 480px; border-radius: 12px; border: 2px solid var(--p);">
-            </div>
-            <button type="submit" class="btn-save" style="margin-top: 30px;">💾 حفظ إعدادات الترحيب</button>
-        </div>
-    </form>`;
 
+            <label style="margin-top:20px;">💬 الرسالة:</label>
+            <textarea name="embedMessage" rows="2">${s.welcome?.embedMessage || ''}</textarea>
+
+            <div style="margin-top:20px; display: flex; gap: 10px; align-items: center;">
+                <label style="margin:0;">🖼️ خلفية الترحيب:</label>
+                <input type="file" name="welcomeImage" accept="image/*" style="width: auto;">
+                <button type="button" onclick="generateRandomBg()" class="btn-save" style="width:auto; padding:5px 15px; background:#00d2ff; font-size:12px;">🎲 توليد صورة عشوائية</button>
+                <input type="hidden" name="remoteBg" id="remoteBg">
+            </div>
+
+            <!-- لوحة التحكم بالمكان -->
+            <div style="margin-top:30px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px;">
+                <div style="position: relative; border: 2px solid #5865F2; border-radius: 10px; overflow: hidden; background: #000;">
+                    <img src="${img}" id="previewBg" style="width: 100%; display: block; opacity: 0.6;">
+                    <div id="previewAvatar" style="position: absolute; width: 60px; height: 60px; border: 2px solid #fff; border-radius: 50%; background: url('${client.user.displayAvatarURL()}'); background-size: cover; left: ${s.welcome?.avatarX || 50}%; top: ${s.welcome?.avatarY || 50}%; transform: translate(-50%, -50%); box-shadow: 0 0 15px rgba(255,255,255,0.5);"></div>
+                </div>
+                
+                <div style="text-align: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
+                    <p style="margin-bottom: 10px; font-weight: bold; color: #00d2ff;">🎮 تحكم بمكان الصورة</p>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 150px; margin: 0 auto;">
+                        <div></div><button type="button" onclick="move('up')" class="btn-save" style="padding:10px;">⬆️</button><div></div>
+                        <button type="button" onclick="move('left')" class="btn-save" style="padding:10px;">⬅️</button>
+                        <button type="button" onclick="move('center')" class="btn-save" style="padding:10px; background:#5865F2;">🎯</button>
+                        <button type="button" onclick="move('right')" class="btn-save" style="padding:10px;">➡️</button>
+                        <div></div><button type="button" onclick="move('down')" class="btn-save" style="padding:10px;">⬇️</button><div></div>
+                    </div>
+                    <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
+                    <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
+                    <p style="font-size: 12px; color: #aaa; margin-top: 10px;">استخدم الأزرار لتحريك صورة العضو</p>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-save" style="margin-top: 30px;">💾 حفظ الإعدادات</button>
+        </div>
+    </form>
+
+    <script>
+        function move(dir) {
+            let x = parseInt(document.getElementById('avatarX').value);
+            let y = parseInt(document.getElementById('avatarY').value);
+            if(dir === 'up') y -= 5;
+            if(dir === 'down') y += 5;
+            if(dir === 'left') x -= 5;
+            if(dir === 'right') x += 5;
+            if(dir === 'center') { x = 50; y = 50; }
+            
+            x = Math.max(0, Math.min(100, x));
+            y = Math.max(0, Math.min(100, y));
+            
+            document.getElementById('avatarX').value = x;
+            document.getElementById('avatarY').value = y;
+            document.getElementById('previewAvatar').style.left = x + '%';
+            document.getElementById('previewAvatar').style.top = y + '%';
+        }
+
+        function generateRandomBg() {
+            const randomId = Math.floor(Math.random() * 1000);
+            const url = 'https://picsum.photos/seed/' + randomId + '/800/400';
+            document.getElementById('previewBg' ).src = url;
+            document.getElementById('remoteBg').value = url;
+            alert('تم توليد خلفية عشوائية! لا تنسى الضغط على حفظ.');
+        }
+    </script>
+    `;
     res.send(ui(g, 'welcome', content));
 });
 
@@ -805,19 +850,23 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
             'welcome.enabled': b.enabled === 'on',
             'welcome.channel': b.channel,
             'welcome.embedMessage': b.embedMessage,
+            'welcome.avatarX': parseInt(b.avatarX) || 50,
+            'welcome.avatarY': parseInt(b.avatarY) || 50
         };
 
         if (req.file) {
             updateData['welcome.imagePath'] = req.file.path;
+        } else if (b.remoteBg) {
+            updateData['welcome.imagePath'] = b.remoteBg;
         }
 
-        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true, new: true });
+        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true });
         res.redirect(`/manage/${guildId}/welcome`);
     } catch (err) {
-        console.error("❌ Welcome Save Error:", err);
-        res.status(500).send(`حدث خطأ: ${err.message}`);
+        res.status(500).send("خطأ في الحفظ");
     }
 });
+
 
 // --- [ Auto Reply ] ---
 app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
@@ -1379,17 +1428,34 @@ app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'clans', content));
 });
+app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { clanName, leaderId, roleId, resultsChannelId } = req.body;
+
+        // ✅ FIX: احسب الـ index من السيرفر مباشرة لتجنب أي تلاعب أو تكرار
+        const lastClan = await Clan.findOne({ guildId }).sort({ clanIndex: -1 });
+        const clanIndex = lastClan ? lastClan.clanIndex + 1 : 0;
+
+        await Clan.create({ guildId, clanName, leaderId, roleId, resultsChannelId, clanIndex, members: [], assistantIds: [] });
+        res.redirect(`/manage/${guildId}/clans`);
+    } catch (err) {
+        console.error("Clan Save Error:", err);
+        res.status(500).send("خطأ في إضافة الكلان");
+    }
+});
 
 app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    const existingCount = await Clan.countDocuments({ guildId: g.id });
+    const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
+const nextIndex = lastClan ? lastClan.clanIndex + 1 : 0;
 
     const content = `
     <form method="POST" action="/save/${g.id}/clans">
         <div class="card">
             <h3>🚩 إضافة كلان جديد</h3>
-            <input type="hidden" name="clanIndex" value="${existingCount}">
+            <input type="hidden" name="clanIndex" value="${nextIndex}">
             <label>اسم الكلان:</label>
             <input name="clanName" required placeholder="اسم الكلان">
             <label>القائد (ID):</label>
@@ -1913,52 +1979,62 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
 });
 
 client.on('guildMemberAdd', async (member) => {
-    // Log
-    const embed = new EmbedBuilder()
-        .setTitle("✅ عضو انضم")
-        .setColor("Green")
-        .setThumbnail(member.user.displayAvatarURL())
-        .addFields(
-            { name: "👤 العضو", value: `${member.user.tag} (<@${member.id}>)`, inline: true },
-            { name: "🔢 عدد الأعضاء", value: `${member.guild.memberCount}`, inline: true }
-        )
-        .setTimestamp();
-    await sendLog(member.guild, 'members', embed);
-    await Stats.findOneAndUpdate({ guildId: member.guild.id }, { $push: { "membersLog.joined": new Date() } }, { upsert: true });
-
-    // Welcome Message
     const config = await GuildConfig.findOne({ guildId: member.guild.id });
     if (!config?.welcome?.enabled || !config.welcome.channel) return;
 
     const welcomeChannel = member.guild.channels.cache.get(config.welcome.channel);
     if (!welcomeChannel) return;
 
-    const rawMsg = config.welcome.embedMessage || "مرحباً بك {member} في سيرفر {guild}! ✨";
-    const welcomeMsg = rawMsg
-        .replace('{member}', `<@${member.id}>`)
-        .replace('{guild}', member.guild.name)
-        .replace('{count}', member.guild.memberCount);
+    try {
+        // إعداد الـ Canvas
+        const canvas = createCanvas(800, 400);
+        const ctx = canvas.getContext('2d');
 
-    const welcomeEmbed = new EmbedBuilder()
-        .setTitle(`🎉 مرحباً في ${member.guild.name}`)
-        .setDescription(welcomeMsg)
-        .setColor('#5865F2')
-        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-        .setTimestamp();
+        // تحميل الخلفية
+        let bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400?text=Welcome';
+        const background = await loadImage(bgUrl );
+        ctx.drawImage(background, 0, 0, 800, 400);
 
-    const files = [];
-    if (config.welcome.imagePath) {
-        const imgPath = config.welcome.imagePath.startsWith('http') ? config.welcome.imagePath : config.welcome.imagePath;
-        if (!imgPath.startsWith('http') && fs.existsSync(imgPath)) {
-            const imgName = path.basename(imgPath);
-            files.push(new AttachmentBuilder(imgPath, { name: imgName }));
-            welcomeEmbed.setImage(`attachment://${imgName}`);
-        } else if (imgPath.startsWith('http')) {
-            welcomeEmbed.setImage(imgPath);
-        }
+        // إضافة طبقة تظليل خفيفة (اختياري لجمالية الصورة)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(0, 0, 800, 400);
+
+        // رسم صورة العضو (دائرة)
+        const avatarSize = 150;
+        const x = (config.welcome.avatarX / 100) * 800;
+        const y = (config.welcome.avatarY / 100) * 400;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, avatarSize / 2, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.clip();
+
+        const avatar = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 256 }));
+        ctx.drawImage(avatar, x - (avatarSize / 2), y - (avatarSize / 2), avatarSize, avatarSize);
+        
+        ctx.restore();
+
+        // إضافة إطار أبيض للدائرة
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(x, y, avatarSize / 2, 0, Math.PI * 2, true);
+        ctx.stroke();
+
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome.png' });
+        
+        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member}!")
+            .replace('{member}', `<@${member.id}>`)
+            .replace('{guild}', member.guild.name)
+            .replace('{count}', member.guild.memberCount);
+
+        welcomeChannel.send({ content: welcomeMsg, files: [attachment] });
+
+    } catch (err) {
+        console.error("Canvas Error:", err);
+        welcomeChannel.send(`مرحباً <@${member.id}> في السيرفر! ✨`);
     }
-
-    welcomeChannel.send({ embeds: [welcomeEmbed], files }).catch(() => { });
 });
 
 client.on('guildMemberRemove', async (member) => {
