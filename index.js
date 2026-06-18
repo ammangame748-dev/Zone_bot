@@ -124,9 +124,10 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         channel: String,
         embedMessage: { type: String, default: "مرحباً بك {member} في سيرفر {guild}! ✨" },
         imagePath: String,
-        avatarX: { type: Number, default: 50 }, // الإحداثي الأفقي
-        avatarY: { type: Number, default: 50 }, // الإحداثي الرأسي
-        avatarSize: { type: Number, default: 150 }, // حجم الدائرة
+        avatarX: { type: Number, default: 50 },
+        avatarY: { type: Number, default: 50 },
+        avatarSize: { type: Number, default: 150 }, // حقل جديد للحجم
+        aiPrompt: { type: String, default: "Anime style landscape, forest, sun light, high quality" }, // حقل جديد للوصف
         bannerURL: String
     },
 }));
@@ -744,7 +745,6 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     res.redirect(`/manage/${req.params.guildId}/logs`);
 });
 
-// --- [ Welcome ] ---
 app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
@@ -754,15 +754,15 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
     let content = `
     <div class="card">
-        <h3>🎨 لوحة تحكم الترحيب الاحترافية</h3>
+        <h3>🎨 صانع صور الترحيب بالذكاء الاصطناعي (AI )</h3>
     </div>
-    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" id="welcomeForm">
+    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
         <div class="card">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div>
                     <label>📍 قناة الترحيب:</label>
                     <select name="channel" required>
-                        ${g.channels.cache.filter(c => c.type === 0 ).map(c => `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
+                        ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
                     </select>
                 </div>
                 <div>
@@ -774,39 +774,44 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                 </div>
             </div>
 
-            <label style="margin-top:20px;">💬 الرسالة:</label>
-            <textarea name="embedMessage" rows="2">${s.welcome?.embedMessage || ''}</textarea>
-
-            <div style="margin-top:20px; display: flex; gap: 10px; align-items: center;">
-                <label style="margin:0;">🖼️ خلفية الترحيب:</label>
-                <input type="file" name="welcomeImage" accept="image/*" style="width: auto;">
-                <button type="button" onclick="generateRandomBg()" class="btn-save" style="width:auto; padding:5px 15px; background:#00d2ff; font-size:12px;">🎲 توليد صورة عشوائية</button>
-                <input type="hidden" name="remoteBg" id="remoteBg">
+            <label>💬 وصف الصورة (بالإنجليزي) ليقوم الـ AI بصناعتها:</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="aiPromptInput" name="aiPrompt" value="${s.welcome?.aiPrompt || ''}" placeholder="مثلاً: Cyberpunk city, neon lights, welcome background" style="flex:1;">
+                <button type="button" onclick="generateAIImage()" class="btn-save" style="width:auto; background:#7b2ff7;">🚀 توليد بالـ AI</button>
             </div>
+            <input type="hidden" name="remoteBg" id="remoteBg">
 
-            <!-- لوحة التحكم بالمكان -->
             <div style="margin-top:30px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px;">
-                <div style="position: relative; border: 2px solid #5865F2; border-radius: 10px; overflow: hidden; background: #000;">
-                    <img src="${img}" id="previewBg" style="width: 100%; display: block; opacity: 0.6;">
-                    <div id="previewAvatar" style="position: absolute; width: 60px; height: 60px; border: 2px solid #fff; border-radius: 50%; background: url('${client.user.displayAvatarURL()}'); background-size: cover; left: ${s.welcome?.avatarX || 50}%; top: ${s.welcome?.avatarY || 50}%; transform: translate(-50%, -50%); box-shadow: 0 0 15px rgba(255,255,255,0.5);"></div>
+                <div style="position: relative; border: 2px solid #5865F2; border-radius: 10px; overflow: hidden; background: #000; aspect-ratio: 2/1;">
+                    <img src="${img}" id="previewBg" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.7;">
+                    <div id="previewAvatar" style="position: absolute; width: ${s.welcome?.avatarSize || 150}px; height: ${s.welcome?.avatarSize || 150}px; border: 3px solid #fff; border-radius: 50%; background: url('${client.user.displayAvatarURL()}'); background-size: cover; left: ${s.welcome?.avatarX || 50}%; top: ${s.welcome?.avatarY || 50}%; transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(0,0,0,0.8);"></div>
                 </div>
                 
-                <div style="text-align: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                    <p style="margin-bottom: 10px; font-weight: bold; color: #00d2ff;">🎮 تحكم بمكان الصورة</p>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 150px; margin: 0 auto;">
-                        <div></div><button type="button" onclick="move('up')" class="btn-save" style="padding:10px;">⬆️</button><div></div>
-                        <button type="button" onclick="move('left')" class="btn-save" style="padding:10px;">⬅️</button>
-                        <button type="button" onclick="move('center')" class="btn-save" style="padding:10px; background:#5865F2;">🎯</button>
-                        <button type="button" onclick="move('right')" class="btn-save" style="padding:10px;">➡️</button>
-                        <div></div><button type="button" onclick="move('down')" class="btn-save" style="padding:10px;">⬇️</button><div></div>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; text-align: center;">
+                    <p style="color: #00d2ff; font-weight: bold; margin-bottom:15px;">🎮 التحكم المتقدم</p>
+                    
+                    <label style="font-size:12px;">المكان (X, Y):</label>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 120px; margin: 0 auto 15px;">
+                        <div></div><button type="button" onclick="move('up')" class="btn-save" style="padding:5px;">⬆️</button><div></div>
+                        <button type="button" onclick="move('left')" class="btn-save" style="padding:5px;">⬅️</button>
+                        <button type="button" onclick="move('center')" class="btn-save" style="padding:5px; background:#5865F2;">🎯</button>
+                        <button type="button" onclick="move('right')" class="btn-save" style="padding:5px;">➡️</button>
+                        <div></div><button type="button" onclick="move('down')" class="btn-save" style="padding:5px;">⬇️</button><div></div>
                     </div>
+
+                    <label style="font-size:12px;">الحجم (Size):</label>
+                    <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 15px;">
+                        <button type="button" onclick="changeSize(-10)" class="btn-save" style="width:40px; background:#ff4757;">➖</button>
+                        <button type="button" onclick="changeSize(10)" class="btn-save" style="width:40px; background:#00ff88;">➕</button>
+                    </div>
+
                     <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
                     <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
-                    <p style="font-size: 12px; color: #aaa; margin-top: 10px;">استخدم الأزرار لتحريك صورة العضو</p>
+                    <input type="hidden" name="avatarSize" id="avatarSize" value="${s.welcome?.avatarSize || 150}">
                 </div>
             </div>
 
-            <button type="submit" class="btn-save" style="margin-top: 30px;">💾 حفظ الإعدادات</button>
+            <button type="submit" class="btn-save" style="margin-top: 30px;">💾 حفظ وتثبيت التصميم</button>
         </div>
     </form>
 
@@ -814,27 +819,52 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
         function move(dir) {
             let x = parseInt(document.getElementById('avatarX').value);
             let y = parseInt(document.getElementById('avatarY').value);
-            if(dir === 'up') y -= 5;
-            if(dir === 'down') y += 5;
-            if(dir === 'left') x -= 5;
-            if(dir === 'right') x += 5;
+            if(dir === 'up') y -= 2;
+            if(dir === 'down') y += 2;
+            if(dir === 'left') x -= 2;
+            if(dir === 'right') x += 2;
             if(dir === 'center') { x = 50; y = 50; }
-            
-            x = Math.max(0, Math.min(100, x));
-            y = Math.max(0, Math.min(100, y));
-            
             document.getElementById('avatarX').value = x;
             document.getElementById('avatarY').value = y;
-            document.getElementById('previewAvatar').style.left = x + '%';
-            document.getElementById('previewAvatar').style.top = y + '%';
+            updatePreview();
         }
 
-        function generateRandomBg() {
-            const randomId = Math.floor(Math.random() * 1000);
-            const url = 'https://picsum.photos/seed/' + randomId + '/800/400';
+        function changeSize(amt) {
+            let size = parseInt(document.getElementById('avatarSize').value);
+            size += amt;
+            size = Math.max(50, Math.min(300, size));
+            document.getElementById('avatarSize').value = size;
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const av = document.getElementById('previewAvatar');
+            const x = document.getElementById('avatarX').value;
+            const y = document.getElementById('avatarY').value;
+            const size = document.getElementById('avatarSize').value;
+            av.style.left = x + '%';
+            av.style.top = y + '%';
+            av.style.width = size + 'px';
+            av.style.height = size + 'px';
+        }
+
+        async function generateAIImage() {
+            const prompt = document.getElementById('aiPromptInput').value;
+            if(!prompt) return alert('اكتب وصف للصورة أولاً!');
+            
+            const btn = event.target;
+            btn.innerText = '⏳ جارٍ التوليد...';
+            btn.disabled = true;
+
+            // استخدام Pollinations AI للتوليد (مجاني وسريع)
+            const encodedPrompt = encodeURIComponent(prompt + " , high resolution, digital art, no text");
+            const url = 'https://image.pollinations.ai/prompt/' + encodedPrompt + '?width=800&height=400&nologo=true';
+            
             document.getElementById('previewBg' ).src = url;
             document.getElementById('remoteBg').value = url;
-            alert('تم توليد خلفية عشوائية! لا تنسى الضغط على حفظ.');
+            
+            btn.innerText = '🚀 توليد بالـ AI';
+            btn.disabled = false;
         }
     </script>
     `;
@@ -851,7 +881,9 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
             'welcome.channel': b.channel,
             'welcome.embedMessage': b.embedMessage,
             'welcome.avatarX': parseInt(b.avatarX) || 50,
-            'welcome.avatarY': parseInt(b.avatarY) || 50
+            'welcome.avatarY': parseInt(b.avatarY) || 50,
+            'welcome.avatarSize': parseInt(b.avatarSize) || 150,
+            'welcome.aiPrompt': b.aiPrompt
         };
 
         if (req.file) {
@@ -866,6 +898,7 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), asy
         res.status(500).send("خطأ في الحفظ");
     }
 });
+
 
 
 // --- [ Auto Reply ] ---
@@ -1977,7 +2010,6 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
 
     await sendLog(oldMsg.guild, 'messages', embed);
 });
-
 client.on('guildMemberAdd', async (member) => {
     const config = await GuildConfig.findOne({ guildId: member.guild.id });
     if (!config?.welcome?.enabled || !config.welcome.channel) return;
@@ -1986,38 +2018,39 @@ client.on('guildMemberAdd', async (member) => {
     if (!welcomeChannel) return;
 
     try {
-        // إعداد الـ Canvas
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
 
-        // تحميل الخلفية
+        // تحميل الخلفية (سواء كانت مرفوعة أو مولدة بالـ AI)
         let bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400?text=Welcome';
         const background = await loadImage(bgUrl );
         ctx.drawImage(background, 0, 0, 800, 400);
 
-        // إضافة طبقة تظليل خفيفة (اختياري لجمالية الصورة)
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        // تظليل خفيف للخلفية عشان تبرز صورة العضو
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.fillRect(0, 0, 800, 400);
 
-        // رسم صورة العضو (دائرة)
-        const avatarSize = 150;
+        // إحداثيات وحجم صورة العضو من قاعدة البيانات
+        const avatarSize = config.welcome.avatarSize || 150;
         const x = (config.welcome.avatarX / 100) * 800;
         const y = (config.welcome.avatarY / 100) * 400;
 
+        // رسم الدائرة المقصوصة
         ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, avatarSize / 2, 0, Math.PI * 2, true);
         ctx.closePath();
         ctx.clip();
 
-        const avatar = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 256 }));
+        const avatar = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 512 }));
         ctx.drawImage(avatar, x - (avatarSize / 2), y - (avatarSize / 2), avatarSize, avatarSize);
-        
         ctx.restore();
 
-        // إضافة إطار أبيض للدائرة
+        // رسم إطار مضيء للدائرة
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 6;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
         ctx.beginPath();
         ctx.arc(x, y, avatarSize / 2, 0, Math.PI * 2, true);
         ctx.stroke();
@@ -2033,9 +2066,9 @@ client.on('guildMemberAdd', async (member) => {
 
     } catch (err) {
         console.error("Canvas Error:", err);
-        welcomeChannel.send(`مرحباً <@${member.id}> في السيرفر! ✨`);
     }
 });
+
 
 client.on('guildMemberRemove', async (member) => {
     const embed = new EmbedBuilder()
