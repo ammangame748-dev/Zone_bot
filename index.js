@@ -2650,45 +2650,50 @@ client.once('ready', async () => {
         console.error('❌ Error registering slash commands:', err);
     }
 });
-
 // ==========================================
 // 1️⃣4️⃣ Kick.com Live Checker (Polling)
 // ==========================================
+// ملاحظة: موقع Kick محمي بـ Cloudflare، إذا لم يعمل الكود ستحتاج لاستخدام Scraper API أو Proxy
 setInterval(async () => {
-    const allConfigs = await KickConfig.find({});
-    for (const config of allConfigs) {
-        const guild = client.guilds.cache.get(config.guildId);
-        if (!guild) continue;
+    try {
+        const allConfigs = await KickConfig.find({});
+        for (const config of allConfigs) {
+            const guild = client.guilds.cache.get(config.guildId);
+            if (!guild) continue;
 
-        for (const streamer of config.streamers) {
-            try {
-                const response = await axios.get(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
-                    headers: { 'Accept': 'application/json' },
-                    timeout: 5000
-                });
-                const isLive = response.data?.livestream !== null && response.data?.livestream !== undefined;
+            for (const streamer of config.streamers) {
+                try {
+                    // استخدام Browser User-Agent لتجنب الحظر البسيط
+                    const response = await axios.get(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
+                        headers: { 
+                            'Accept': 'application/json',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64 ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+                        },
+                        timeout: 7000
+                    });
 
-                if (isLive && !streamer.isLive) {
-                    streamer.isLive = true;
-                    const channel = guild.channels.cache.get(streamer.channelId);
-                    if (channel) {
-                        const msg = (streamer.customMessage || '🔴 **%name%** بدأ البث الآن!').replace('%name%', streamer.kickUsername);
-                        const mention = streamer.roleId ? `<@&${streamer.roleId}> ` : '';
-                        channel.send(`${mention}${msg}\nhttps://kick.com/${streamer.kickUsername}`);
+                    const isLive = response.data?.livestream !== null && response.data?.livestream !== undefined;
+
+                    if (isLive && !streamer.isLive) {
+                        streamer.isLive = true;
+                        const channel = guild.channels.cache.get(streamer.channelId);
+                        if (channel) {
+                            const msg = (streamer.customMessage || '🔴 **%name%** بدأ البث الآن!').replace('%name%', streamer.kickUsername);
+                            const mention = streamer.roleId ? `<@&${streamer.roleId}> ` : '';
+                            channel.send(`${mention}${msg}\nhttps://kick.com/${streamer.kickUsername}` );
+                        }
+                    } else if (!isLive && streamer.isLive) {
+                        streamer.isLive = false;
                     }
-                } else if (!isLive && streamer.isLive) {
-                    streamer.isLive = false;
-                }
-            } catch (e) {
-                // Silently handle API errors
+                } catch (e) { /* تجاهل أخطاء API مؤقتاً */ }
             }
+            await config.save();
         }
-        await config.save();
-    }
-}, 60000);
+    } catch (err) { console.error("Kick Checker Error:", err); }
+}, 120000); // زيادة الوقت لـ 2 دقيقة لتجنب حظر الـ IP
 
 // ==========================================
-// 1️⃣5️⃣ Giveaway Checker
+// 1️⃣5️⃣ Giveaway Checker (إصلاح مشكلة الـ 100 فائز)
 // ==========================================
 setInterval(async () => {
     const now = new Date();
@@ -2697,157 +2702,117 @@ setInterval(async () => {
     for (const gw of endedGiveaways) {
         try {
             const guild = client.guilds.cache.get(gw.guildId);
-            if (!guild) continue;
-
-            const channel = guild.channels.cache.get(gw.channelId);
+            const channel = guild?.channels.cache.get(gw.channelId);
             if (!channel) continue;
 
             const message = await channel.messages.fetch(gw.messageId).catch(() => null);
-            if (!message) continue;
+            if (!message) {
+                gw.ended = true; await gw.save();
+                continue;
+            }
 
             const reaction = message.reactions.cache.get('🎉');
-            if (!reaction) continue;
+            if (!reaction) {
+                channel.send(`🎉 انتهى القيف اواي على **${gw.prize}** ولكن لم يتم العثور على تفاعلات!`);
+                gw.ended = true; await gw.save();
+                continue;
+            }
 
-            const users = await reaction.users.fetch();
-            const eligible = users.filter(u => !u.bot).map(u => u.id);
+            // جلب كل المستخدمين (حتى لو تجاوزوا 100)
+            let subscribers = [];
+            let lastUser = null;
+            while (true) {
+                const options = { limit: 100 };
+                if (lastUser) options.after = lastUser;
+                const fetchedUsers = await reaction.users.fetch(options);
+                if (fetchedUsers.size === 0) break;
+                subscribers.push(...fetchedUsers.filter(u => !u.bot).map(u => u.id));
+                lastUser = fetchedUsers.last().id;
+                if (fetchedUsers.size < 100) break;
+            }
 
-            if (eligible.length === 0) {
-                channel.send(`🎉 القيف اواي انتهى ولكن لم يشترك أحد! **${gw.prize}**`);
+            if (subscribers.length === 0) {
+                channel.send(`🎉 انتهى القيف اواي ولكن لم يشترك أحد! **${gw.prize}**`);
             } else {
                 const winners = [];
-                const shuffled = eligible.sort(() => Math.random() - 0.5);
-                for (let i = 0; i < Math.min(gw.winnersCount, shuffled.length); i++) {
-                    winners.push(`<@${shuffled[i]}>`);
+                for (let i = 0; i < Math.min(gw.winnersCount, subscribers.length); i++) {
+                    const randomIndex = Math.floor(Math.random() * subscribers.length);
+                    winners.push(`<@${subscribers.splice(randomIndex, 1)[0]}>`);
                 }
                 channel.send(`🎉 **انتهى القيف اواي!**\nالجائزة: **${gw.prize}**\nالفائزون: ${winners.join(', ')}`);
             }
 
             gw.ended = true;
             await gw.save();
-        } catch (err) {
-            console.error("Giveaway Error:", err);
-        }
+        } catch (err) { console.error("Giveaway Error:", err); }
     }
 }, 30000);
 
 // ==========================================
-// 1️⃣6️⃣ Streak Warning & Reset (Daily Check)
+// 1️⃣6️⃣ Streak Warning (تحسين الأداء)
 // ==========================================
 setInterval(async () => {
-    const allUsers = await UserLevel.find({});
-    for (const u of allUsers) {
-        if (!u.lastMessageDate) continue;
+    const now = Date.now();
+    const warnThreshold = now - (17 * 60 * 60 * 1000);
+    const resetThreshold = now - (24 * 60 * 60 * 1000);
 
-        const now = Date.now();
-        const last = new Date(u.lastMessageDate).getTime();
-        const diff = now - last;
-        const fullDay = 24 * 60 * 60 * 1000;
-        const warnTime = 17 * 60 * 60 * 1000;
+    // البحث فقط عن المستخدمين الذين يحتاجون لتنبيه أو تصفير (بدل جلب الكل)
+    const usersToWarn = await UserLevel.find({ 
+        warned: false, 
+        lastMessageDate: { $lte: new Date(warnThreshold), $gt: new Date(resetThreshold) } 
+    });
 
-        if (diff >= warnTime && diff < fullDay && !u.warned) {
-            const guild = client.guilds.cache.get(u.guildId);
-            if (!guild) continue;
-
-            try {
-                const member = await guild.members.fetch(u.userId).catch(() => null);
-                if (member) {
-                    const embed = new EmbedBuilder()
-                        .setTitle("⏰ تنبيه التفاعل اليومي")
-                        .setDescription(`أهلاً بك! متبقي **7 ساعات** فقط لتجديد تفاعلك اليومي.\n\n🔥 الستريك الحالي: **${u.streakCount}** يوم.\n\n💬 اكتب رسالة الآن للحفاظ على نشاطك!`)
-                        .setColor('#5865F2')
-                        .setFooter({ text: 'نظام التفاعل التلقائي • Zone System' })
-                        .setTimestamp();
-
-                    await member.send({ embeds: [embed] }).catch(() => { });
-                    u.warned = true;
-                    await u.save();
-                }
-            } catch (e) {
-                console.error("Warning Error:", e.message);
-            }
-        }
-
-        if (diff >= fullDay) {
-            u.streakCount = 0;
-            u.dailyMsgs = 0;
-            u.warned = false;
-            await u.save();
+    for (const u of usersToWarn) {
+        const guild = client.guilds.cache.get(u.guildId);
+        const member = await guild?.members.fetch(u.userId).catch(() => null);
+        if (member) {
+            const embed = new EmbedBuilder()
+                .setTitle("⏰ تنبيه التفاعل اليومي")
+                .setDescription(`أهلاً بك! متبقي **7 ساعات** فقط لتجديد تفاعلك اليومي.\n\n🔥 الستريك الحالي: **${u.streakCount}** يوم.`)
+                .setColor('#5865F2');
+            await member.send({ embeds: [embed] }).catch(() => { });
+            u.warned = true; await u.save();
         }
     }
-}, 60000);
+
+    // تصفير الستريك لمن تجاوز 24 ساعة
+    await UserLevel.updateMany(
+        { lastMessageDate: { $lte: new Date(resetThreshold) }, streakCount: { $gt: 0 } },
+        { $set: { streakCount: 0, dailyMsgs: 0, warned: false } }
+    );
+}, 300000); // كل 5 دقائق كافية جداً
 
 // ==========================================
-// 1️⃣7️⃣ Voice Points for Clans
+// 1️⃣7️⃣ Voice Points (تحسين أداء الكلانات)
 // ==========================================
 setInterval(async () => {
-    client.guilds.cache.forEach(async (guild) => {
-        guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).forEach(async (channel) => {
-            channel.members.forEach(async (member) => {
+    for (const [guildId, guild] of client.guilds.cache) {
+        // جلب كل كلانات السيرفر مرة واحدة بدل البحث لكل عضو
+        const clans = await Clan.find({ guildId });
+        if (clans.length === 0) continue;
+
+        // إنشاء خريطة (Map) لمعرفة كل عضو لأي كلان ينتمي بسرعة
+        const memberToClan = new Map();
+        clans.forEach(c => c.members.forEach(mId => memberToClan.set(mId, c)));
+
+        guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).forEach(channel => {
+            channel.members.forEach(async member => {
                 if (member.user.bot || member.voice.selfDeaf || member.voice.serverDeaf) return;
 
-                const memberClan = await Clan.findOne({ guildId: guild.id, members: { $in: [member.id] } });
-                if (memberClan) {
-                    let mData = await ClanMember.findOne({ guildId: guild.id, userId: member.id, clanIndex: memberClan.clanIndex });
-                    if (!mData) mData = new ClanMember({ guildId: guild.id, userId: member.id, clanIndex: memberClan.clanIndex });
+                const clan = memberToClan.get(member.id);
+                if (clan) {
+                    let mData = await ClanMember.findOne({ guildId, userId: member.id, clanIndex: clan.clanIndex });
+                    if (!mData) mData = new ClanMember({ guildId, userId: member.id, clanIndex: clan.clanIndex });
 
                     mData.voiceMinutes = (mData.voiceMinutes || 0) + 1;
-
                     if (mData.voiceMinutes >= 30) {
                         mData.voiceMinutes = 0;
                         mData.points += 20;
-                        memberClan.points += 20;
-                        await memberClan.save();
+                        await Clan.updateOne({ _id: clan._id }, { $inc: { points: 20 } });
                     }
                     await mData.save();
                 }
             });
         });
-    });
+    }
 }, 60000);
-async function sendClanApplyEmbed(channel, clan) {
-    const embed = new EmbedBuilder()
-        .setTitle(`🛡️ نظام التقديم | ${clan.clanName}`)
-        .setDescription("اضغط على الزر أدناه لفتح تذكرة تقديم والإجابة على الأسئلة.")
-        .setColor('#5865F2');
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`apply_clan_${clan._id}`).setLabel('تقديم الآن').setStyle(ButtonStyle.Success)
-    );
-    await channel.send({ embeds: [embed], components: [row] });
-}
-
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-    if (interaction.customId.startsWith('apply_clan_')) {
-        const clanId = interaction.customId.replace('apply_clan_', '');
-        const clan = await Clan.findById(clanId);
-        const thread = await interaction.channel.threads.create({
-            name: `تقديم-${clan.clanName}-${interaction.user.username}`,
-            autoArchiveDuration: 60,
-            type: 11,
-        });
-        await thread.members.add(interaction.user.id);
-        await interaction.reply({ content: `تم فتح قناة التقديم: ${thread}`, ephemeral: true });
-        askNextQuestion(thread, interaction.user, clan, 0);
-    }
-    if (interaction.customId.startsWith('conf_')) {
-        const [_, status, clanId, qIndex] = interaction.customId.split('_');
-        const clan = await Clan.findById(clanId);
-        await interaction.message.delete();
-        if (status === 'yes') askNextQuestion(interaction.channel, interaction.user, clan, parseInt(qIndex) + 1);
-        else askNextQuestion(interaction.channel, interaction.user, clan, parseInt(qIndex));
-    }
-});
-
-
-
-// ==========================================
-// 1️⃣8️⃣ Startup
-// ==========================================
-process.on('unhandledRejection', err => console.error("❌ Unhandled Rejection:", err));
-process.on('uncaughtException', err => console.error("❌ Uncaught Exception:", err));
-
-app.listen(PORT, () => {
-    console.log(`🚀 Dashboard running at http://localhost:${PORT}`);
-});
-
-client.login(process.env.TOKEN);
