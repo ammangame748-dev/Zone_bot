@@ -2763,8 +2763,15 @@ client.on('interactionCreate', async (interaction) => {
 
         // --- [ Accept / Reject Clan Member ] ---
         if (interaction.isButton() && (interaction.customId.startsWith('accept_member:') || interaction.customId.startsWith('reject_member:'))) {
-            const [action, targetId, clanIdx] = interaction.customId.split(':');
-            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: parseInt(clanIdx) });
+            const parts = interaction.customId.split(':');
+            const action = parts[0];
+            const targetId = parts[1];
+            const clanIdx = parseInt(parts[2]);
+
+            // التأكد من أن الـ Index رقم صحيح لتجنب خطأ NaN
+            if (isNaN(clanIdx)) return interaction.reply({ content: 'خطأ في بيانات الكلان.', ephemeral: true });
+
+            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
 
             if (interaction.user.id !== clan.leaderId) {
@@ -2794,6 +2801,8 @@ client.on('interactionCreate', async (interaction) => {
         // --- [ Clan Control Select Menu ] ---
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
             const clanIdx = parseInt(interaction.customId.replace('clan_control_', ''));
+            if (isNaN(clanIdx)) return interaction.reply({ content: 'خطأ في التعرف على الكلان.', ephemeral: true });
+
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
 
@@ -2857,8 +2866,10 @@ client.on('interactionCreate', async (interaction) => {
             const action = parts[1];
             const clanIdx = parseInt(parts[2]);
             const memberId = interaction.fields.getTextInputValue('member_id').trim();
-            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             
+            if (isNaN(clanIdx)) return interaction.reply({ content: 'خطأ في معالجة البيانات.', ephemeral: true });
+
+            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
 
             if (action === 'add_mem') {
