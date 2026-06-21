@@ -1927,9 +1927,21 @@ app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
 });
 
 app.get('/manage/:guildId/clans/delete/:index', checkAuth, async (req, res) => {
-    await Clan.deleteOne({ guildId: req.params.guildId, clanIndex: parseInt(req.params.index) });
+    const clanIdx = parseInt(req.params.index);
+    
+    // التأكد من أن الـ Index رقم صحيح قبل محاولة الحذف
+    if (isNaN(clanIdx)) {
+        return res.redirect(`/manage/${req.params.guildId}/clans`);
+    }
+
+    await Clan.deleteOne({ 
+        guildId: req.params.guildId, 
+        clanIndex: clanIdx 
+    });
+    
     res.redirect(`/manage/${req.params.guildId}/clans`);
 });
+
 
 app.get('/manage/:guildId/clans/edit/:index', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
