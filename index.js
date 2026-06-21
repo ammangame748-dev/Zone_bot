@@ -1698,7 +1698,6 @@ app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'roles', content));
 });
-
 app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
     const b = req.body;
     const rolesPanel = [];
@@ -1707,13 +1706,36 @@ app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
         const label = b[`role_label_${i}`]?.trim();
         if (roleId && label) rolesPanel.push({ roleId, label, type: 'button' });
     }
-    await GuildConfig.findOneAndUpdate(
+    
+    const config = await GuildConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         { $set: { rolesPanel, rolesChannel: b.rolesChannel } },
-        { upsert: true }
+        { upsert: true, new: true }
     );
+
+    // إرسال اللوحة تلقائياً للروم
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (g && b.rolesChannel && rolesPanel.length > 0) {
+        const channel = g.channels.cache.get(b.rolesChannel);
+        if (channel) {
+            const rows = [];
+            let row = new ActionRowBuilder();
+            for (const r of rolesPanel) {
+                row.addComponents(new ButtonBuilder().setCustomId(`role_${r.roleId}`).setLabel(r.label).setStyle(ButtonStyle.Secondary));
+                if (row.components.length === 5) { rows.push(row); row = new ActionRowBuilder(); }
+            }
+            if (row.components.length > 0) rows.push(row);
+            
+            await channel.send({ 
+                embeds: [new EmbedBuilder().setTitle('لوحة الرتب الذاتية').setDescription('اضغط على الزر للحصول على الرتبة أو إزالتها').setColor(0x1e90ff)],
+                components: rows 
+            }).catch(() => {});
+        }
+    }
+
     res.redirect(`/manage/${req.params.guildId}/roles`);
 });
+
 
 // --- [ Mod / Jail Config ] ---
 app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
