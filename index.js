@@ -2800,20 +2800,22 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
-        // --- [ Clan Control Select Menu ] ---
+          // --- [ Clan Control Select Menu ] ---
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
-            const rawIdx = interaction.customId.replace('clan_control_', '');
-            if (!rawIdx || isNaN(parseInt(rawIdx))) {
-                return interaction.reply({ content: 'خطأ في التعرف على رقم الكلان.', ephemeral: true });
+            // استخراج الأرقام فقط من الـ customId لمنع خطأ NaN نهائياً
+            const cleanNumbers = interaction.customId.replace(/[^0-9]/g, '');
+            const clanIdx = parseInt(cleanNumbers);
+
+            if (isNaN(clanIdx)) {
+                return interaction.reply({ content: '❌ خطأ: لم يتم التعرف على رقم الكلان بشكل صحيح.', flags: ['Ephemeral'] });
             }
-            const clanIdx = parseInt(rawIdx);
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', flags: ['Ephemeral'] });
 
             const isLeader = clan.leaderId === interaction.user.id;
             const isAssistant = clan.assistantIds?.includes(interaction.user.id);
-            if (!isLeader && !isAssistant) return interaction.reply({ content: 'ليس لديك صلاحية.', ephemeral: true });
+            if (!isLeader && !isAssistant) return interaction.reply({ content: 'ليس لديك صلاحية.', flags: ['Ephemeral'] });
 
             const selected = interaction.values[0];
 
@@ -2834,7 +2836,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp()
                     .setFooter({ text: 'VORTEX System - Clans' });
 
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.reply({ embeds: [embed], flags: ['Ephemeral'] });
             }
 
             const modalTitle = {
@@ -2846,7 +2848,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (modalTitle) {
                 if ((selected === 'add_assist' || selected === 'remove_assist') && !isLeader) {
-                    return interaction.reply({ content: 'هذا الخيار للقائد فقط.', ephemeral: true });
+                    return interaction.reply({ content: 'هذا الخيار للقائد فقط.', flags: ['Ephemeral'] });
                 }
 
                 const modal = new ModalBuilder()
