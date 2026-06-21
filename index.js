@@ -738,6 +738,8 @@ function ui(guild, active, content) {
 // 6️⃣ Routes & Logic
 // ==========================================
 
+app.get('/', (req, res) => res.redirect('/dashboard'));
+
 app.get('/login', (req, res) => res.send(`
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
@@ -1654,7 +1656,7 @@ mongoose.connect(process.env.MONGO_CONNECTION_STRING)
     .then(() => console.log('✅ Connected to MongoDB'))
     .catch(err => console.error('❌ MongoDB Error:', err));
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);
 
 app.listen(PORT, () => {
     console.log(`🚀 Dashboard running on http://localhost:${PORT}`);
