@@ -2766,10 +2766,12 @@ client.on('interactionCreate', async (interaction) => {
             const parts = interaction.customId.split(':');
             const action = parts[0];
             const targetId = parts[1];
+            
+            // تحقق صارم من وجود القيمة وتحويلها
+            if (!parts[2] || isNaN(parseInt(parts[2]))) {
+                return interaction.reply({ content: '❌ خطأ: لم يتم العثور على رقم الكلان في هذا الزر.', ephemeral: true });
+            }
             const clanIdx = parseInt(parts[2]);
-
-            // التأكد من أن الـ Index رقم صحيح لتجنب خطأ NaN
-            if (isNaN(clanIdx)) return interaction.reply({ content: 'خطأ في بيانات الكلان.', ephemeral: true });
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
@@ -2800,8 +2802,11 @@ client.on('interactionCreate', async (interaction) => {
 
         // --- [ Clan Control Select Menu ] ---
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
-            const clanIdx = parseInt(interaction.customId.replace('clan_control_', ''));
-            if (isNaN(clanIdx)) return interaction.reply({ content: 'خطأ في التعرف على الكلان.', ephemeral: true });
+            const rawIdx = interaction.customId.replace('clan_control_', '');
+            if (!rawIdx || isNaN(parseInt(rawIdx))) {
+                return interaction.reply({ content: 'خطأ في التعرف على رقم الكلان.', ephemeral: true });
+            }
+            const clanIdx = parseInt(rawIdx);
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
@@ -2864,10 +2869,12 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isModalSubmit() && interaction.customId.startsWith('clmod_')) {
             const parts = interaction.customId.split('_');
             const action = parts[1];
+            
+            if (!parts[2] || isNaN(parseInt(parts[2]))) {
+                return interaction.reply({ content: 'خطأ في معالجة بيانات رقم الكلان من النموذج.', ephemeral: true });
+            }
             const clanIdx = parseInt(parts[2]);
             const memberId = interaction.fields.getTextInputValue('member_id').trim();
-            
-            if (isNaN(clanIdx)) return interaction.reply({ content: 'خطأ في معالجة البيانات.', ephemeral: true });
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
