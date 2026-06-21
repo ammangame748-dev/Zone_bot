@@ -2682,10 +2682,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (embed) await sendLog(guild, 'voice', embed);
 });
 
-
-// ==========================================
-// 12. Interaction Handler
-// ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.guild) return;
@@ -2727,13 +2723,11 @@ client.on('interactionCreate', async (interaction) => {
             const clan = await Clan.findById(clanId).catch(() => null);
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
 
-            // إنشاء thread للتقديم
             const thread = await interaction.channel.threads.create({
                 name: `تقديم-${clan.clanName}-${interaction.user.username}`,
                 autoArchiveDuration: 60,
                 type: ChannelType.PrivateThread,
             }).catch(async () => {
-                // إذا لم يدعم Private Threads، استخدم Public Thread
                 return await interaction.channel.threads.create({
                     name: `تقديم-${clan.clanName}-${interaction.user.username}`,
                     autoArchiveDuration: 60,
@@ -2752,7 +2746,6 @@ client.on('interactionCreate', async (interaction) => {
         // --- [ Clan Application Confirmation Buttons ] ---
         if (interaction.isButton() && interaction.customId.startsWith('conf_')) {
             const parts = interaction.customId.split('_');
-            // format: conf_yes_CLANID_QINDEX or conf_no_CLANID_QINDEX
             const status = parts[1];
             const clanId = parts[2];
             const qIndex = parseInt(parts[3]);
@@ -2811,12 +2804,8 @@ client.on('interactionCreate', async (interaction) => {
             const selected = interaction.values[0];
 
             if (selected === 'show_stats') {
-                const membersList = clan.members.length > 0
-                    ? clan.members.map(id => `<@${id}>`).join(', ')
-                    : 'لا يوجد أعضاء';
-                const assistantsList = clan.assistantIds?.length > 0
-                    ? clan.assistantIds.map(id => `<@${id}>`).join(', ')
-                    : 'لا يوجد مساعدين';
+                const membersList = clan.members.length > 0 ? clan.members.map(id => `<@${id}>`).join(', ') : 'لا يوجد أعضاء';
+                const assistantsList = clan.assistantIds?.length > 0 ? clan.assistantIds.map(id => `<@${id}>`).join(', ') : 'لا يوجد مساعدين';
 
                 const embed = new EmbedBuilder()
                     .setTitle(`إحصائيات كلان ${clan.clanName}`)
@@ -2834,136 +2823,75 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            if (selected === 'add_mem') {
-                const modal = new ModalBuilder()
-                    .setCustomId(`clan_add_mem_${clanIdx}`)
-                    .setTitle('اضافة عضو للكلان');
-                const input = new TextInputBuilder()
-                    .setCustomId('member_id')
-                    .setLabel('ID العضو')
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('ادخل ID العضو')
-                    .setRequired(true);
-                modal.addComponents(new ActionRowBuilder().addComponents(input));
-                return interaction.showModal(modal);
-            }
+            const modalTitle = {
+                'add_mem': 'اضافة عضو للكلان',
+                'kick_mem': 'طرد عضو من الكلان',
+                'add_assist': 'اضافة مساعد',
+                'remove_assist': 'سحب رتبة مساعد'
+            }[selected];
 
-            if (selected === 'kick_mem') {
-                const modal = new ModalBuilder()
-                    .setCustomId(`clan_kick_mem_${clanIdx}`)
-                    .setTitle('طرد عضو من الكلان');
-                const input = new TextInputBuilder()
-                    .setCustomId('member_id')
-                    .setLabel('ID العضو')
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('ادخل ID العضو')
-                    .setRequired(true);
-                modal.addComponents(new ActionRowBuilder().addComponents(input));
-                return interaction.showModal(modal);
-            }
+            if (modalTitle) {
+                if ((selected === 'add_assist' || selected === 'remove_assist') && !isLeader) {
+                    return interaction.reply({ content: 'هذا الخيار للقائد فقط.', ephemeral: true });
+                }
 
-            if (selected === 'add_assist') {
-                if (!isLeader) return interaction.reply({ content: 'هذا الخيار للقائد فقط.', ephemeral: true });
                 const modal = new ModalBuilder()
-                    .setCustomId(`clan_add_assist_${clanIdx}`)
-                    .setTitle('اضافة مساعد');
+                    .setCustomId(`clmod_${selected}_${clanIdx}`)
+                    .setTitle(modalTitle);
+                
                 const input = new TextInputBuilder()
                     .setCustomId('member_id')
-                    .setLabel('ID العضو')
+                    .setLabel('ID العضو / المساعد')
                     .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('ادخل ID العضو الذي تريد ترقيته')
+                    .setPlaceholder('ادخل الـ ID هنا...')
                     .setRequired(true);
-                modal.addComponents(new ActionRowBuilder().addComponents(input));
-                return interaction.showModal(modal);
-            }
 
-            if (selected === 'remove_assist') {
-                if (!isLeader) return interaction.reply({ content: 'هذا الخيار للقائد فقط.', ephemeral: true });
-                const modal = new ModalBuilder()
-                    .setCustomId(`clan_remove_assist_${clanIdx}`)
-                    .setTitle('سحب رتبة مساعد');
-                const input = new TextInputBuilder()
-                    .setCustomId('member_id')
-                    .setLabel('ID المساعد')
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('ادخل ID المساعد لسحب رتبته')
-                    .setRequired(true);
                 modal.addComponents(new ActionRowBuilder().addComponents(input));
                 return interaction.showModal(modal);
             }
         }
 
         // --- [ Clan Control Modals ] ---
-        if (interaction.isModalSubmit()) {
-            const customId = interaction.customId;
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('clmod_')) {
+            const parts = interaction.customId.split('_');
+            const action = parts[1];
+            const clanIdx = parseInt(parts[2]);
+            const memberId = interaction.fields.getTextInputValue('member_id').trim();
+            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
+            
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
 
-            if (customId.startsWith('clan_add_mem_')) {
-                const clanIdx = parseInt(customId.replace('clan_add_mem_', ''));
-                const memberId = interaction.fields.getTextInputValue('member_id').trim();
-                const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-                if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-                if (clan.members.length >= 10) return interaction.reply({ content: 'الكلان ممتلئ (10 أعضاء كحد أقصى)!', ephemeral: true });
-                if (clan.members.includes(memberId)) return interaction.reply({ content: 'هذا العضو موجود في الكلان مسبقاً.', ephemeral: true });
-
-                const member = await interaction.guild.members.fetch(memberId).catch(() => null);
-                if (!member) return interaction.reply({ content: 'العضو غير موجود في السيرفر.', ephemeral: true });
-
+            if (action === 'add_mem') {
+                if (clan.members.length >= 10) return interaction.reply({ content: 'الكلان ممتلئ!', ephemeral: true });
+                if (clan.members.includes(memberId)) return interaction.reply({ content: 'العضو موجود مسبقاً.', ephemeral: true });
                 clan.members.push(memberId);
                 await clan.save();
-                if (clan.roleId) await member.roles.add(clan.roleId).catch(() => {});
-
-                return interaction.reply({ content: `تم اضافة <@${memberId}> للكلان بنجاح.`, ephemeral: true });
+                const mem = await interaction.guild.members.fetch(memberId).catch(() => null);
+                if (mem && clan.roleId) await mem.roles.add(clan.roleId).catch(() => {});
+                return interaction.reply({ content: `تمت إضافة <@${memberId}> للكلان بنجاح.`, ephemeral: true });
             }
-
-            if (customId.startsWith('clan_kick_mem_')) {
-                const clanIdx = parseInt(customId.replace('clan_kick_mem_', ''));
-                const memberId = interaction.fields.getTextInputValue('member_id').trim();
-                const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-                if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-                if (!clan.members.includes(memberId)) return interaction.reply({ content: 'هذا العضو ليس في الكلان.', ephemeral: true });
-
+            
+            if (action === 'kick_mem') {
                 clan.members = clan.members.filter(id => id !== memberId);
-                // إذا كان مساعداً، اسحب رتبته أيضاً
                 clan.assistantIds = (clan.assistantIds || []).filter(id => id !== memberId);
                 await clan.save();
-
-                const member = await interaction.guild.members.fetch(memberId).catch(() => null);
-                if (member && clan.roleId) await member.roles.remove(clan.roleId).catch(() => {});
-
+                const mem = await interaction.guild.members.fetch(memberId).catch(() => null);
+                if (mem && clan.roleId) await mem.roles.remove(clan.roleId).catch(() => {});
                 return interaction.reply({ content: `تم طرد <@${memberId}> من الكلان.`, ephemeral: true });
             }
 
-            if (customId.startsWith('clan_add_assist_')) {
-                const clanIdx = parseInt(customId.replace('clan_add_assist_', ''));
-                const memberId = interaction.fields.getTextInputValue('member_id').trim();
-                const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-                if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-                if (!clan.members.includes(memberId)) return interaction.reply({ content: 'هذا العضو ليس في الكلان، أضفه أولاً.', ephemeral: true });
-                if (clan.assistantIds?.includes(memberId)) return interaction.reply({ content: 'هذا العضو مساعد مسبقاً.', ephemeral: true });
-
+            if (action === 'add_assist') {
+                if (!clan.members.includes(memberId)) return interaction.reply({ content: 'العضو ليس في الكلان، أضفه أولاً.', ephemeral: true });
                 if (!clan.assistantIds) clan.assistantIds = [];
-                clan.assistantIds.push(memberId);
+                if (!clan.assistantIds.includes(memberId)) clan.assistantIds.push(memberId);
                 await clan.save();
-
-                return interaction.reply({ content: `تم ترقية <@${memberId}> لمساعد في الكلان.`, ephemeral: true });
+                return interaction.reply({ content: `تمت ترقية <@${memberId}> لمساعد بنجاح.`, ephemeral: true });
             }
 
-            if (customId.startsWith('clan_remove_assist_')) {
-                const clanIdx = parseInt(customId.replace('clan_remove_assist_', ''));
-                const memberId = interaction.fields.getTextInputValue('member_id').trim();
-                const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-                if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-                if (!clan.assistantIds?.includes(memberId)) return interaction.reply({ content: 'هذا العضو ليس مساعداً.', ephemeral: true });
-
-                clan.assistantIds = clan.assistantIds.filter(id => id !== memberId);
+            if (action === 'remove_assist') {
+                clan.assistantIds = (clan.assistantIds || []).filter(id => id !== memberId);
                 await clan.save();
-
-                // ملاحظة: لا يتم طرده من الكلان، فقط سحب رتبة المساعد
-                return interaction.reply({ content: `تم سحب رتبة المساعد من <@${memberId}>. (لا يزال عضواً في الكلان)`, ephemeral: true });
+                return interaction.reply({ content: `تم سحب رتبة المساعد من <@${memberId}>.`, ephemeral: true });
             }
         }
 
@@ -3024,122 +2952,9 @@ client.on('interactionCreate', async (interaction) => {
                 if (tConfig.buttons?.[btnIndex]) ticketType = tConfig.buttons[btnIndex].label;
             }
             await openTicket(interaction, tConfig, ticketType);
-            return;
         }
-
-        // --- [ Ticket Menu ] ---
-        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') {
-            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!tConfig) return interaction.reply({ content: 'لم يتم العثور على إعدادات التذاكر.', ephemeral: true });
-
-            const selectedIndex = parseInt(interaction.values[0].replace('ticket_opt_', ''));
-            const ticketType = tConfig.menuOptions?.[selectedIndex]?.label || 'تذكرة دعم';
-            await openTicket(interaction, tConfig, ticketType);
-            return;
-        }
-
-        // --- [ Ticket Control Buttons ] ---
-        if (interaction.isButton() && ['close_ticket', 'claim_ticket'].includes(interaction.customId)) {
-            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
-            if (!ticket) return;
-            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!tConfig) return;
-            const isAdmin = interaction.member.roles.cache.has(tConfig.adminRole);
-            if (!isAdmin) return interaction.reply({ content: 'هذه الأزرار مخصصة للإدارة فقط!', ephemeral: true });
-
-            if (interaction.customId === 'close_ticket') {
-                ticket.closedAt = new Date();
-                ticket.closedBy = interaction.user.id;
-                await ticket.save();
-
-                const owner = await client.users.fetch(ticket.ownerId).catch(() => null);
-                if (owner) {
-                    const statsEmbed = new EmbedBuilder()
-                        .setTitle('سجل إغلاق التذكرة')
-                        .setColor(0xe63946)
-                        .setThumbnail(interaction.guild.iconURL())
-                        .addFields(
-                            { name: 'صاحب التكت', value: `<@${ticket.ownerId}>`, inline: true },
-                            { name: 'المستلم', value: ticket.claimedBy ? `<@${ticket.claimedBy}>` : 'لم تستلم', inline: true },
-                            { name: 'أغلقها', value: `<@${interaction.user.id}>`, inline: true },
-                            { name: 'وقت الفتح', value: `<t:${Math.floor(new Date(ticket.openedAt).getTime() / 1000)}:F>` },
-                            { name: 'وقت الإغلاق', value: `<t:${Math.floor(new Date(ticket.closedAt).getTime() / 1000)}:F>` }
-                        )
-                        .setFooter({ text: 'VORTEX System' });
-                    await owner.send({ embeds: [statsEmbed] }).catch(() => {});
-                }
-                await interaction.reply('سيتم حذف التكت خلال 5 ثوانٍ...');
-                setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
-            }
-        }
-
-        // --- [ Ticket Control Select Menu ] ---
-        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
-            const selected = interaction.values[0];
-            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
-            if (!ticket) return interaction.reply({ content: 'لم يتم العثور على بيانات التكت.', ephemeral: true });
-
-            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!tConfig) return;
-
-            const isAdmin = interaction.member.roles.cache.has(tConfig.adminRole);
-            const adminPermissions = ['claim_ticket', 'close_ticket', 'add_member', 'remove_member', 'summon_member'];
-            if (!isAdmin && adminPermissions.includes(selected)) {
-                return interaction.reply({ content: 'هذه القائمة للإدارة فقط!', ephemeral: true });
-            }
-
-            if (selected === 'claim_ticket') {
-                if (ticket.claimedBy) return interaction.reply({ content: 'التكت مستلم بالفعل!', ephemeral: true });
-                ticket.claimedBy = interaction.user.id;
-                await ticket.save();
-                return interaction.reply({ content: `تم استلام التكت بواسطة ${interaction.user}` });
-            }
-
-            if (selected === 'close_ticket') {
-                ticket.closedAt = new Date();
-                ticket.closedBy = interaction.user.id;
-                await ticket.save();
-                await interaction.reply({ content: 'سيتم حذف التكت خلال 5 ثوانٍ...' });
-                setTimeout(() => { interaction.channel.delete().catch(() => {}); }, 5000);
-                return;
-            }
-
-            if (selected === 'add_member') {
-                const userSelect = new UserSelectMenuBuilder().setCustomId('add_user_menu').setPlaceholder('اختر الشخص').setMaxValues(1);
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
-            }
-
-            if (selected === 'remove_member') {
-                const userSelect = new UserSelectMenuBuilder().setCustomId('remove_user_menu').setPlaceholder('اختر الشخص').setMaxValues(1);
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
-            }
-
-            if (selected === 'summon_member') {
-                return interaction.channel.send(`<@${ticket.ownerId}> الادمن ${interaction.user} يستدعيك!`);
-            }
-        }
-
-        // --- [ User Select Menus ] ---
-        if (interaction.isUserSelectMenu()) {
-            const targetId = interaction.values[0];
-            const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
-            if (!targetMember) return interaction.reply({ content: 'لم يتم العثور على العضو.', ephemeral: true });
-
-            if (interaction.customId === 'add_user_menu') {
-                await interaction.channel.permissionOverwrites.edit(targetMember, { ViewChannel: true, SendMessages: true });
-                return interaction.update({ content: `تم إضافة ${targetMember} للتكت.`, components: [] });
-            }
-            if (interaction.customId === 'remove_user_menu') {
-                await interaction.channel.permissionOverwrites.edit(targetMember, { ViewChannel: false });
-                return interaction.update({ content: `تم إزالة ${targetMember} من التكت.`, components: [] });
-            }
-        }
-
     } catch (err) {
         console.error('[Interaction Error]', err);
-        if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-            interaction.reply({ content: 'حدث خطأ غير متوقع.', ephemeral: true }).catch(() => {});
-        }
     }
 });
 
