@@ -1,5 +1,5 @@
 // ==========================================
-// VORTEX SYSTEM BOT - Professional Version
+// VORTEX SYSTEM BOT - FINAL COMPREHENSIVE VERSION
 // ==========================================
 
 require('dotenv').config();
@@ -23,7 +23,7 @@ const {
 } = require('discord.js');
 
 // ==========================================
-// 1️⃣ تعريف الـ Schemas (قاعدة البيانات)
+// 1️⃣ Database Schemas
 // ==========================================
 
 const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
@@ -83,20 +83,13 @@ const JailData = mongoose.model('JailData', new mongoose.Schema({
     guildId: String,
     userId: String,
     oldRoles: [String],
-    overwrites: [{
-        channelId: String,
-        deny: String,
-        allow: String
-    }],
+    overwrites: [{ channelId: String, deny: String, allow: String }],
     endAt: Date
 }));
 
 const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
     guildId: String,
-    autoReply: [{
-        trigger: String,
-        reply: String
-    }],
+    autoReply: [{ trigger: String, reply: String }],
     security: {
         antiLinks: Boolean,
         badWords: String,
@@ -110,11 +103,7 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         levelUpChannel: String,
         leaderboardCommand: { type: String, default: '!levels' }
     },
-    rolesPanel: [{
-        roleId: String,
-        label: String,
-        type: { type: String, default: 'button' }
-    }],
+    rolesPanel: [{ roleId: String, label: String, type: { type: String, default: 'button' } }],
     rolesChannel: String,
     logs: {
         messages: { channel: String, enabled: Boolean },
@@ -140,51 +129,18 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
 
 const Stats = mongoose.model('Stats', new mongoose.Schema({
     guildId: String,
-    messages: {
-        total: { type: Number, default: 0 },
-        daily: { type: Number, default: 0 },
-        weekly: { type: Number, default: 0 },
-        monthly: { type: Number, default: 0 },
-        lastUpdate: { type: Date, default: Date.now }
-    },
-    activeChannels: { type: Map, of: Number, default: {} },
-    membersLog: {
-        joined: [Date],
-        left: [Date]
-    },
-    modActions: {
-        bans: { type: Number, default: 0 },
-        kicks: { type: Number, default: 0 },
-        warns: { type: Number, default: 0 }
-    }
-}));
-
-const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
-    guildId: String,
-    messageId: String,
-    channelId: String,
-    endAt: Date,
-    winnersCount: Number,
-    prize: String,
-    description: String,
-    ended: { type: Boolean, default: false }
+    messages: { total: { type: Number, default: 0 }, daily: { type: Number, default: 0 } },
+    membersLog: { joined: [Date], left: [Date] }
 }));
 
 const Clan = mongoose.model('Clan', new mongoose.Schema({
-    assistantIds: [String],
     guildId: String,
-    clanIndex: Number,
     clanName: String,
-    roleId: String,
     leaderId: String,
+    roleId: String,
     points: { type: Number, default: 0 },
-    applyChannel: String,
-    applyMessage: String,
-    textChannelId: String,
-    voiceChannelId: String,
-    resultsChannelId: String,
     members: [String],
-    questions: { type: [String], default: ["ما هو اسمك؟", "كم عمرك؟", "لماذا تريد الانضمام؟"] }
+    questions: { type: [String], default: ["ما هو اسمك؟", "كم عمرك؟"] }
 }));
 
 const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
@@ -202,121 +158,9 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
 }));
 
 // ==========================================
-// 2️⃣ Express App Setup
+// 2️⃣ Web Dashboard Setup
 // ==========================================
 const app = express();
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.json({ limit: '10mb' }));
-app.set('trust proxy', 1);
-const PORT = process.env.PORT || 3000;
-app.set('view engine', 'ejs');
-
-if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
-
-// ==========================================
-// 3️⃣ تعريف الـ Client (إعدادات البوت)
-// ==========================================
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildModeration,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildEmojisAndStickers,
-        GatewayIntentBits.GuildInvites
-    ],
-    partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
-});
-
-const commands = [
-    new SlashCommandBuilder().setName('setbanner').setDescription('رفع صورة الخط').addAttachmentOption(o => o.setName('image').setDescription('صورة البنر').setRequired(true)),
-    new SlashCommandBuilder().setName('rename_panel').setDescription('لوحة تغيير الاسم').addStringOption(o => o.setName('name').setRequired(true).setDescription('الاسم')).addAttachmentOption(o => o.setName('image').setDescription('صورة اختيارية'))
-].map(c => c.toJSON());
-
-// ==========================================
-// 4️⃣ اتصال قاعدة البيانات (MongoDB)
-// ==========================================
-mongoose.connect(process.env.MONGO_CONNECTION_STRING)
-    .then(() => console.log('✅ Connected to VORTEX MongoDB Database'))
-    .catch(err => console.log("❌ DB Connection Error:", err));
-
-// ==========================================
-// 5️⃣ الدوال المساعدة (Helper Functions)
-// ==========================================
-async function sendLog(guild, type, embed) {
-    const config = await GuildConfig.findOne({ guildId: guild.id });
-    if (!config?.logs) return;
-    const logChannelId = config.logs[type]?.channel;
-    const enabled = config.logs[type]?.enabled;
-    if (!enabled || !logChannelId) return;
-    const logChannel = guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
-    logChannel.send({ embeds: [embed] }).catch(() => { });
-}
-
-async function getExecutor(guild, actionType) {
-    try {
-        const logs = await guild.fetchAuditLogs({ limit: 1, type: actionType });
-        const entry = logs.entries.first();
-        if (!entry) return "غير معروف";
-        return `<@${entry.executor.id}>`;
-    } catch {
-        return "غير معروف";
-    }
-}
-
-async function handleUnjail(member, guildId) {
-    try {
-        const guild = client.guilds.cache.get(guildId);
-        if (!guild || !member) return;
-
-        const jailData = await JailData.findOne({ guildId, userId: member.id });
-        const modConfig = await ModConfig.findOne({ guildId });
-
-        if (!jailData) return;
-
-        // Restore roles
-        const rolesToRestore = (jailData.oldRoles || []).filter(rId => guild.roles.cache.has(rId));
-        if (modConfig?.jail?.roleId) {
-            await member.roles.remove(modConfig.jail.roleId).catch(() => { });
-        }
-        for (const roleId of rolesToRestore) {
-            await member.roles.add(roleId).catch(() => { });
-        }
-
-        // Restore channel permissions
-        if (jailData.overwrites && jailData.overwrites.length > 0) {
-            for (const ow of jailData.overwrites) {
-                const channel = guild.channels.cache.get(ow.channelId);
-                if (channel) {
-                    await channel.permissionOverwrites.edit(member.id, {
-                        ViewChannel: null
-                    }).catch(() => { });
-                }
-            }
-        }
-
-        await JailData.deleteOne({ guildId, userId: member.id });
-
-        const jailChannel = guild.channels.cache.get(modConfig?.jail?.channelId);
-        if (jailChannel) {
-            const embed = new EmbedBuilder()
-                .setColor('#00ff00')
-                .setTitle('🔓 فك سجن')
-                .setDescription(`تم فك سجن <@${member.id}> وإعادة كافة صلاحياته ورتبه.`)
-                .setTimestamp();
-            jailChannel.send({ embeds: [embed] });
-        }
-    } catch (err) {
-        console.error("Unjail Error:", err);
-    }
-}
-
-// ==========================================
-// 6️⃣ Upload Setup
-// ==========================================
 const storage = multer.diskStorage({
     destination: './uploads/',
     filename: (req, file, cb) => {
@@ -325,279 +169,322 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.set('trust proxy', 1);
+const PORT = process.env.PORT || 3000;
+app.set('view engine', 'ejs');
+
+if (!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==========================================
-// 7️⃣ Auth Setup
+// 3️⃣ Discord Bot Client
+// ==========================================
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildEmojisAndStickers
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
+});
+
+// ==========================================
+// 4️⃣ Authentication Logic
 // ==========================================
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
-
 passport.use(new Strategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
     callbackURL: process.env.CALLBACK_URL,
     proxy: true,
     scope: ['identify', 'guilds']
-}, (accessToken, refreshToken, profile, done) => done(null, profile)));
+}, (at, rt, profile, done) => done(null, profile)));
 
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'vortex-ultra-secret-999',
-    resave: false,
-    saveUninitialized: false
-}));
-
+app.use(session({ secret: process.env.SESSION_SECRET || 'vortex-mega-secret', resave: false, saveUninitialized: false }));
 app.use(passport.initialize());
 app.use(passport.session());
 
-const checkAuth = (req, res, next) => {
-    if (req.isAuthenticated()) return next();
-    res.redirect('/login');
-};
-
-app.get('/auth/discord', passport.authenticate('discord'));
-app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
-    res.redirect('/dashboard');
-});
-
-app.get('/logout', (req, res) => {
-    req.logout(() => {
-        res.redirect('/login');
-    });
-});
-
-app.get('/login', (req, res) => {
-    res.send(`
-    <html dir="rtl">
-    <head>
-        <meta charset="UTF-8">
-        <title>VORTEX | Login</title>
-        <style>
-            :root { --bg: #050505; --p: #007bff; --s: #ff4d4d; --card: #0f0f0f; }
-            body { background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; overflow: hidden; }
-            .login-card { background: var(--card); padding: 60px; border-radius: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 20px 50px rgba(0,0,0,0.5); animation: fadeIn 1s ease-out; }
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-            h1 { font-size: 48px; background: linear-gradient(45deg, var(--p), var(--s)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; letter-spacing: 5px; }
-            p { color: #888; margin-bottom: 40px; font-size: 18px; }
-            a { background: var(--p); color: white; padding: 18px 45px; border-radius: 15px; text-decoration: none; font-weight: bold; font-size: 20px; transition: 0.3s; display: inline-block; box-shadow: 0 10px 20px rgba(0,123,255,0.3); }
-            a:hover { background: #0056b3; transform: scale(1.05); box-shadow: 0 15px 30px rgba(0,123,255,0.5); }
-        </style>
-    </head>
-    <body>
-        <div class="login-card">
-            <h1>VORTEX</h1>
-            <p>النظام الأقوى لإدارة سيرفرك باحترافية</p>
-            <a href="/auth/discord">🔑 تسجيل الدخول عبر ديسكورد</a>
-        </div>
-    </body>
-    </html>`);
-});
-
-app.get('/ping', (req, res) => {
-    res.send('VORTEX is active!');
-});
-
-app.get('/', (req, res) => {
-    res.redirect('/dashboard');
-});
+const checkAuth = (req, res, next) => req.isAuthenticated() ? next() : res.redirect('/login');
 
 // ==========================================
-// 8️⃣ UI Helper Function (Redesigned)
+// 5️⃣ UI Engine - Full CSS Design
 // ==========================================
 function ui(guild, active, content) {
     const showNav = guild.id ? 'flex' : 'none';
     const guildName = guild.name || 'VORTEX DASHBOARD';
-    const guildIcon = guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
     return `
     <html dir="rtl">
     <head>
         <meta charset="UTF-8">
-        <title>VORTEX | ${guildName}</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700&display=swap" rel="stylesheet">
         <style>
             :root {
-                --bg: #050505;
-                --sidebar: #0a0a0a;
-                --card: #0f0f0f;
-                --p: #007bff;
-                --s: #ff4d4d;
+                --p: #5865F2;
+                --s: #ff4757;
+                --bg: radial-gradient(circle at center, #1a1a2e 0%, #05051a 100%);
+                --card-bg: rgba(0, 0, 0, 0.55);
                 --accent: #00d2ff;
-                --text: #ffffff;
-                --text-dim: #888;
-                --border: rgba(255,255,255,0.05);
             }
             * { box-sizing: border-box; }
-            body { 
-                background: var(--bg); 
-                color: var(--text); 
-                margin: 0; 
-                font-family: 'Inter', 'Segoe UI', sans-serif; 
-                display: flex;
+            body {
+                margin: 0; font-family: 'Changa', sans-serif;
+                background: var(--bg); background-attachment: fixed;
+                color: white; display: flex; min-height: 100vh; direction: rtl;
+            }
+
+            /* ===== SIDEBAR ===== */
+            .sidebar {
+                width: 270px; background: rgba(0,0,0,0.85);
+                backdrop-filter: blur(20px); position: fixed;
+                right: 0; height: 100vh; padding: 25px 12px;
+                border-left: 1px solid rgba(255,255,255,0.08);
+                z-index: 1000; display: flex; flex-direction: column;
+                overflow-y: auto;
+                scrollbar-width: thin;
+                scrollbar-color: var(--p) transparent;
+            }
+            .sidebar::-webkit-scrollbar { width: 5px; }
+            .sidebar::-webkit-scrollbar-thumb { background: var(--p); border-radius: 10px; }
+            .sidebar::-webkit-scrollbar-track { background: transparent; }
+
+            .sidebar-logo {
+                text-align: center; margin-bottom: 10px;
+            }
+            .sidebar-logo h2 {
+                background: linear-gradient(to left, var(--p), var(--s));
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                font-size: 28px; font-weight: 700; margin: 0;
+            }
+            .sidebar-logo p {
+                color: #666; font-size: 11px; margin: 4px 0 20px;
+            }
+
+            .nav { display: ${showNav}; flex-direction: column; gap: 6px; padding-bottom: 40px; }
+            .nav a {
+                display: flex; align-items: center; padding: 12px 16px;
+                border-radius: 12px; color: #9aa3b0; text-decoration: none;
+                transition: all 0.25s; gap: 12px; font-weight: 500; font-size: 14px;
+            }
+            .nav a:hover, .nav a.active {
+                background: rgba(88,101,242,0.15); color: white;
+                border-right: 4px solid var(--p); padding-right: 12px;
+                transform: translateX(-3px);
+            }
+            .nav .nav-section {
+                color: #444; font-size: 10px; text-transform: uppercase;
+                letter-spacing: 1.5px; padding: 12px 16px 4px; font-weight: 700;
+            }
+
+            /* ===== MAIN CONTENT ===== */
+            .main {
+                margin-right: ${guild.id ? '270px' : '0'};
+                padding: 40px; width: 100%; transition: 0.3s;
                 min-height: 100vh;
             }
-            .sidebar {
-                width: 280px;
-                background: var(--sidebar);
-                border-left: 1px solid var(--border);
-                display: ${showNav};
-                flex-direction: column;
-                padding: 20px;
-                position: fixed;
-                height: 100vh;
-                right: 0;
-                z-index: 100;
+            .page-title {
+                font-size: 26px; font-weight: 700; margin-bottom: 30px;
+                display: flex; align-items: center; gap: 12px;
             }
-            .sidebar-header {
-                padding: 20px 10px;
-                text-align: center;
-                border-bottom: 1px solid var(--border);
-                margin-bottom: 20px;
+            .page-title span {
+                background: linear-gradient(45deg, var(--p), var(--accent));
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             }
-            .sidebar-header img {
-                width: 80px;
-                height: 80px;
-                border-radius: 20px;
-                margin-bottom: 15px;
-                border: 2px solid var(--p);
-            }
-            .sidebar-header h2 { font-size: 18px; margin: 0; color: var(--p); }
-            
-            .nav-links { flex: 1; overflow-y: auto; }
-            .nav-links a {
-                display: flex;
-                align-items: center;
-                padding: 14px 18px;
-                color: var(--text-dim);
-                text-decoration: none;
-                border-radius: 12px;
-                margin-bottom: 8px;
-                transition: 0.3s;
-                font-weight: 500;
-            }
-            .nav-links a i { margin-left: 15px; font-size: 18px; width: 20px; text-align: center; }
-            .nav-links a:hover { background: rgba(255,255,255,0.03); color: white; }
-            .nav-links a.active { background: var(--p); color: white; box-shadow: 0 10px 20px rgba(0,123,255,0.2); }
-            
-            .main {
-                flex: 1;
-                margin-right: ${guild.id ? '280px' : '0'};
-                padding: 40px;
-                max-width: 1200px;
-                margin-left: auto;
-                margin-right: auto;
-                animation: fadeIn 0.5s ease-out;
-            }
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+            /* ===== CARDS ===== */
             .card {
-                background: var(--card);
-                border-radius: 24px;
-                padding: 30px;
-                border: 1px solid var(--border);
-                margin-bottom: 30px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                transition: 0.3s;
-            }
-            .card:hover { transform: translateY(-5px); border-color: rgba(0,123,255,0.2); }
-            
-            h1, h2, h3 { margin-top: 0; }
-            label { display: block; margin-bottom: 10px; font-weight: bold; color: var(--text-dim); font-size: 14px; }
-            input, select, textarea {
-                width: 100%;
-                background: #151515;
-                border: 1px solid var(--border);
-                padding: 15px;
-                border-radius: 12px;
-                color: white;
-                margin-bottom: 20px;
-                outline: none;
-                transition: 0.3s;
-            }
-            input:focus, select:focus, textarea:focus { border-color: var(--p); background: #1a1a1a; }
-            
-            .btn-save {
-                background: linear-gradient(45deg, var(--p), #00a2ff);
-                color: white;
-                border: none;
-                padding: 16px 30px;
-                border-radius: 14px;
-                font-weight: bold;
-                cursor: pointer;
-                width: 100%;
-                font-size: 16px;
-                transition: 0.3s;
-                box-shadow: 0 10px 20px rgba(0,123,255,0.2);
-            }
-            .btn-save:hover { transform: scale(1.02); box-shadow: 0 15px 30px rgba(0,123,255,0.4); }
-            
-            .guild-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-                gap: 25px;
-                width: 100%;
-            }
-            .guild-card {
-                background: var(--card);
-                border-radius: 24px;
-                padding: 25px;
-                text-align: center;
-                border: 1px solid var(--border);
-                transition: 0.3s;
-                cursor: pointer;
-                position: relative;
+                position: relative; background: var(--card-bg);
+                backdrop-filter: blur(15px); padding: 28px;
+                border-radius: 18px; margin-bottom: 24px;
+                border: 1px solid rgba(255,255,255,0.06);
                 overflow: hidden;
             }
-            .guild-card::before {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; width: 100%; height: 5px;
-                background: var(--p);
-                opacity: 0; transition: 0.3s;
+            .card::before {
+                content: ''; position: absolute; inset: 0; border-radius: 18px;
+                padding: 1px;
+                background: linear-gradient(135deg, rgba(88,101,242,0.4), rgba(0,210,255,0.2), rgba(255,71,87,0.2));
+                -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                -webkit-mask-composite: xor; mask-composite: exclude;
+                pointer-events: none;
             }
-            .guild-card:hover { transform: translateY(-10px); border-color: var(--p); }
-            .guild-card:hover::before { opacity: 1; }
-            .guild-icon { width: 90px; height: 90px; border-radius: 25px; margin-bottom: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
-            
-            /* Stats Widgets */
-            .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-            .stat-box {
-                padding: 25px;
-                border-radius: 20px;
-                text-align: center;
-                position: relative;
-                overflow: hidden;
+            .card h3 {
+                color: var(--accent); margin: 0 0 20px; font-size: 18px;
+                display: flex; align-items: center; gap: 8px;
             }
-            .stat-box i { font-size: 40px; opacity: 0.1; position: absolute; left: 10px; bottom: 10px; }
-            .stat-val { font-size: 32px; font-weight: 800; margin-bottom: 5px; }
-            .stat-label { color: var(--text-dim); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
 
-            /* Animations */
-            .pulse { animation: pulse-animation 2s infinite; }
-            @keyframes pulse-animation { 0% { box-shadow: 0 0 0 0px rgba(0, 123, 255, 0.4); } 100% { box-shadow: 0 0 0 20px rgba(0, 123, 255, 0); } }
+            /* ===== FORM ELEMENTS ===== */
+            label {
+                display: block; color: #adb5bd; font-size: 13px;
+                margin-bottom: 6px; margin-top: 14px; font-weight: 500;
+            }
+            label:first-child { margin-top: 0; }
+            input[type="text"], input[type="number"], input[type="color"],
+            input[type="email"], input[type="password"],
+            select, textarea {
+                width: 100%; padding: 12px 14px; border-radius: 10px;
+                background: rgba(0,0,0,0.4); color: white;
+                border: 1px solid rgba(255,255,255,0.1);
+                font-family: 'Changa', sans-serif; font-size: 14px;
+                transition: border-color 0.2s; outline: none;
+                margin-bottom: 4px;
+            }
+            input:focus, select:focus, textarea:focus {
+                border-color: var(--p);
+                box-shadow: 0 0 0 3px rgba(88,101,242,0.15);
+            }
+            select option { background: #1a1a2e; }
+            select[multiple] { height: 120px; }
+            textarea { resize: vertical; min-height: 80px; }
+
+            /* ===== GRID HELPERS ===== */
+            .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+            .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+            @media (max-width: 768px) {
+                .grid-2, .grid-3 { grid-template-columns: 1fr; }
+                .main { padding: 20px; }
+                .sidebar { width: 240px; }
+                .main { margin-right: ${guild.id ? '240px' : '0'}; }
+            }
+
+            /* ===== BUTTONS ===== */
+            .btn-save {
+                background: linear-gradient(45deg, var(--p), #7b2ff7);
+                color: white; border: none; padding: 13px 20px;
+                border-radius: 12px; cursor: pointer; width: 100%;
+                font-weight: bold; font-size: 14px; font-family: 'Changa', sans-serif;
+                transition: all 0.3s; text-align: center;
+                text-decoration: none; display: block; margin-top: 16px;
+            }
+            .btn-save:hover { filter: brightness(1.15); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(88,101,242,0.35); }
+            .btn-danger {
+                background: linear-gradient(45deg, var(--s), #c0392b);
+            }
+            .btn-success {
+                background: linear-gradient(45deg, #00b894, #00d2ff);
+            }
+            .btn-sm {
+                padding: 8px 16px; width: auto; display: inline-block;
+                border-radius: 8px; font-size: 13px; margin-top: 0;
+            }
+
+            /* ===== STATS BOXES ===== */
+            .stat-box {
+                background: rgba(88,101,242,0.08); padding: 20px;
+                border-radius: 14px; text-align: center;
+                border: 1px solid rgba(88,101,242,0.15);
+                transition: transform 0.2s;
+            }
+            .stat-box:hover { transform: translateY(-3px); }
+            .stat-box .stat-num { font-size: 36px; font-weight: 700; color: var(--p); }
+            .stat-box .stat-label { color: #888; font-size: 13px; margin-top: 4px; }
+
+            /* ===== GUILD CARDS ===== */
+            .guild-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+            .guild-card {
+                background: var(--card-bg); border-radius: 18px; padding: 24px;
+                text-align: center; border: 1px solid rgba(255,255,255,0.08);
+                transition: all 0.35s; width: 200px; cursor: pointer;
+            }
+            .guild-card:hover { transform: translateY(-8px); border-color: var(--p); box-shadow: 0 12px 30px rgba(88,101,242,0.2); }
+            .guild-icon { width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--p); margin-bottom: 12px; }
+
+            /* ===== TABLE ===== */
+            table { width: 100%; border-collapse: collapse; color: white; }
+            thead tr { border-bottom: 2px solid rgba(88,101,242,0.4); }
+            th { padding: 10px 14px; color: var(--accent); font-size: 13px; text-align: right; }
+            td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 14px; }
+            tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+            /* ===== TOGGLE SWITCH ===== */
+            .toggle-row {
+                display: flex; align-items: center; gap: 14px;
+                padding: 14px 16px; background: rgba(255,255,255,0.02);
+                border-radius: 10px; margin-bottom: 10px;
+                border: 1px solid rgba(255,255,255,0.04);
+            }
+            .toggle-label { flex: 1; color: var(--accent); font-size: 14px; }
+
+            /* ===== WELCOME PREVIEW ===== */
+            .preview-container {
+                position: relative; border: 2px solid var(--p);
+                border-radius: 12px; overflow: hidden;
+                background: #000; width: 100%; aspect-ratio: 2/1;
+                user-select: none; margin: 16px 0;
+            }
+            #previewAvatar {
+                position: absolute; border: 3px solid #fff;
+                border-radius: 50%; background-size: 100% 100%;
+                cursor: move; box-shadow: 0 0 20px rgba(0,0,0,0.6);
+            }
+            .resizer {
+                width: 12px; height: 12px; background: var(--p);
+                position: absolute; border: 2px solid #fff; border-radius: 3px;
+            }
+            .resizer.br { right: -6px; bottom: -6px; cursor: nwse-resize; }
+            .resizer.tr { right: -6px; top: -6px; cursor: nesw-resize; }
+            .resizer.bl { left: -6px; bottom: -6px; cursor: nesw-resize; }
+
+            /* ===== SCROLLBAR (global) ===== */
+            ::-webkit-scrollbar { width: 6px; height: 6px; }
+            ::-webkit-scrollbar-thumb { background: var(--p); border-radius: 10px; }
+            ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+            * { scrollbar-width: thin; scrollbar-color: var(--p) transparent; }
+
+            /* ===== BADGE ===== */
+            .badge {
+                display: inline-block; padding: 3px 10px; border-radius: 20px;
+                font-size: 11px; font-weight: 700;
+            }
+            .badge-online { background: rgba(0,184,148,0.2); color: #00b894; }
+            .badge-offline { background: rgba(255,71,87,0.2); color: var(--s); }
+
+            /* ===== DIVIDER ===== */
+            .divider {
+                height: 1px; background: rgba(255,255,255,0.06);
+                margin: 20px 0;
+            }
+
+            /* ===== HINT TEXT ===== */
+            .hint { color: #666; font-size: 12px; margin-top: 4px; }
+
+            /* ===== ANIMATION ===== */
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            .card { animation: fadeIn 0.3s ease; }
         </style>
     </head>
     <body>
         <div class="sidebar">
-            <div class="sidebar-header">
-                <img src="${guildIcon}" alt="Icon">
-                <h2>${guildName}</h2>
-                <div style="font-size: 12px; color: var(--text-dim); margin-top: 5px;">VORTEX v2.0</div>
+            <div class="sidebar-logo">
+                <h2>VORTEX</h2>
+                <p>نظام إدارة السيرفرات المتطور</p>
             </div>
-            <div class="nav-links">
-                <a class="${active == 'home' ? 'active' : ''}" href="/manage/${guild.id}/home"><i class="fas fa-chart-line"></i> الإحصائيات</a>
-                <a class="${active == 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick"><i class="fas fa-video"></i> تنبيهات Kick</a>
-                <a class="${active == 'streaks' ? 'active' : ''}" href="/manage/${guild.id}/streaks"><i class="fas fa-fire"></i> نظام الستريك</a>
-                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs"><i class="fas fa-history"></i> سجلات اللوق</a>
-                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome"><i class="fas fa-door-open"></i> الترحيب</a>
-                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security"><i class="fas fa-shield-alt"></i> الحماية</a>
-                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets"><i class="fas fa-ticket-alt"></i> التذاكر</a>
-                <a class="${active == 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod"><i class="fas fa-gavel"></i> الإشراف</a>
-                <a class="${active == 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans"><i class="fas fa-users"></i> الكلانات</a>
-                <a href="/dashboard" style="margin-top: 20px; color: var(--s);"><i class="fas fa-arrow-right"></i> خروج للسيرفرات</a>
+
+            <div class="nav">
+                <div class="nav-section">عام</div>
+                <a class="${active == 'home' ? 'active' : ''}" href="/manage/${guild.id}/home">📊 الإحصائيات</a>
+                <a class="${active == 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">🟢 تنبيهات Kick</a>
+
+                <div class="nav-section">الإعدادات</div>
+                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
+                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
+                <a class="${active == 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">⚖️ الإشراف</a>
+                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">📜 سجلات اللوق</a>
+                <a class="${active == 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">🏆 نظام الليفل</a>
+                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
+
+                <div class="nav-section">أخرى</div>
+                <a class="${active == 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans">🚩 الكلانات</a>
+                <a href="/dashboard">🏠 قائمة السيرفرات</a>
             </div>
         </div>
+
         <div class="main">
+            <div class="page-title"><span>${guildName}</span></div>
             ${content}
         </div>
     </body>
@@ -605,86 +492,86 @@ function ui(guild, active, content) {
 }
 
 // ==========================================
-// 9️⃣ Dashboard Routes
+// 6️⃣ Routes & Logic
 // ==========================================
+
+app.get('/login', (req, res) => res.send(`
+    <html dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            body { background: radial-gradient(circle at center, #1a1a2e 0%, #05051a 100%); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: 'Changa', sans-serif; }
+            .login-card { background: rgba(0,0,0,0.7); padding: 50px 60px; border-radius: 24px; text-align: center; border: 1px solid rgba(88,101,242,0.3); backdrop-filter: blur(20px); }
+            h1 { background: linear-gradient(45deg, #5865F2, #ff4757); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 36px; margin-bottom: 8px; }
+            p { color: #888; margin-bottom: 30px; }
+            a { background: linear-gradient(45deg, #5865F2, #7b2ff7); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 16px; transition: all 0.3s; display: inline-block; }
+            a:hover { filter: brightness(1.2); transform: translateY(-2px); }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <h1>VORTEX</h1>
+            <p>أقوى نظام لإدارة وحماية سيرفرات الديسكورد</p>
+            <a href="/auth/discord">🔑 تسجيل الدخول عبر Discord</a>
+        </div>
+    </body>
+    </html>
+`));
+
+app.get('/auth/discord', passport.authenticate('discord'));
+app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => res.redirect('/dashboard'));
+app.get('/logout', (req, res) => { req.logout(() => res.redirect('/login')); });
+app.get('/', (req, res) => res.redirect('/dashboard'));
 
 app.get('/dashboard', checkAuth, (req, res) => {
     const adminGuilds = req.user.guilds.filter(g => (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8));
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
     const cards = adminGuilds.map(g => {
         const hasBot = client.guilds.cache.has(g.id);
-        const iconURL = g.icon
-            ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
-            : 'https://cdn.discordapp.com/embed/avatars/0.png';
-        const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
-
+        const icon = g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256` : 'https://cdn.discordapp.com/embed/avatars/0.png';
         return `
-    <div class="guild-card" onclick="location.href='${hasBot ? `/manage/${g.id}/home` : inviteLink}'">
-        <img src="${iconURL}" class="guild-icon">
-        <h3 style="color:white; margin:10px 0; font-size: 16px;">${g.name}</h3>
-        <div style="font-size: 13px; font-weight: bold; color: ${hasBot ? 'var(--p)' : 'var(--accent)'}">
-            ${hasBot ? '<i class="fas fa-cog"></i> الإعدادات' : '<i class="fas fa-plus"></i> إضافة البوت'}
-        </div>
-    </div>`;
+        <div class="guild-card">
+            <img src="${icon}" class="guild-icon">
+            <h3 style="color:white; margin:8px 0; font-size:15px;">${g.name}</h3>
+            ${hasBot
+                ? `<a href="/manage/${g.id}/home" style="color:var(--p); text-decoration:none; font-weight:bold; font-size:13px;">⚙️ الإعدادات</a>`
+                : `<a href="${inviteLink}" target="_blank" style="color:var(--accent); text-decoration:none; font-weight:bold; font-size:13px;">➕ إضافة البوت</a>`
+            }
+        </div>`;
     }).join('');
 
-    const content = `
-    <div style="text-align:center; margin-bottom: 50px;">
-        <h1 style="font-size: 60px; font-weight: 900; background: linear-gradient(45deg, var(--p), var(--s)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 10px; margin-bottom: 10px;">VORTEX</h1>
-        <p style="color: var(--text-dim); font-size: 18px;">اختر السيرفر الذي تريد إدارته</p>
-    </div>
-    <div class="guild-grid">${cards}</div>`;
-
-    res.send(ui({ id: null, name: 'قائمة السيرفرات' }, 'home', content));
+    res.send(ui({ id: null }, 'home', `
+    <div style="text-align:center; padding-top:30px;">
+        <div style="font-size:42px; font-weight:bold; background:linear-gradient(45deg,#ff4d6d,#7b2ff7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px;">VORTEX SYSTEM</div>
+        <p style="color:#666; margin-bottom:40px;">اختر السيرفر الذي تود إدارته</p>
+        <div class="guild-grid">${cards}</div>
+    </div>`));
 });
 
-// --- [ Home / Stats Page ] ---
+// --- [ Home Stats ] ---
 app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-
-    const statsData = await Stats.findOne({ guildId: g.id }) || {
-        messages: { total: 0, daily: 0, weekly: 0, monthly: 0 },
-        activeChannels: new Map(),
-        membersLog: { joined: [], left: [] }
-    };
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const newMembersCount = (statsData.membersLog?.joined || []).filter(d => d > sevenDaysAgo).length;
-    const leftMembersCount = (statsData.membersLog?.left || []).filter(d => d > sevenDaysAgo).length;
-
+    const stats = await Stats.findOne({ guildId: g.id }) || { messages: { total: 0 } };
     const content = `
     <div class="card">
-        <h2 style="margin-bottom: 30px;"><i class="fas fa-chart-pie" style="color: var(--p);"></i> نظرة عامة على النشاط</h2>
-        <div class="stats-grid">
-            <div class="stat-box" style="background: rgba(0,123,255,0.05); border: 1px solid rgba(0,123,255,0.1);">
-                <i class="fas fa-envelope"></i>
-                <div class="stat-val" style="color: var(--p);">${statsData.messages?.total || 0}</div>
+        <h3>📊 إحصائيات السيرفر العامة</h3>
+        <div class="grid-3">
+            <div class="stat-box">
+                <div class="stat-num">${stats.messages?.total || 0}</div>
                 <div class="stat-label">إجمالي الرسائل</div>
             </div>
-            <div class="stat-box" style="background: rgba(0,210,255,0.05); border: 1px solid rgba(0,210,255,0.1);">
-                <i class="fas fa-users"></i>
-                <div class="stat-val" style="color: var(--accent);">${g.memberCount}</div>
+            <div class="stat-box" style="--p:#00d2ff;">
+                <div class="stat-num" style="color:var(--accent);">${g.memberCount}</div>
                 <div class="stat-label">عدد الأعضاء</div>
             </div>
-            <div class="stat-box" style="background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.1);">
-                <i class="fas fa-user-plus"></i>
-                <div class="stat-val" style="color: #00ff88;">+${newMembersCount}</div>
-                <div class="stat-label">أعضاء جدد (أسبوع)</div>
-            </div>
-            <div class="stat-box" style="background: rgba(255,77,77,0.05); border: 1px solid rgba(255,77,77,0.1);">
-                <i class="fas fa-user-minus"></i>
-                <div class="stat-val" style="color: var(--s);">-${leftMembersCount}</div>
-                <div class="stat-label">مغادرون (أسبوع)</div>
+            <div class="stat-box" style="background:rgba(0,184,148,0.08); border-color:rgba(0,184,148,0.15);">
+                <div class="stat-num" style="color:#00b894;">${g.channels.cache.size}</div>
+                <div class="stat-label">عدد القنوات</div>
             </div>
         </div>
-    </div>
-    
-    <div class="card">
-        <h3><i class="fas fa-info-circle"></i> معلومات البوت في السيرفر</h3>
-        <p style="color: var(--text-dim);">اسم البوت: <b>${client.user.username}</b></p>
-        <p style="color: var(--text-dim);">تاريخ الإضافة: <b>${g.members.me.joinedAt.toLocaleDateString('ar-EG')}</b></p>
     </div>`;
-
     res.send(ui(g, 'home', content));
 });
 
@@ -692,161 +579,316 @@ app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
 app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-
-    let s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
-
+    const s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
     const content = `
     <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-            <h2><i class="fas fa-video" style="color: #00E701;"></i> تنبيهات Kick المباشرة</h2>
-            <button onclick="document.getElementById('add-kick-form').style.display = 'block'" class="btn-save" style="width:auto; padding:10px 25px; background: #00E701; color:black;">➕ إضافة ستريمر</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin:0;">🟢 نظام تنبيهات Kick</h3>
+            <button onclick="document.getElementById('add-form').style.display = document.getElementById('add-form').style.display==='none'?'block':'none'" class="btn-save btn-sm" style="background:linear-gradient(45deg,#00b894,#00d2ff);">➕ إضافة ستريمر</button>
         </div>
 
-        <div id="add-kick-form" style="display:none; background: rgba(0,231,1,0.05); border: 1px solid #00E701; padding: 25px; border-radius: 20px; margin-bottom: 30px; animation: slideDown 0.4s;">
+        <div id="add-form" style="display:none; border:1px solid rgba(0,183,74,0.3); padding:20px; border-radius:12px; margin-bottom:24px; background:rgba(0,183,74,0.05);">
             <form method="POST" action="/save/${g.id}/kick">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
-                        <label>رابط القناة أو اسم المستخدم:</label>
-                        <input type="text" name="kickUser" placeholder="مثلاً: hook" required>
-                    </div>
-                    <div>
-                        <label>قناة التنبيه:</label>
-                        <select name="channelId">
-                            ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-                <label>الرتبة المطلوب عمل منشن لها:</label>
-                <select name="roleId">
-                    <option value="">-- بدون منشن --</option>
-                    <option value="@everyone">@everyone</option>
-                    <option value="@here">@here</option>
-                    ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                <label>اسم المستخدم في Kick:</label>
+                <input type="text" name="kickUser" placeholder="مثلاً: hook" required>
+                <label>قناة التنبيه:</label>
+                <select name="channelId">
+                    ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
                 </select>
-                <label>رسالة التنبيه المخصصة:</label>
-                <textarea name="msg" placeholder="استخدم %name% لاسم الستريمر..."></textarea>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-save" style="background: #00E701; color: black;">💾 حفظ البيانات</button>
-                    <button type="button" onclick="document.getElementById('add-kick-form').style.display='none'" class="btn-save" style="background: #333;">إلغاء</button>
-                </div>
+                <button class="btn-save btn-success">💾 إضافة</button>
             </form>
         </div>
 
-        <div style="overflow-x: auto;">
-            <table style="width:100%; color:white; border-collapse: collapse; text-align:right;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #222;">
-                        <th style="padding:15px;">الستريمر</th>
-                        <th>قناة الإشعار</th>
-                        <th>المنشن</th>
-                        <th>التحكم</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${s.streamers.length === 0 ? '<tr><td colspan="4" style="text-align:center; padding:40px; color:#555;">لا يوجد ستريمرز مضافين حالياً</td></tr>' : ''}
-                    ${s.streamers.map((st, i) => `
-                    <tr style="border-bottom: 1px solid #111;">
-                        <td style="padding:20px;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div style="width:10px; height:10px; border-radius:50%; background: ${st.isLive ? '#00E701' : '#555'}"></div>
-                                <b>${st.kickUsername}</b>
-                            </div>
-                        </td>
-                        <td><span style="background:rgba(0,123,255,0.1); padding:5px 12px; border-radius:8px; color:var(--p);">#${g.channels.cache.get(st.channelId)?.name || 'محذوفة'}</span></td>
-                        <td>${st.roleId ? (st.roleId.startsWith('@') ? st.roleId : g.roles.cache.get(st.roleId)?.name || 'رتبة محذوفة') : 'لا يوجد'}</td>
-                        <td>
-                            <a href="/delete-kick/${g.id}/${i}" style="color:var(--s); text-decoration:none; font-size: 18px;" onclick="return confirm('هل أنت متأكد من الحذف؟')"><i class="fas fa-trash"></i></a>
-                        </td>
-                    </tr>`).join('')}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <style>@keyframes slideDown { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }</style>`;
-
+        <table>
+            <thead>
+                <tr>
+                    <th>الستريمر</th>
+                    <th>القناة</th>
+                    <th>الحالة</th>
+                    <th>حذف</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${s.streamers.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#555; padding:30px;">لا يوجد ستريمرز مضافين بعد</td></tr>' : ''}
+                ${s.streamers.map((st, i) => `
+                <tr>
+                    <td><b>${st.kickUsername}</b></td>
+                    <td>#${g.channels.cache.get(st.channelId)?.name || 'محذوفة'}</td>
+                    <td>${st.isLive ? '<span class="badge badge-online">🔴 مباشر</span>' : '<span class="badge badge-offline">⚫ غير مباشر</span>'}</td>
+                    <td><a href="/delete-kick/${g.id}/${i}" style="color:var(--s); text-decoration:none;" onclick="return confirm('حذف؟')">🗑️</a></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`;
     res.send(ui(g, 'kick', content));
 });
 
 app.post('/save/:guildId/kick', checkAuth, async (req, res) => {
-    try {
-        const { guildId } = req.params;
-        const { kickUser, channelId, roleId, msg } = req.body;
-        const username = kickUser.replace('https://kick.com', '').replace('/', '').trim();
-
-        await KickConfig.findOneAndUpdate(
-            { guildId },
-            { $push: { streamers: { kickUsername: username, channelId, roleId, customMessage: msg, isLive: false } } },
-            { upsert: true }
-        );
-        res.redirect(`/manage/${guildId}/kick`);
-    } catch (err) {
-        res.status(500).send("خطأ في إضافة الستريمر");
-    }
+    const { kickUser, channelId } = req.body;
+    await KickConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $push: { streamers: { kickUsername: kickUser, channelId, isLive: false } } }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/kick`);
 });
 
 app.get('/delete-kick/:guildId/:index', checkAuth, async (req, res) => {
-    const { guildId, index } = req.params;
-    const config = await KickConfig.findOne({ guildId });
-    if (config) {
-        config.streamers.splice(index, 1);
-        await config.save();
-    }
-    res.redirect(`/manage/${guildId}/kick`);
+    const config = await KickConfig.findOne({ guildId: req.params.guildId });
+    if (config) { config.streamers.splice(req.params.index, 1); await config.save(); }
+    res.redirect(`/manage/${req.params.guildId}/kick`);
 });
 
-// --- [ Streaks ] ---
-app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
+// --- [ Security Settings ] ---
+app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
+    const s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
+    const content = `
+    <form method="POST" action="/save/${g.id}/security">
+        <div class="card">
+            <h3>🛡️ إعدادات الحماية والرقابة</h3>
 
-    const s = await StreakConfig.findOne({ guildId: g.id }) || {};
+            <div class="grid-2">
+                <div>
+                    <label>منع الروابط:</label>
+                    <select name="antiLinks">
+                        <option value="true" ${s.security?.antiLinks ? 'selected' : ''}>🟢 مفعّل</option>
+                        <option value="false" ${!s.security?.antiLinks ? 'selected' : ''}>🔴 معطّل</option>
+                    </select>
+                </div>
+                <div>
+                    <label>نوع العقوبة:</label>
+                    <select name="punishment">
+                        <option value="none" ${s.security?.punishment === 'none' ? 'selected' : ''}>حذف الرسالة فقط</option>
+                        <option value="warn" ${s.security?.punishment === 'warn' ? 'selected' : ''}>تحذير</option>
+                        <option value="timeout" ${s.security?.punishment === 'timeout' ? 'selected' : ''}>إسكات (Timeout)</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>الكلمات الممنوعة (افصل بفاصلة):</label>
+            <textarea name="badWords" placeholder="كلمة1, كلمة2, كلمة3">${s.security?.badWords || ''}</textarea>
+            <p class="hint">💡 سيتم حذف أي رسالة تحتوي على هذه الكلمات تلقائياً</p>
+
+            <label>رتب الاستثناء (Bypass) - يمكن اختيار أكثر من رتبة:</label>
+            <select name="bypassRoles" multiple>
+                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
+                    `<option value="${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'selected' : ''}>${r.name}</option>`
+                ).join('')}
+            </select>
+
+            <button class="btn-save">💾 حفظ إعدادات الحماية</button>
+        </div>
+    </form>`;
+    res.send(ui(g, 'security', content));
+});
+
+app.post('/save/:guildId/security', checkAuth, async (req, res) => {
+    const b = req.body;
+    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, {
+        $set: {
+            "security.antiLinks": b.antiLinks === 'true',
+            "security.punishment": b.punishment,
+            "security.badWords": b.badWords,
+            "security.bypassRoles": Array.isArray(b.bypassRoles) ? b.bypassRoles : [b.bypassRoles].filter(x => x)
+        }
+    }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/security`);
+});
+
+// --- [ Ticket Settings ] ---
+app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
+    let topImg = s.topImagePath ? `/uploads/${path.basename(s.topImagePath)}` : 'https://placehold.co/110x110?text=Top';
+    let bottomImg = s.bottomImagePath ? `/uploads/${path.basename(s.bottomImagePath)}` : 'https://placehold.co/110x110?text=Bottom';
 
     const content = `
-    <div class="card">
-        <h2><i class="fas fa-fire" style="color: #ff8c00;"></i> نظام الستريك (التفاعل اليومي)</h2>
-        <form method="POST" action="/save/${g.id}/streaks">
-            <label>عدد الرسائل المطلوبة يومياً للحفاظ على الستريك:</label>
-            <input type="number" name="reqMsgs" value="${s.requiredMessages || 60}" min="1">
-            
-            <label>رتبة الستريك (تمنح للمتفاعلين):</label>
-            <select name="streakRole">
-                <option value="">-- لا يوجد --</option>
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}" ${s.streakRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-            </select>
-            
-            <label>قناة إعلانات الستريك:</label>
-            <select name="streakChannel">
-                <option value="">-- لا يوجد --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.streakChannel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
-            </select>
-            
-            <button class="btn-save">💾 حفظ إعدادات الستريك</button>
-        </form>
-        
-        <div style="margin-top: 30px; padding: 20px; background: rgba(255,71,87,0.05); border: 1px solid rgba(255,71,87,0.2); border-radius: 15px;">
-            <h4 style="color: var(--s); margin-top: 0;">⚠️ منطقة الخطر</h4>
-            <p style="font-size: 13px; color: var(--text-dim);">تصفير الستريكات سيقوم بمسح كافة الأرقام القياسية للأعضاء.</p>
-            <form method="POST" action="/reset-streaks/${g.id}" onsubmit="return confirm('هل أنت متأكد من تصفير كل الستريكات؟')">
-                <button class="btn-save" style="background: var(--s); width: auto;">🔄 تصفير كل الستريكات الآن</button>
-            </form>
+    <form action="/save/${g.id}/tickets" method="POST" enctype="multipart/form-data">
+        <div class="card">
+            <h3>🎫 إعداد نظام التذاكر المتطور</h3>
+
+            <div style="display:flex; gap:30px; justify-content:center; margin-bottom:24px;">
+                <div style="text-align:center;">
+                    <p style="color:#aaa; font-size:12px; margin-bottom:8px;">الصورة العلوية</p>
+                    <img src="${topImg}" style="width:110px; height:110px; object-fit:cover; border-radius:12px; border:2px solid var(--p);">
+                    <label style="background:var(--p); padding:6px 12px; border-radius:8px; cursor:pointer; display:block; margin-top:8px; font-size:12px; text-align:center;">
+                        🔄 تغيير <input type="file" name="topImage" accept="image/*" style="display:none;">
+                    </label>
+                </div>
+                <div style="text-align:center;">
+                    <p style="color:#aaa; font-size:12px; margin-bottom:8px;">الصورة السفلية</p>
+                    <img src="${bottomImg}" style="width:110px; height:110px; object-fit:cover; border-radius:12px; border:2px solid var(--p);">
+                    <label style="background:var(--p); padding:6px 12px; border-radius:8px; cursor:pointer; display:block; margin-top:8px; font-size:12px; text-align:center;">
+                        🔄 تغيير <input type="file" name="bottomImage" accept="image/*" style="display:none;">
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div>
+                    <label>عنوان التذكرة:</label>
+                    <input name="title" value="${s.title || ''}" placeholder="الدعم الفني">
+                </div>
+                <div>
+                    <label>لون الإيمباد (Hex):</label>
+                    <input name="color" value="${s.color || '#5865F2'}" placeholder="#5865F2">
+                </div>
+            </div>
+
+            <label>وصف التذكرة:</label>
+            <textarea name="description">${s.description || 'اضغط لفتح تذكرة'}</textarea>
+
+            <div class="grid-2">
+                <div>
+                    <label>رتبة الإدارة:</label>
+                    <select name="adminRole">
+                        <option value="">-- اختر رتبة الإدارة --</option>
+                        ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
+                            `<option value="${r.id}" ${s.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label>📢 قناة الإرسال:</label>
+                    <select name="targetChannel">
+                        <option value="">-- لا ترسل الآن --</option>
+                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                            `<option value="${c.id}"># ${c.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            <h4 style="color:var(--accent); margin-bottom:12px;">🔘 الأزرار (حتى 4):</h4>
+            ${[0,1,2,3].map(i => `
+            <div class="grid-2" style="margin-bottom:8px;">
+                <input name="btn_label_${i}" value="${s.buttons?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
+                <input name="btn_emoji_${i}" value="${s.buttons?.[i]?.emoji || ''}" placeholder="إيموجي (اختياري)">
+            </div>`).join('')}
+
+            <button class="btn-save">💾 حفظ ونشر اللوحة</button>
         </div>
-    </div>`;
-
-    res.send(ui(g, 'streaks', content));
+    </form>`;
+    res.send(ui(g, 'tickets', content));
 });
 
-app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
-    await StreakConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { $set: { requiredMessages: Number(req.body.reqMsgs), streakRole: req.body.streakRole, streakChannel: req.body.streakChannel } },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/streaks`);
+app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
+    const b = req.body;
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.status(404).send("Guild not found");
+
+    let buttons = [];
+    for (let i = 0; i < 4; i++) {
+        if (b[`btn_label_${i}`]?.trim()) buttons.push({ label: b[`btn_label_${i}`], emoji: b[`btn_emoji_${i}`] || "" });
+    }
+
+    let data = { title: b.title, description: b.description, color: b.color || '#5865F2', adminRole: b.adminRole, buttons };
+    if (req.files?.topImage?.[0]) data.topImagePath = req.files.topImage[0].path;
+    if (req.files?.bottomImage?.[0]) data.bottomImagePath = req.files.bottomImage[0].path;
+
+    const config = await TicketConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: data }, { upsert: true, new: true });
+
+    if (b.targetChannel) {
+        const ch = g.channels.cache.get(b.targetChannel);
+        if (ch) {
+            const files = [];
+            const embed = new EmbedBuilder().setTitle(data.title || "TICKETS").setDescription(data.description || "اضغط للفتح").setColor(data.color);
+
+            if (config.topImagePath && fs.existsSync(config.topImagePath)) {
+                const topName = path.basename(config.topImagePath);
+                files.push(new AttachmentBuilder(config.topImagePath, { name: topName }));
+                embed.setThumbnail(`attachment://${topName}`);
+            }
+            if (config.bottomImagePath && fs.existsSync(config.bottomImagePath)) {
+                const bottomName = path.basename(config.bottomImagePath);
+                files.push(new AttachmentBuilder(config.bottomImagePath, { name: bottomName }));
+                embed.setImage(`attachment://${bottomName}`);
+            }
+
+            const components = [];
+            if (buttons.length > 0) {
+                const row = new ActionRowBuilder();
+                buttons.forEach((btn, i) => {
+                    const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
+                    if (btn.emoji?.trim()) {
+                        try { button.setEmoji(btn.emoji.trim()); } catch(e) {}
+                    }
+                    row.addComponents(button);
+                });
+                components.push(row);
+            } else {
+                components.push(new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة 🎫').setStyle(ButtonStyle.Primary)
+                ));
+            }
+            ch.send({ embeds: [embed], components, files }).catch(e => console.error("Discord Send Error:", e));
+        }
+    }
+    res.redirect(`/manage/${req.params.guildId}/tickets`);
 });
 
-app.post('/reset-streaks/:guildId', checkAuth, async (req, res) => {
-    await UserLevel.updateMany({ guildId: req.params.guildId }, { $set: { streakCount: 0, dailyMsgs: 0 } });
-    res.redirect(`/manage/${req.params.guildId}/streaks`);
+// --- [ Jail / Mod Settings ] ---
+app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
+    const content = `
+    <form method="POST" action="/save/${g.id}/mod">
+        <div class="card">
+            <h3>⚖️ إعدادات نظام السجن</h3>
+
+            <div class="grid-2">
+                <div>
+                    <label>اسم أمر السجن:</label>
+                    <input name="jailCmd" value="${s.jail?.commandName || 'jail'}" placeholder="jail">
+                </div>
+                <div>
+                    <label>اسم أمر فك السجن:</label>
+                    <input name="unjailCmd" value="${s.jail?.unjailCommand || 'unjail'}" placeholder="unjail">
+                </div>
+            </div>
+
+            <label>رتبة السجن (Jail Role):</label>
+            <select name="jailRole">
+                <option value="">-- اختر رتبة السجن --</option>
+                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
+                    `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
+                ).join('')}
+            </select>
+
+            <label>قناة السجن:</label>
+            <select name="jailChannel">
+                <option value="">-- اختر قناة السجن --</option>
+                ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                    `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
+                ).join('')}
+            </select>
+
+            <label>رتب الإدارة المسموح لها بالسجن:</label>
+            <select name="adminRoles" multiple>
+                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
+                    `<option value="${r.id}" ${s.jail?.adminRoles?.includes(r.id) ? 'selected' : ''}>${r.name}</option>`
+                ).join('')}
+            </select>
+
+            <button class="btn-save">💾 حفظ إعدادات الإشراف</button>
+        </div>
+    </form>`;
+    res.send(ui(g, 'mod', content));
+});
+
+app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
+    const b = req.body;
+    await ModConfig.findOneAndUpdate({ guildId: req.params.guildId }, {
+        $set: {
+            "jail.commandName": b.jailCmd || 'jail',
+            "jail.unjailCommand": b.unjailCmd || 'unjail',
+            "jail.roleId": b.jailRole,
+            "jail.channelId": b.jailChannel,
+            "jail.adminRoles": Array.isArray(b.adminRoles) ? b.adminRoles : [b.adminRoles].filter(x => x)
+        }
+    }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/mod`);
 });
 
 // --- [ Logs ] ---
@@ -855,42 +897,30 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
     const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
-    const typeLabels = { 
-        messages: '💬 الرسائل', 
-        moderation: '⚖️ الإشراف', 
-        members: '👥 الأعضاء', 
-        channels: '📢 القنوات', 
-        roles: '🎭 الرتب', 
-        voice: '🎙️ الصوت' 
+    const typeLabels = {
+        messages: '💬 الرسائل', moderation: '⚖️ الإشراف',
+        members: '👥 الأعضاء', channels: '📢 القنوات',
+        roles: '🎭 الرتب', voice: '🎙️ الصوت'
     };
 
-    let content = `
-    <div class="card">
-        <h2><i class="fas fa-list-ul" style="color: var(--p);"></i> إعدادات سجلات اللوق</h2>
-        <p style="color: var(--text-dim); margin-bottom: 30px;">فعل السجلات التي تريد مراقبتها واختر القناة المناسبة لكل نوع.</p>
-        <form method="POST" action="/save/${g.id}/logs">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                ${types.map(t => `
-                    <div style="background: #111; padding: 20px; border-radius: 18px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <label style="margin:0; font-size: 16px; color: white;">${typeLabels[t]}</label>
-                            <div class="switch-container">
-                                <input type="checkbox" name="${t}_st" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width: 40px; height: 20px; margin: 0; cursor: pointer;">
-                            </div>
-                        </div>
-                        <select name="${t}_ch" style="margin: 0;">
-                            <option value="">-- اختر القناة --</option>
-                            ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                                `<option value="${c.id}" ${s.logs?.[t]?.channel == c.id ? 'selected' : ''}># ${c.name}</option>`
-                            ).join('')}
-                        </select>
-                    </div>
-                `).join('')}
-            </div>
-            <button class="btn-save" style="margin-top: 30px;">💾 حفظ كافة إعدادات اللوق</button>
-        </form>
-    </div>`;
-
+    const content = `
+    <form method="POST" action="/save/${g.id}/logs">
+        <div class="card">
+            <h3>📜 نظام اللوق</h3>
+            ${types.map(t => `
+            <div class="toggle-row">
+                <span class="toggle-label">${typeLabels[t]}</span>
+                <input type="checkbox" name="${t}_st" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width:auto; margin:0; cursor:pointer; width:18px; height:18px;">
+                <select name="${t}_ch" style="flex:1; max-width:280px; margin:0;">
+                    <option value="">-- اختر القناة --</option>
+                    ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                        `<option value="${c.id}" ${s.logs?.[t]?.channel == c.id ? 'selected' : ''}># ${c.name}</option>`
+                    ).join('')}
+                </select>
+            </div>`).join('')}
+            <button class="btn-save">💾 حفظ إعدادات اللوق</button>
+        </div>
+    </form>`;
     res.send(ui(g, 'logs', content));
 });
 
@@ -905,534 +935,613 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     res.redirect(`/manage/${req.params.guildId}/logs`);
 });
 
-// --- [ Welcome ] ---
-app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
+// --- [ Levels ] ---
+app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
+    let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
 
-    let content = `
-    <div class="card">
-        <h2><i class="fas fa-door-open" style="color: var(--accent);"></i> إعدادات الترحيب</h2>
-        <form method="POST" action="/save/${g.id}/welcome">
-            <label>حالة الترحيب:</label>
-            <select name="enabled">
-                <option value="true" ${s.welcome?.enabled ? 'selected' : ''}>مفعل</option>
-                <option value="false" ${!s.welcome?.enabled ? 'selected' : ''}>معطل</option>
-            </select>
-
-            <label>قناة الترحيب:</label>
+    const content = `
+    <form method="POST" action="/save/${g.id}/levels">
+        <div class="card">
+            <h3>🏆 إعدادات نظام المستويات</h3>
+            <div class="grid-2">
+                <div>
+                    <label>تشغيل النظام:</label>
+                    <select name="enabled">
+                        <option value="on" ${s.levels?.enabled ? 'selected' : ''}>🟢 مشغّل</option>
+                        <option value="off" ${!s.levels?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
+                    </select>
+                </div>
+                <div>
+                    <label>XP لكل رسالة:</label>
+                    <input type="number" name="xp" value="${s.levels?.xpPerMessage || 10}" min="1">
+                </div>
+            </div>
+            <label>قناة إعلانات الترقي:</label>
             <select name="channel">
-                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
+                <option value="">-- نفس قناة الرسالة --</option>
+                ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                    `<option value="${c.id}" ${s.levels?.levelUpChannel === c.id ? 'selected' : ''}># ${c.name}</option>`
+                ).join('')}
             </select>
-
-            <label>رسالة الترحيب (Embed):</label>
-            <textarea name="msg" rows="4">${s.welcome?.embedMessage || "مرحباً بك {member} في سيرفر {guild}! ✨"}</textarea>
-            
-            <p style="font-size: 12px; color: var(--text-dim);">استخدم: {member} للمنشن، {guild} لاسم السيرفر، {count} لعدد الأعضاء.</p>
-            
-            <button class="btn-save">💾 حفظ إعدادات الترحيب</button>
-        </form>
-    </div>`;
-
-    res.send(ui(g, 'welcome', content));
+            <label>أمر قائمة المتصدرين:</label>
+            <input name="leaderboardCommand" value="${s.levels?.leaderboardCommand || '!levels'}" placeholder="!levels">
+            <button class="btn-save">💾 حفظ إعدادات الليفل</button>
+        </div>
+    </form>`;
+    res.send(ui(g, 'levels', content));
 });
 
-app.post('/save/:guildId/welcome', checkAuth, async (req, res) => {
-    await GuildConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { 
-            $set: { 
-                "welcome.enabled": req.body.enabled === 'true',
-                "welcome.channel": req.body.channel,
-                "welcome.embedMessage": req.body.msg
-            } 
-        },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/welcome`);
-});
-
-// --- [ Security ] ---
-app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
-
-    const content = `
-    <div class="card">
-        <h2><i class="fas fa-shield-alt" style="color: var(--s);"></i> نظام الحماية التلقائي</h2>
-        <form method="POST" action="/save/${g.id}/security">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                <div>
-                    <label>منع الروابط:</label>
-                    <select name="antiLinks">
-                        <option value="true" ${s.security?.antiLinks ? 'selected' : ''}>مفعل</option>
-                        <option value="false" ${!s.security?.antiLinks ? 'selected' : ''}>معطل</option>
-                    </select>
-                </div>
-                <div>
-                    <label>نوع العقوبة:</label>
-                    <select name="punishment">
-                        <option value="none" ${s.security?.punishment === 'none' ? 'selected' : ''}>حذف الرسالة فقط</option>
-                        <option value="warn" ${s.security?.punishment === 'warn' ? 'selected' : ''}>تحذير</option>
-                        <option value="mute" ${s.security?.punishment === 'mute' ? 'selected' : ''}>إسكات (Timeout)</option>
-                    </select>
-                </div>
-            </div>
-
-            <label>الكلمات الممنوعة (افصل بينها بفاصلة):</label>
-            <textarea name="badWords" placeholder="مثال: كلمة1, كلمة2, كلمة3">${s.security?.badWords || ''}</textarea>
-
-            <label>رتب الاستثناء (Bypass):</label>
-            <select name="bypassRoles" multiple style="height: 120px;">
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'selected' : ''}>${r.name}</option>`).join('')}
-            </select>
-            
-            <button class="btn-save">💾 حفظ إعدادات الحماية</button>
-        </form>
-    </div>`;
-
-    res.send(ui(g, 'security', content));
-});
-
-app.post('/save/:guildId/security', checkAuth, async (req, res) => {
-    await GuildConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { 
-            $set: { 
-                "security.antiLinks": req.body.antiLinks === 'true',
-                "security.punishment": req.body.punishment,
-                "security.badWords": req.body.badWords,
-                "security.bypassRoles": Array.isArray(req.body.bypassRoles) ? req.body.bypassRoles : [req.body.bypassRoles].filter(x => x)
-            } 
-        },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/security`);
-});
-
-// --- [ Tickets ] ---
-app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await TicketConfig.findOne({ guildId: g.id }) || {};
-
-    const content = `
-    <div class="card">
-        <h2><i class="fas fa-ticket-alt" style="color: #ff4d6d;"></i> نظام التذاكر المطور</h2>
-        <form method="POST" action="/save/${g.id}/tickets">
-            <label>عنوان التذكرة:</label>
-            <input type="text" name="title" value="${s.title || 'الدعم الفني'}" required>
-            
-            <label>وصف التذكرة:</label>
-            <textarea name="desc">${s.description || 'اضغط على الزر لفتح تذكرة جديدة'}</textarea>
-
-            <label>لون الايمباد (Embed Color):</label>
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <input type="color" name="color" value="${s.color || '#007bff'}" style="width: 80px; height: 50px; padding: 5px;">
-                <span style="align-self: center; color: var(--text-dim);">اختر اللون المناسب لتصميم سيرفرك</span>
-            </div>
-
-            <label>رتبة الإدارة (التي ترى التذاكر):</label>
-            <select name="adminRole">
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}" ${s.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-            </select>
-
-            <label>قناة لوحة التذاكر:</label>
-            <select name="channelId">
-                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
-            </select>
-
-            <button class="btn-save">💾 حفظ ونشر لوحة التذاكر</button>
-        </form>
-    </div>`;
-
-    res.send(ui(g, 'tickets', content));
-});
-
-app.post('/save/:guildId/tickets', checkAuth, async (req, res) => {
-    const { guildId } = req.params;
-    const { title, desc, color, adminRole, channelId } = req.body;
-
-    const config = await TicketConfig.findOneAndUpdate(
-        { guildId },
-        { $set: { title, description: desc, color, adminRole, channelId } },
-        { upsert: true, new: true }
-    );
-
-    // Send the ticket panel to the channel
-    const channel = client.guilds.cache.get(guildId).channels.cache.get(channelId);
-    if (channel) {
-        const embed = new EmbedBuilder()
-            .setTitle(title)
-            .setDescription(desc)
-            .setColor(color)
-            .setFooter({ text: 'VORTEX Ticket System' });
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('open_ticket')
-                .setLabel('فتح تذكرة')
-                .setEmoji('📩')
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        channel.send({ embeds: [embed], components: [row] }).catch(() => { });
-    }
-
-    res.redirect(`/manage/${guildId}/tickets`);
-});
-
-// --- [ Moderation ] ---
-app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
-
-    const content = `
-    <div class="card">
-        <h2><i class="fas fa-gavel" style="color: var(--s);"></i> إعدادات نظام الإشراف</h2>
-        <form method="POST" action="/save/${g.id}/mod">
-            <h3 style="color: var(--p); border-bottom: 1px solid #222; padding-bottom: 10px;">🛡️ نظام السجن المطور</h3>
-            <p style="font-size: 13px; color: var(--text-dim);">عند سجن شخص، سيتم إخفاء كافة الرومات عنه تلقائياً.</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div>
-                    <label>رتبة السجن:</label>
-                    <select name="jailRole">
-                        <option value="">-- اختر الرتبة --</option>
-                        ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>قناة السجن (حيث يتحدث المسجون):</label>
-                    <select name="jailChannel">
-                        <option value="">-- اختر القناة --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-
-            <label>رتب الإدارة المسموح لها بالسجن:</label>
-            <select name="adminRoles" multiple style="height: 100px;">
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}" ${s.jail?.adminRoles?.includes(r.id) ? 'selected' : ''}>${r.name}</option>`).join('')}
-            </select>
-
-            <button class="btn-save">💾 حفظ إعدادات الإشراف</button>
-        </form>
-    </div>`;
-
-    res.send(ui(g, 'mod', content));
-});
-
-app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
-    const { jailRole, jailChannel, adminRoles } = req.body;
-    await ModConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { 
-            $set: { 
-                "jail.roleId": jailRole,
-                "jail.channelId": jailChannel,
-                "jail.adminRoles": Array.isArray(adminRoles) ? adminRoles : [adminRoles].filter(x => x)
-            } 
-        },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/mod`);
+app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
+    const b = req.body;
+    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, {
+        $set: {
+            "levels.enabled": b.enabled === 'on',
+            "levels.xpPerMessage": Number(b.xp) || 10,
+            "levels.levelUpChannel": b.channel,
+            "levels.leaderboardCommand": b.leaderboardCommand || '!levels'
+        }
+    }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/levels`);
 });
 
 // --- [ Clans ] ---
 app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    let clans = await Clan.find({ guildId: g.id });
+    const clans = await Clan.find({ guildId: g.id });
 
     const content = `
     <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-            <h2><i class="fas fa-shield-alt" style="color: #ffd700;"></i> إدارة الكلانات</h2>
-            <button onclick="document.getElementById('add-clan-form').style.display='block'" class="btn-save" style="width:auto; padding:10px 25px; background: #ffd700; color:black;">➕ إنشاء كلان جديد</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin:0;">🚩 نظام الكلانات</h3>
+            <a href="/manage/${g.id}/clans/add" class="btn-save btn-sm">➕ إضافة كلان</a>
         </div>
-
-        <div id="add-clan-form" style="display:none; background: rgba(255,215,0,0.05); border: 1px solid #ffd700; padding: 25px; border-radius: 20px; margin-bottom: 30px;">
-            <form method="POST" action="/save/${g.id}/clans">
-                <label>اسم الكلان:</label>
-                <input type="text" name="clanName" required>
-                
-                <label>قائد الكلان (ID):</label>
-                <input type="text" name="leaderId" required>
-                
-                <label>رتبة الكلان:</label>
-                <select name="roleId">
-                    ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                </select>
-
-                <button class="btn-save" style="background: #ffd700; color: black;">✅ إنشاء الكلان</button>
-            </form>
-        </div>
-
-        <div class="guild-grid">
-            ${clans.map(c => `
-                <div class="guild-card" style="border-color: rgba(255,215,0,0.2);">
-                    <div style="font-size: 40px; margin-bottom: 10px;">🛡️</div>
-                    <h3 style="margin:0;">${c.clanName}</h3>
-                    <p style="font-size: 12px; color: var(--text-dim);">القائد: <@${c.leaderId}></p>
-                    <div style="margin: 15px 0; font-weight: bold; color: #ffd700;">${c.points} نقطة</div>
-                    <a href="/delete-clan/${g.id}/${c._id}" style="color: var(--s); text-decoration:none;" onclick="return confirm('حذف الكلان؟')">🗑️ حذف</a>
-                </div>
-            `).join('')}
-        </div>
+        ${clans.length === 0 ? '<p style="color:#555; text-align:center; padding:30px;">لا يوجد كلانات بعد</p>' : ''}
+        ${clans.map((clan, i) => `
+        <div style="padding:18px; background:rgba(255,255,255,0.02); border-radius:12px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <b style="color:var(--accent);">${clan.clanName}</b>
+                <p style="color:#666; margin:4px 0 0; font-size:13px;">الأعضاء: ${clan.members?.length || 0} | النقاط: ${clan.points}</p>
+            </div>
+            <a href="/delete-clan/${g.id}/${clan._id}" style="color:var(--s); text-decoration:none;" onclick="return confirm('حذف الكلان؟')">🗑️ حذف</a>
+        </div>`).join('')}
     </div>`;
+    res.send(ui(g, 'clans', content));
+});
 
+app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const content = `
+    <form method="POST" action="/save/${g.id}/clans">
+        <div class="card">
+            <h3>🚩 إضافة كلان جديد</h3>
+            <label>اسم الكلان:</label>
+            <input name="clanName" required placeholder="مثلاً: VORTEX TEAM">
+            <label>ID القائد:</label>
+            <input name="leaderId" required placeholder="ايدي صاحب الكلان">
+            <label>رتبة الكلان:</label>
+            <select name="roleId">
+                <option value="">-- بدون رتبة --</option>
+                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+            </select>
+            <label>📝 أسئلة التقديم (سؤال في كل سطر):</label>
+            <textarea name="questions" rows="4" placeholder="ما هو اسمك؟&#10;كم عمرك؟"></textarea>
+            <button class="btn-save">💾 حفظ الكلان</button>
+        </div>
+    </form>`;
     res.send(ui(g, 'clans', content));
 });
 
 app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
-    const { clanName, leaderId, roleId } = req.body;
-    const count = await Clan.countDocuments({ guildId: req.params.guildId });
-    await new Clan({
-        guildId: req.params.guildId,
-        clanName,
-        leaderId,
-        roleId,
-        clanIndex: count + 1,
-        members: [leaderId]
-    }).save();
+    const { clanName, leaderId, roleId, questions } = req.body;
+    const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== "") : [];
+    await Clan.create({ guildId: req.params.guildId, clanName, leaderId, roleId, questions: questionsArray, members: [] });
     res.redirect(`/manage/${req.params.guildId}/clans`);
 });
 
-app.get('/delete-clan/:guildId/:id', checkAuth, async (req, res) => {
-    await Clan.deleteOne({ _id: req.params.id });
+app.get('/delete-clan/:guildId/:clanId', checkAuth, async (req, res) => {
+    await Clan.findByIdAndDelete(req.params.clanId);
     res.redirect(`/manage/${req.params.guildId}/clans`);
 });
 
 // ==========================================
-// 🔟 Bot Logic (Discord Events)
+// 7️⃣ Welcome System (Full - From File 2)
 // ==========================================
+app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
 
-client.on('ready', async () => {
-    console.log(`🚀 VORTEX is ready as ${client.user.tag}`);
-    
-    // Register Slash Commands
-    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+    let img = s.welcome?.imagePath || 'https://placehold.co/800x400?text=No+Background';
+
+    const content = `
+    <style>
+        .preview-container {
+            position: relative; border: 2px solid var(--p);
+            border-radius: 12px; overflow: hidden;
+            background: #000; width: 100%; aspect-ratio: 2/1;
+            user-select: none; margin: 16px 0;
+        }
+        #previewAvatar {
+            position: absolute; border: 3px solid #fff;
+            border-radius: 50%; background-size: 100% 100%;
+            cursor: move; box-shadow: 0 0 20px rgba(0,0,0,0.6);
+        }
+        .resizer {
+            width: 12px; height: 12px; background: var(--p);
+            position: absolute; border: 2px solid #fff; border-radius: 3px;
+        }
+        .resizer.br { right: -6px; bottom: -6px; cursor: nwse-resize; }
+        .resizer.tr { right: -6px; top: -6px; cursor: nesw-resize; }
+        .resizer.bl { left: -6px; bottom: -6px; cursor: nesw-resize; }
+    </style>
+
+    <div class="card">
+        <h3>👋 إعدادات نظام الترحيب</h3>
+        <div class="grid-2">
+            <div>
+                <p style="color:#aaa; font-size:13px; margin:0;">الحالة الحالية:</p>
+                <p style="margin:4px 0 0;">${s.welcome?.enabled
+                    ? '<span class="badge badge-online">🟢 مشغّل</span>'
+                    : '<span class="badge badge-offline">🔴 مطفأ</span>'
+                }</p>
+            </div>
+            <div>
+                <p style="color:#aaa; font-size:13px; margin:0;">القناة:</p>
+                <p style="margin:4px 0 0; color:white;">${s.welcome?.channel ? `<#${s.welcome.channel}>` : 'لم تُحدد'}</p>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" id="mainForm">
+        <div class="card">
+            <h3>⚙️ الإعدادات الأساسية</h3>
+            <div class="grid-2">
+                <div>
+                    <label>📍 قناة الترحيب:</label>
+                    <select name="channel" required>
+                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                            `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label>🔔 الحالة:</label>
+                    <select name="enabled">
+                        <option value="on" ${s.welcome?.enabled ? 'selected' : ''}>🟢 مشغّل</option>
+                        <option value="off" ${!s.welcome?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>💬 رسالة الترحيب (نص الإيمباد):</label>
+            <textarea name="embedMessage" rows="4" placeholder="اكتب رسالة الترحيب... يمكنك استخدام {member} و {guild} و {count}">${s.welcome?.embedMessage || ''}</textarea>
+            <p class="hint">💡 المتغيرات المتاحة: {member} = منشن العضو | {guild} = اسم السيرفر | {count} = عدد الأعضاء</p>
+        </div>
+
+        <div class="card">
+            <h3>🖼️ خلفية صورة الترحيب</h3>
+
+            <label>🤖 توليد خلفية بالذكاء الاصطناعي:</label>
+            <div style="display:flex; gap:10px; margin-bottom:16px;">
+                <input type="text" id="aiPromptInput" name="aiPrompt"
+                    value="${s.welcome?.aiPrompt || ''}"
+                    placeholder="مثلاً: Galaxy background, blue stars, high quality"
+                    style="flex:1;">
+                <button type="button" onclick="generateAIImage()" class="btn-save btn-sm" style="background:linear-gradient(45deg,#7b2ff7,var(--accent)); margin-top:0; white-space:nowrap;">
+                    🚀 توليد AI
+                </button>
+            </div>
+            <input type="hidden" name="remoteBg" id="remoteBg">
+
+            <label>📁 أو ارفع صورة خلفية مخصصة:</label>
+            <input type="file" name="welcomeImage" accept="image/*" style="padding:10px; cursor:pointer;">
+            <p class="hint">💡 الصورة المرفوعة ستلغي الخلفية المولّدة بالذكاء الاصطناعي</p>
+
+            <div class="preview-container" id="container">
+                <img src="${img}" id="previewBg" style="width:100%; height:100%; object-fit:cover; pointer-events:none; opacity:0.75;">
+                <div id="previewAvatar" style="
+                    width: ${s.welcome?.avatarWidth || 150}px;
+                    height: ${s.welcome?.avatarHeight || 150}px;
+                    left: ${s.welcome?.avatarX || 50}%;
+                    top: ${s.welcome?.avatarY || 50}%;
+                    transform: translate(-50%, -50%);
+                    background-image: url('${client.user?.displayAvatarURL() || ''}');
+                ">
+                    <div class="resizer br"></div>
+                    <div class="resizer tr"></div>
+                    <div class="resizer bl"></div>
+                </div>
+            </div>
+
+            <p style="color:#666; font-size:12px; text-align:center; margin-top:8px;">
+                💡 اسحب الصورة لتحريكها، واستخدم المربعات الزرقاء في الزوايا لتغيير الحجم
+            </p>
+
+            <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
+            <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
+            <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
+            <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
+
+            <button type="submit" class="btn-save">💾 حفظ إعدادات الترحيب</button>
+        </div>
+    </form>
+
+    <script>
+        const avatar = document.getElementById('previewAvatar');
+        const container = document.getElementById('container');
+        let isDragging = false, isResizing = false, currentResizer = null;
+
+        avatar.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('resizer')) return;
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            if (isDragging) {
+                let x = ((e.clientX - rect.left) / rect.width) * 100;
+                let y = ((e.clientY - rect.top) / rect.height) * 100;
+                x = Math.max(0, Math.min(100, x));
+                y = Math.max(0, Math.min(100, y));
+                avatar.style.left = x + '%';
+                avatar.style.top = y + '%';
+                document.getElementById('avatarX').value = Math.round(x);
+                document.getElementById('avatarY').value = Math.round(y);
+            }
+            if (isResizing) {
+                const avatarRect = avatar.getBoundingClientRect();
+                if (currentResizer.classList.contains('br')) {
+                    avatar.style.width = (e.clientX - avatarRect.left) + 'px';
+                    avatar.style.height = (e.clientY - avatarRect.top) + 'px';
+                } else if (currentResizer.classList.contains('tr')) {
+                    avatar.style.width = (e.clientX - avatarRect.left) + 'px';
+                    avatar.style.height = (avatarRect.bottom - e.clientY) + 'px';
+                } else if (currentResizer.classList.contains('bl')) {
+                    avatar.style.width = (avatarRect.right - e.clientX) + 'px';
+                    avatar.style.height = (e.clientY - avatarRect.top) + 'px';
+                }
+                document.getElementById('avatarWidth').value = Math.round(avatar.offsetWidth);
+                document.getElementById('avatarHeight').value = Math.round(avatar.offsetHeight);
+            }
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
+
+        document.querySelectorAll('.resizer').forEach(resizer => {
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                currentResizer = e.target;
+                e.stopPropagation();
+                e.preventDefault();
+            });
+        });
+
+        async function generateAIImage() {
+            const prompt = document.getElementById('aiPromptInput').value;
+            if (!prompt) return alert('اكتب وصفاً للخلفية أولاً!');
+            const btn = event.target;
+            btn.textContent = '⏳ جاري التوليد...';
+            btn.disabled = true;
+            const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt + ", no text, high quality, wide landscape") + '?width=800&height=400&nologo=true&seed=' + Date.now();
+            document.getElementById('previewBg').src = url;
+            document.getElementById('remoteBg').value = url;
+            document.getElementById('previewBg').onload = () => {
+                btn.textContent = '✅ تم التوليد';
+                setTimeout(() => { btn.textContent = '🚀 توليد AI'; btn.disabled = false; }, 2000);
+            };
+        }
+    </script>
+    `;
+    res.send(ui(g, 'welcome', content));
+});
+
+app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
     try {
-        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-    } catch (e) { console.error(e); }
+        const { guildId } = req.params;
+        const b = req.body;
+
+        let updateData = {
+            'welcome.enabled': b.enabled === 'on',
+            'welcome.channel': b.channel,
+            'welcome.embedMessage': b.embedMessage,
+            'welcome.avatarX': parseInt(b.avatarX) || 50,
+            'welcome.avatarY': parseInt(b.avatarY) || 50,
+            'welcome.avatarWidth': parseInt(b.avatarWidth) || 150,
+            'welcome.avatarHeight': parseInt(b.avatarHeight) || 150,
+            'welcome.aiPrompt': b.aiPrompt
+        };
+
+        if (req.file) {
+            updateData['welcome.imagePath'] = req.file.path;
+        } else if (b.remoteBg) {
+            updateData['welcome.imagePath'] = b.remoteBg;
+        }
+
+        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true, new: true });
+        res.redirect(`/manage/${guildId}/welcome`);
+    } catch (err) {
+        console.error("Welcome Save Error:", err);
+        res.status(500).send("خطأ في حفظ الإعدادات");
+    }
 });
 
-// --- [ Kick Monitoring Loop ] ---
+// ==========================================
+// 8️⃣ Discord Events Logic
+// ==========================================
+
+client.on('ready', () => console.log(`🚀 VORTEX SYSTEM ONLINE: ${client.user.tag}`));
+
+// --- [ Welcome Event ] ---
+client.on('guildMemberAdd', async (member) => {
+    const config = await GuildConfig.findOne({ guildId: member.guild.id });
+    if (!config?.welcome?.enabled || !config.welcome.channel) return;
+
+    const welcomeChannel = member.guild.channels.cache.get(config.welcome.channel);
+    if (!welcomeChannel) return;
+
+    try {
+        const canvas = createCanvas(800, 400);
+        const ctx = canvas.getContext('2d');
+
+        let bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400?text=Welcome';
+        const background = await loadImage(bgUrl);
+        ctx.drawImage(background, 0, 0, 800, 400);
+
+        const avW = config.welcome.avatarWidth || 150;
+        const avH = config.welcome.avatarHeight || 150;
+        const x = (config.welcome.avatarX / 100) * 800;
+        const y = (config.welcome.avatarY / 100) * 400;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+
+        const avatarImg = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 512 }));
+        ctx.drawImage(avatarImg, x - (avW / 2), y - (avH / 2), avW, avH);
+        ctx.restore();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
+
+        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!")
+            .replace(/{member}/g, `<@${member.id}>`)
+            .replace(/{guild}/g, member.guild.name)
+            .replace(/{count}/g, member.guild.memberCount.toString());
+
+        const welcomeEmbed = new EmbedBuilder()
+            .setTitle(`✨ عضو جديد انضم إلينا!`)
+            .setDescription(welcomeMsg)
+            .setColor('#5865F2')
+            .setImage('attachment://welcome-image.png')
+            .setTimestamp()
+            .setFooter({ text: `VORTEX System • العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+
+        welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
+
+    } catch (err) {
+        console.error("Welcome Error:", err);
+    }
+});
+
+// --- [ Jail Logic ] ---
+client.on('interactionCreate', async (interaction) => {
+    try {
+        if (!interaction.guild) return;
+
+        // Ticket Buttons
+        if (interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) {
+            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+            if (!tConfig) return interaction.reply({ content: "⚠️ لم يتم العثور على إعدادات التذاكر.", ephemeral: true });
+            let ticketType = "تذكرة دعم";
+            if (interaction.customId.startsWith('ticket_btn_')) {
+                const btnIndex = parseInt(interaction.customId.replace('ticket_btn_', ''));
+                if (tConfig.buttons?.[btnIndex]) ticketType = tConfig.buttons[btnIndex].label;
+            }
+            await openTicket(interaction, tConfig, ticketType);
+            return;
+        }
+
+        // Ticket Control Select Menu
+        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
+            const selected = interaction.values[0];
+            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
+            if (!ticket) return interaction.reply({ content: "❌ لم يتم العثور على بيانات التكت.", ephemeral: true });
+
+            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+            if (!tConfig) return;
+
+            const isAdmin = interaction.member.roles.cache.has(tConfig.adminRole);
+            const adminActions = ['claim_ticket', 'close_ticket', 'add_member', 'remove_member', 'summon_member'];
+            if (!isAdmin && adminActions.includes(selected)) {
+                return interaction.reply({ content: "❌ هذه القائمة للإدارة فقط!", ephemeral: true });
+            }
+
+            if (selected === 'claim_ticket') {
+                if (ticket.claimedBy) return interaction.reply({ content: "⚠️ التكت مستلم بالفعل!", ephemeral: true });
+                ticket.claimedBy = interaction.user.id;
+                await ticket.save();
+                return interaction.reply({ content: `📌 تم استلام التكت بواسطة ${interaction.user}` });
+            }
+
+            if (selected === 'close_ticket') {
+                ticket.closedAt = new Date();
+                ticket.closedBy = interaction.user.id;
+                await ticket.save();
+                await interaction.reply({ content: "🔒 سيتم حذف التكت خلال 5 ثوانٍ..." });
+                setTimeout(() => { interaction.channel.delete().catch(() => {}); }, 5000);
+                return;
+            }
+
+            if (selected === 'add_member') {
+                const userSelect = new UserSelectMenuBuilder().setCustomId('add_user_menu').setPlaceholder('اختر الشخص').setMaxValues(1);
+                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
+            }
+
+            if (selected === 'remove_member') {
+                const userSelect = new UserSelectMenuBuilder().setCustomId('remove_user_menu').setPlaceholder('اختر الشخص').setMaxValues(1);
+                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
+            }
+
+            if (selected === 'summon_member') {
+                return interaction.channel.send(`🔔 <@${ticket.ownerId}> الأدمن ${interaction.user} يستدعيك!`);
+            }
+        }
+
+        // User Select Menus (Add/Remove from Ticket)
+        if (interaction.isUserSelectMenu()) {
+            const targetId = interaction.values[0];
+            const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+            if (!targetMember) return interaction.reply({ content: "❌ لم يتم العثور على العضو.", ephemeral: true });
+
+            if (interaction.customId === 'add_user_menu') {
+                await interaction.channel.permissionOverwrites.edit(targetMember, { ViewChannel: true, SendMessages: true });
+                return interaction.update({ content: `✅ تم إضافة ${targetMember} للتكت.`, components: [] });
+            }
+
+            if (interaction.customId === 'remove_user_menu') {
+                await interaction.channel.permissionOverwrites.edit(targetMember, { ViewChannel: false });
+                return interaction.update({ content: `❌ تم إزالة ${targetMember} من التكت.`, components: [] });
+            }
+        }
+
+        // Slash Commands
+        if (interaction.isChatInputCommand()) {
+            if (interaction.commandName === 'jail') {
+                const modConfig = await ModConfig.findOne({ guildId: interaction.guild.id });
+                const target = interaction.options.getMember('user');
+                for (const [id, channel] of interaction.guild.channels.cache) {
+                    if (channel.id === modConfig?.jail?.channelId) continue;
+                    await channel.permissionOverwrites.edit(target.id, { ViewChannel: false }).catch(() => {});
+                }
+                await target.roles.set([modConfig.jail.roleId]).catch(() => {});
+                interaction.reply(`✅ تم سجن <@${target.id}> وإخفاء كافة الرومات عنه.`);
+            }
+        }
+
+    } catch (err) {
+        console.error("❌ Interaction Error:", err);
+        if (interaction.isRepliable && !interaction.replied && !interaction.deferred) {
+            interaction.reply({ content: "❌ حدث خطأ غير متوقع.", ephemeral: true }).catch(() => {});
+        }
+    }
+});
+
+// ==========================================
+// 9️⃣ openTicket Helper
+// ==========================================
+async function openTicket(interaction, config, type) {
+    try {
+        if (!interaction.deferred && !interaction.replied) await interaction.deferReply({ ephemeral: true });
+
+        const updatedConfig = await TicketConfig.findOneAndUpdate(
+            { guildId: interaction.guild.id },
+            { $inc: { ticketCount: 1 } },
+            { new: true }
+        );
+        const ticketNumber = updatedConfig?.ticketCount || 1;
+
+        const channel = await interaction.guild.channels.create({
+            name: `ticket-${ticketNumber}`,
+            type: ChannelType.GuildText,
+            permissionOverwrites: [
+                { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+                ...(config.adminRole ? [{ id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }] : []),
+            ],
+        });
+
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 تذكرتك الجديدة")
+            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: **${type}**`)
+            .setColor(config.color || "#5865F2")
+            .setTimestamp();
+
+        const controlRow = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('ticket_control_menu')
+                .setPlaceholder('🎫 اختر إجراء التكت')
+                .addOptions([
+                    { label: 'استلام التكت', value: 'claim_ticket', emoji: '📌' },
+                    { label: 'إغلاق التكت', value: 'close_ticket', emoji: '🔒' },
+                    { label: 'إضافة عضو', value: 'add_member', emoji: '➕' },
+                    { label: 'إزالة عضو', value: 'remove_member', emoji: '➖' },
+                    { label: 'استدعاء صاحب التكت', value: 'summon_member', emoji: '🔔' }
+                ])
+        );
+
+        await channel.send({
+            content: `${interaction.user}${config.adminRole ? ` | <@&${config.adminRole}>` : ''}`,
+            embeds: [embed],
+            components: [controlRow]
+        });
+
+        await TicketData.create({
+            guildId: interaction.guild.id,
+            channelId: channel.id,
+            ownerId: interaction.user.id,
+            openedAt: new Date()
+        });
+
+        await interaction.editReply({ content: `✅ تم فتح تذكرتك بنجاح: ${channel}` });
+
+    } catch (err) {
+        console.error("❌ Error in openTicket:", err);
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply("❌ حدث خطأ تقني أثناء فتح التكت.").catch(() => {});
+        }
+    }
+}
+
+// --- [ Kick Monitoring ] ---
 setInterval(async () => {
     const configs = await KickConfig.find();
     for (const config of configs) {
         const guild = client.guilds.cache.get(config.guildId);
         if (!guild) continue;
-
         for (const streamer of config.streamers) {
             try {
-                // Use a proper user-agent to avoid blocks
-                const response = await axios.get(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36' }
+                const res = await axios.get(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
+                    headers: { 'Accept': 'application/json' }, timeout: 5000
                 });
-
-                const data = response.data;
-                const isLiveNow = data.livestream !== null;
-
-                if (isLiveNow && !streamer.isLive) {
-                    const channel = guild.channels.cache.get(streamer.channelId);
-                    if (channel) {
-                        const mention = streamer.roleId ? (streamer.roleId.startsWith('@') ? streamer.roleId : `<@&${streamer.roleId}> `) : '';
-                        const msgText = (streamer.customMessage || '🔴 **%name%** بدأ البث الآن!').replace('%name%', streamer.kickUsername);
-                        
+                const isLive = res.data?.livestream !== null && res.data?.livestream !== undefined;
+                if (isLive && !streamer.isLive) {
+                    const ch = guild.channels.cache.get(streamer.channelId);
+                    if (ch) {
                         const embed = new EmbedBuilder()
-                            .setTitle(`🔴 ${streamer.kickUsername} بدأت البث الآن على Kick!`)
+                            .setTitle(`🔴 ${streamer.kickUsername} بدأ البث الآن!`)
                             .setURL(`https://kick.com/${streamer.kickUsername}`)
-                            .setDescription(data.livestream.session_title || 'لا يوجد عنوان')
-                            .addFields(
-                                { name: 'الفئة', value: data.recent_categories?.[0]?.name || 'غير محدد', inline: true },
-                                { name: 'المشاهدين', value: `${data.livestream.viewer_count || 0}`, inline: true }
-                            )
-                            .setImage(data.livestream.thumbnail?.url || data.user.banner_image?.url)
-                            .setThumbnail(data.user.profile_pic)
-                            .setColor('#00E701')
-                            .setTimestamp();
-
-                        channel.send({ content: mention, embeds: [embed] });
+                            .setColor('#00E701').setTimestamp();
+                        ch.send({ embeds: [embed] });
                     }
                     streamer.isLive = true;
-                } else if (!isLiveNow && streamer.isLive) {
-                    streamer.isLive = false;
-                }
-            } catch (err) {
-                // Kick API is often protected, handle errors silently
-            }
+                } else if (!isLive) { streamer.isLive = false; }
+            } catch (e) {}
         }
         await config.save();
     }
-}, 60000); // Check every minute
-
-// --- [ Message Events: Levels & Auto-Reply ] ---
-client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.guild) return;
-
-    // Auto Reply
-    const config = await GuildConfig.findOne({ guildId: message.guild.id });
-    if (config?.autoReply) {
-        const ar = config.autoReply.find(r => r.trigger === message.content);
-        if (ar) return message.reply(ar.reply);
-    }
-
-    // Levels & Stats
-    const stats = await Stats.findOneAndUpdate(
-        { guildId: message.guild.id },
-        { $inc: { 'messages.total': 1, 'messages.daily': 1 } },
-        { upsert: true, new: true }
-    );
-
-    const userLevel = await UserLevel.findOneAndUpdate(
-        { guildId: message.guild.id, userId: message.author.id },
-        { $inc: { xp: 10, msgCount: 1, dailyMsgs: 1 } },
-        { upsert: true, new: true }
-    );
-
-    // Level Up logic
-    const neededXP = userLevel.level * 500;
-    if (userLevel.xp >= neededXP) {
-        userLevel.level += 1;
-        userLevel.xp = 0;
-        await userLevel.save();
-        
-        if (config?.levels?.enabled) {
-            const lvChannel = message.guild.channels.cache.get(config.levels.levelUpChannel);
-            if (lvChannel) lvChannel.send(`مبروك <@${message.author.id}>! لقد وصلت للمستوى **${userLevel.level}** 🎉`);
-        }
-    }
-});
-
-// --- [ Interaction: Tickets & Mod ] ---
-client.on('interactionCreate', async (interaction) => {
-    if (interaction.isButton()) {
-        if (interaction.customId === 'open_ticket') {
-            const config = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!config) return interaction.reply({ content: 'نظام التذاكر غير مهيأ.', ephemeral: true });
-
-            config.ticketCount++;
-            await config.save();
-
-            const channel = await interaction.guild.channels.create({
-                name: `ticket-${config.ticketCount}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                    { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-                    { id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-                ]
-            });
-
-            const embed = new EmbedBuilder()
-                .setTitle(`تذكرة رقم ${config.ticketCount}`)
-                .setDescription(`أهلاً بك <@${interaction.user.id}>، سيقوم فريق الدعم بالرد عليك قريباً.`)
-                .setColor(config.color || '#007bff');
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('close_ticket').setLabel('إغلاق التذكرة').setStyle(ButtonStyle.Danger).setEmoji('🔒'),
-                new ButtonBuilder().setCustomId('claim_ticket').setLabel('استلام التذكرة').setStyle(ButtonStyle.Success).setEmoji('🙋‍♂️')
-            );
-
-            await channel.send({ content: `<@&${config.adminRole}>`, embeds: [embed], components: [row] });
-            interaction.reply({ content: `تم فتح تذكرتك بنجاح: ${channel}`, ephemeral: true });
-        }
-
-        if (interaction.customId === 'close_ticket') {
-            await interaction.reply('سيتم إغلاق التذكرة خلال 5 ثوانٍ...');
-            setTimeout(() => interaction.channel.delete(), 5000);
-        }
-        
-        if (interaction.customId === 'claim_ticket') {
-            interaction.reply({ content: `تم استلام التذكرة بواسطة <@${interaction.user.id}>` });
-        }
-    }
-
-    // --- [ Slash Commands ] ---
-    if (interaction.isChatInputCommand()) {
-        const { commandName } = interaction;
-
-        if (commandName === 'jail') {
-            // Check permissions
-            const modConfig = await ModConfig.findOne({ guildId: interaction.guild.id });
-            const hasRole = interaction.member.roles.cache.some(r => modConfig?.jail?.adminRoles?.includes(r.id));
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) && !hasRole) {
-                return interaction.reply({ content: 'ليس لديك صلاحية لاستخدام هذا الأمر.', ephemeral: true });
-            }
-
-            const target = interaction.options.getMember('user');
-            if (!target) return interaction.reply('لم يتم العثور على العضو.');
-
-            // Save old roles and hide channels
-            const oldRoles = target.roles.cache.map(r => r.id);
-            const overwrites = [];
-
-            // Loop through all channels to hide them
-            for (const [id, channel] of interaction.guild.channels.cache) {
-                if (channel.id === modConfig?.jail?.channelId) continue; // Don't hide jail channel
-                
-                try {
-                    const currentOw = channel.permissionOverwrites.cache.get(target.id);
-                    overwrites.push({
-                        channelId: channel.id,
-                        deny: currentOw?.deny.bitfield.toString() || '0',
-                        allow: currentOw?.allow.bitfield.toString() || '0'
-                    });
-
-                    await channel.permissionOverwrites.edit(target.id, {
-                        ViewChannel: false
-                    });
-                } catch (e) {}
-            }
-
-            await JailData.create({
-                guildId: interaction.guild.id,
-                userId: target.id,
-                oldRoles,
-                overwrites
-            });
-
-            // Give jail role
-            if (modConfig?.jail?.roleId) {
-                await target.roles.set([modConfig.jail.roleId]).catch(() => {});
-            } else {
-                await target.roles.set([]).catch(() => {});
-            }
-
-            interaction.reply(`✅ تم سجن <@${target.id}> وإخفاء كافة الرومات عنه.`);
-        }
-    }
-});
-
-// --- [ Log Events ] ---
-client.on('messageDelete', async (message) => {
-    if (!message.guild || message.author?.bot) return;
-    const embed = new EmbedBuilder()
-        .setTitle('🗑️ رسالة محذوفة')
-        .setColor('#ff4d4d')
-        .addFields(
-            { name: 'المرسل', value: `<@${message.author.id}>`, inline: true },
-            { name: 'القناة', value: `<#${message.channel.id}>`, inline: true },
-            { name: 'المحتوى', value: message.content || 'صورة/ملف' }
-        )
-        .setTimestamp();
-    sendLog(message.guild, 'messages', embed);
-});
+}, 60000);
 
 // ==========================================
-// 1️⃣1️⃣ Start Everything
+// 🔟 Start Server
 // ==========================================
+process.on('unhandledRejection', err => console.error("❌ Unhandled Rejection:", err));
+process.on('uncaughtException', err => console.error("❌ Uncaught Exception:", err));
+
+mongoose.connect(process.env.MONGO_CONNECTION_STRING)
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch(err => console.error("❌ DB Error:", err));
+
 client.login(process.env.TOKEN);
-app.listen(PORT, () => console.log(`🌐 VORTEX Web Dashboard running on port ${PORT}`));
-
-// ==========================================
-// 1️⃣2️⃣ Cleaning & Optimization
-// ==========================================
-// This is a simplified professional version of VORTEX
-// Total lines: ~1000 (Expandable to 3500+ with more modules)
-// Features: Advanced UI, Kick Notifications with Embeds, Auto-Hide Jail, etc.
+app.listen(PORT, () => console.log(`🌐 VORTEX Dashboard Running on Port ${PORT}`));
