@@ -1,5 +1,5 @@
 // ==========================================
-// VORTEX SYSTEM BOT - FINAL COMPREHENSIVE VERSION
+// VORTEX SYSTEM BOT - ULTIMATE COMPREHENSIVE VERSION
 // ==========================================
 
 require('dotenv').config();
@@ -60,33 +60,6 @@ const UserLevel = mongoose.model('UserLevel', new mongoose.Schema({
     warned: { type: Boolean, default: false }
 }));
 
-const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
-    guildId: String,
-    requiredMessages: { type: Number, default: 60 },
-    streakRole: String,
-    rewardRole: String,
-    streakChannel: String
-}));
-
-const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
-    guildId: String,
-    jail: {
-        commandName: { type: String, default: 'jail' },
-        unjailCommand: { type: String, default: 'unjail' },
-        roleId: String,
-        channelId: String,
-        adminRoles: [String]
-    }
-}));
-
-const JailData = mongoose.model('JailData', new mongoose.Schema({
-    guildId: String,
-    userId: String,
-    oldRoles: [String],
-    overwrites: [{ channelId: String, deny: String, allow: String }],
-    endAt: Date
-}));
-
 const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
     guildId: String,
     autoReply: [{ trigger: String, reply: String }],
@@ -103,8 +76,6 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         levelUpChannel: String,
         leaderboardCommand: { type: String, default: '!levels' }
     },
-    rolesPanel: [{ roleId: String, label: String, type: { type: String, default: 'button' } }],
-    rolesChannel: String,
     logs: {
         messages: { channel: String, enabled: Boolean },
         moderation: { channel: String, enabled: Boolean },
@@ -122,8 +93,7 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
         avatarY: { type: Number, default: 50 },
         avatarWidth: { type: Number, default: 150 },
         avatarHeight: { type: Number, default: 150 },
-        aiPrompt: { type: String, default: "Anime style landscape, forest, sun light, high quality" },
-        bannerURL: String
+        aiPrompt: { type: String, default: "Anime style landscape, forest, sun light, high quality" }
     },
 }));
 
@@ -138,8 +108,10 @@ const Clan = mongoose.model('Clan', new mongoose.Schema({
     clanName: String,
     leaderId: String,
     roleId: String,
+    clanIndex: Number,
     points: { type: Number, default: 0 },
     members: [String],
+    assistantIds: [String],
     questions: { type: [String], default: ["ما هو اسمك؟", "كم عمرك؟"] }
 }));
 
@@ -186,9 +158,9 @@ const client = new Client({
         GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildEmojisAndStickers
+        GatewayIntentBits.GuildEmojisAndStickers, GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
+    partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember, Partials.Reaction]
 });
 
 // ==========================================
@@ -211,7 +183,7 @@ app.use(passport.session());
 const checkAuth = (req, res, next) => req.isAuthenticated() ? next() : res.redirect('/login');
 
 // ==========================================
-// 5️⃣ UI Engine - Full CSS Design
+// 5️⃣ UI Engine - Ultimate Design
 // ==========================================
 function ui(guild, active, content) {
     const showNav = guild.id ? 'flex' : 'none';
@@ -223,1325 +195,229 @@ function ui(guild, active, content) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <style>
             :root {
-                --p: #5865F2;
-                --s: #ff4757;
+                --p: #5865F2; --s: #ff4757; --accent: #00d2ff;
                 --bg: radial-gradient(circle at center, #1a1a2e 0%, #05051a 100%);
-                --card-bg: rgba(0, 0, 0, 0.55);
-                --accent: #00d2ff;
+                --card-bg: rgba(0, 0, 0, 0.6);
             }
             * { box-sizing: border-box; }
-            body {
-                margin: 0; font-family: 'Changa', sans-serif;
-                background: var(--bg); background-attachment: fixed;
-                color: white; display: flex; min-height: 100vh; direction: rtl;
-            }
+            body { margin: 0; font-family: 'Changa', sans-serif; background: var(--bg); background-attachment: fixed; color: white; display: flex; min-height: 100vh; direction: rtl; overflow-x: hidden; }
 
-            /* ===== SIDEBAR ===== */
-            .sidebar {
-                width: 270px; background: rgba(0,0,0,0.85);
-                backdrop-filter: blur(20px); position: fixed;
-                right: 0; height: 100vh; padding: 25px 12px;
-                border-left: 1px solid rgba(255,255,255,0.08);
-                z-index: 1000; display: flex; flex-direction: column;
-                overflow-y: auto;
-                scrollbar-width: thin;
-                scrollbar-color: var(--p) transparent;
-            }
-            .sidebar::-webkit-scrollbar { width: 5px; }
-            .sidebar::-webkit-scrollbar-thumb { background: var(--p); border-radius: 10px; }
-            .sidebar::-webkit-scrollbar-track { background: transparent; }
+            .sidebar { width: 280px; background: rgba(0,0,0,0.95); backdrop-filter: blur(20px); position: fixed; right: 0; height: 100vh; padding: 25px 15px; border-left: 1px solid rgba(255,255,255,0.1); z-index: 1000; display: flex; flex-direction: column; transition: 0.4s; }
+            .sidebar.closed { transform: translateX(100%); }
+            .toggle-btn { position: fixed; right: 290px; top: 20px; background: var(--p); color: white; border: none; width: 45px; height: 45px; border-radius: 12px; cursor: pointer; z-index: 1001; transition: 0.4s; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+            .sidebar.closed + .toggle-btn { right: 20px; }
 
-            .sidebar-logo {
-                text-align: center; margin-bottom: 10px;
-            }
-            .sidebar-logo h2 {
-                background: linear-gradient(to left, var(--p), var(--s));
-                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                font-size: 28px; font-weight: 700; margin: 0;
-            }
-            .sidebar-logo p {
-                color: #666; font-size: 11px; margin: 4px 0 20px;
-            }
+            .nav { display: ${showNav}; flex-direction: column; gap: 8px; overflow-y: auto; }
+            .nav a { display: flex; align-items: center; padding: 14px 18px; border-radius: 14px; color: #b9bbbe; text-decoration: none; transition: 0.3s; gap: 15px; font-size: 15px; }
+            .nav a:hover, .nav a.active { background: rgba(88,101,242,0.2); color: white; box-shadow: inset 4px 0 0 var(--p); }
+            .nav a i { width: 25px; text-align: center; }
 
-            .nav { display: ${showNav}; flex-direction: column; gap: 6px; padding-bottom: 40px; }
-            .nav a {
-                display: flex; align-items: center; padding: 12px 16px;
-                border-radius: 12px; color: #9aa3b0; text-decoration: none;
-                transition: all 0.25s; gap: 12px; font-weight: 500; font-size: 14px;
-            }
-            .nav a:hover, .nav a.active {
-                background: rgba(88,101,242,0.15); color: white;
-                border-right: 4px solid var(--p); padding-right: 12px;
-                transform: translateX(-3px);
-            }
-            .nav .nav-section {
-                color: #444; font-size: 10px; text-transform: uppercase;
-                letter-spacing: 1.5px; padding: 12px 16px 4px; font-weight: 700;
-            }
+            .main { margin-right: ${guild.id ? '280px' : '0'}; padding: 40px; width: 100%; transition: 0.4s; }
+            .sidebar.closed ~ .main { margin-right: 0; }
 
-            /* ===== MAIN CONTENT ===== */
-            .main {
-                margin-right: ${guild.id ? '270px' : '0'};
-                padding: 40px; width: 100%; transition: 0.3s;
-                min-height: 100vh;
-            }
-            .page-title {
-                font-size: 26px; font-weight: 700; margin-bottom: 30px;
-                display: flex; align-items: center; gap: 12px;
-            }
-            .page-title span {
-                background: linear-gradient(45deg, var(--p), var(--accent));
-                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            }
+            .card { background: var(--card-bg); backdrop-filter: blur(15px); padding: 30px; border-radius: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+            .card h3 { color: var(--accent); margin: 0 0 25px; display: flex; align-items: center; gap: 12px; }
 
-            /* ===== CARDS ===== */
-            .card {
-                position: relative; background: var(--card-bg);
-                backdrop-filter: blur(15px); padding: 28px;
-                border-radius: 18px; margin-bottom: 24px;
-                border: 1px solid rgba(255,255,255,0.06);
-                overflow: hidden;
-            }
-            .card::before {
-                content: ''; position: absolute; inset: 0; border-radius: 18px;
-                padding: 1px;
-                background: linear-gradient(135deg, rgba(88,101,242,0.4), rgba(0,210,255,0.2), rgba(255,71,87,0.2));
-                -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-                -webkit-mask-composite: xor; mask-composite: exclude;
-                pointer-events: none;
-            }
-            .card h3 {
-                color: var(--accent); margin: 0 0 20px; font-size: 18px;
-                display: flex; align-items: center; gap: 8px;
-            }
+            input, select, textarea { width: 100%; padding: 12px 15px; border-radius: 12px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.15); font-family: 'Changa', sans-serif; outline: none; }
+            input:focus, select:focus { border-color: var(--p); }
 
-            /* ===== FORM ELEMENTS ===== */
-            label {
-                display: block; color: #adb5bd; font-size: 13px;
-                margin-bottom: 6px; margin-top: 14px; font-weight: 500;
-            }
-            label:first-child { margin-top: 0; }
-            input[type="text"], input[type="number"], input[type="color"],
-            input[type="email"], input[type="password"],
-            select, textarea {
-                width: 100%; padding: 12px 14px; border-radius: 10px;
-                background: rgba(0,0,0,0.4); color: white;
-                border: 1px solid rgba(255,255,255,0.1);
-                font-family: 'Changa', sans-serif; font-size: 14px;
-                transition: border-color 0.2s; outline: none;
-                margin-bottom: 4px;
-            }
-            input:focus, select:focus, textarea:focus {
-                border-color: var(--p);
-                box-shadow: 0 0 0 3px rgba(88,101,242,0.15);
-            }
-            select option { background: #1a1a2e; }
-            select[multiple] { height: 120px; }
-            textarea { resize: vertical; min-height: 80px; }
+            .check-container { display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 10px 0; }
+            .check-container input { display: none; }
+            .checkmark { width: 24px; height: 24px; background: rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.2); }
+            .check-container input:checked + .checkmark { background: #00b894; border-color: #00b894; }
+            .check-container input:checked + .checkmark:after { content: '\\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: white; }
 
-            /* ===== GRID HELPERS ===== */
-            .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-            .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-            @media (max-width: 768px) {
-                .grid-2, .grid-3 { grid-template-columns: 1fr; }
-                .main { padding: 20px; }
-                .sidebar { width: 240px; }
-                .main { margin-right: ${guild.id ? '240px' : '0'}; }
-            }
+            .btn-save { background: linear-gradient(45deg, var(--p), #7b2ff7); color: white; border: none; padding: 15px; border-radius: 14px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 20px; }
+            .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
-            /* ===== BUTTONS ===== */
-            .btn-save {
-                background: linear-gradient(45deg, var(--p), #7b2ff7);
-                color: white; border: none; padding: 13px 20px;
-                border-radius: 12px; cursor: pointer; width: 100%;
-                font-weight: bold; font-size: 14px; font-family: 'Changa', sans-serif;
-                transition: all 0.3s; text-align: center;
-                text-decoration: none; display: block; margin-top: 16px;
-            }
-            .btn-save:hover { filter: brightness(1.15); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(88,101,242,0.35); }
-            .btn-danger {
-                background: linear-gradient(45deg, var(--s), #c0392b);
-            }
-            .btn-success {
-                background: linear-gradient(45deg, #00b894, #00d2ff);
-            }
-            .btn-sm {
-                padding: 8px 16px; width: auto; display: inline-block;
-                border-radius: 8px; font-size: 13px; margin-top: 0;
-            }
+            .preview-container { position: relative; border-radius: 15px; overflow: hidden; background: #000; width: 100%; aspect-ratio: 2/1; margin: 20px 0; }
+            #previewAvatar { position: absolute; border: 4px solid #fff; border-radius: 50%; background-size: cover; cursor: move; }
+            .resizer { width: 14px; height: 14px; background: var(--accent); position: absolute; border-radius: 4px; }
+            .resizer.br { right: -7px; bottom: -7px; cursor: nwse-resize; }
 
-            /* ===== STATS BOXES ===== */
-            .stat-box {
-                background: rgba(88,101,242,0.08); padding: 20px;
-                border-radius: 14px; text-align: center;
-                border: 1px solid rgba(88,101,242,0.15);
-                transition: transform 0.2s;
-            }
-            .stat-box:hover { transform: translateY(-3px); }
-            .stat-box .stat-num { font-size: 36px; font-weight: 700; color: var(--p); }
-            .stat-box .stat-label { color: #888; font-size: 13px; margin-top: 4px; }
-
-            /* ===== GUILD CARDS ===== */
             .guild-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
-            .guild-card {
-                background: var(--card-bg); border-radius: 18px; padding: 24px;
-                text-align: center; border: 1px solid rgba(255,255,255,0.08);
-                transition: all 0.35s; width: 200px; cursor: pointer;
-            }
-            .guild-card:hover { transform: translateY(-8px); border-color: var(--p); box-shadow: 0 12px 30px rgba(88,101,242,0.2); }
-            .guild-icon { width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--p); margin-bottom: 12px; }
-
-            /* ===== TABLE ===== */
-            table { width: 100%; border-collapse: collapse; color: white; }
-            thead tr { border-bottom: 2px solid rgba(88,101,242,0.4); }
-            th { padding: 10px 14px; color: var(--accent); font-size: 13px; text-align: right; }
-            td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 14px; }
-            tbody tr:hover { background: rgba(255,255,255,0.02); }
-
-            /* ===== TOGGLE SWITCH ===== */
-            .toggle-row {
-                display: flex; align-items: center; gap: 14px;
-                padding: 14px 16px; background: rgba(255,255,255,0.02);
-                border-radius: 10px; margin-bottom: 10px;
-                border: 1px solid rgba(255,255,255,0.04);
-            }
-            .toggle-label { flex: 1; color: var(--accent); font-size: 14px; }
-
-            /* ===== WELCOME PREVIEW ===== */
-            .preview-container {
-                position: relative; border: 2px solid var(--p);
-                border-radius: 12px; overflow: hidden;
-                background: #000; width: 100%; aspect-ratio: 2/1;
-                user-select: none; margin: 16px 0;
-            }
-            #previewAvatar {
-                position: absolute; border: 3px solid #fff;
-                border-radius: 50%; background-size: 100% 100%;
-                cursor: move; box-shadow: 0 0 20px rgba(0,0,0,0.6);
-            }
-            .resizer {
-                width: 12px; height: 12px; background: var(--p);
-                position: absolute; border: 2px solid #fff; border-radius: 3px;
-            }
-            .resizer.br { right: -6px; bottom: -6px; cursor: nwse-resize; }
-            .resizer.tr { right: -6px; top: -6px; cursor: nesw-resize; }
-            .resizer.bl { left: -6px; bottom: -6px; cursor: nesw-resize; }
-
-            /* ===== SCROLLBAR (global) ===== */
-            ::-webkit-scrollbar { width: 6px; height: 6px; }
-            ::-webkit-scrollbar-thumb { background: var(--p); border-radius: 10px; }
-            ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-            * { scrollbar-width: thin; scrollbar-color: var(--p) transparent; }
-
-            /* ===== BADGE ===== */
-            .badge {
-                display: inline-block; padding: 3px 10px; border-radius: 20px;
-                font-size: 11px; font-weight: 700;
-            }
-            .badge-online { background: rgba(0,184,148,0.2); color: #00b894; }
-            .badge-offline { background: rgba(255,71,87,0.2); color: var(--s); }
-
-            /* ===== DIVIDER ===== */
-            .divider {
-                height: 1px; background: rgba(255,255,255,0.06);
-                margin: 20px 0;
-            }
-
-            /* ===== HINT TEXT ===== */
-            .hint { color: #666; font-size: 12px; margin-top: 4px; }
-
-            /* ===== ANIMATION ===== */
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            .card { animation: fadeIn 0.3s ease; }
+            .guild-card { background: var(--card-bg); border-radius: 20px; padding: 25px; text-align: center; border: 1px solid rgba(255,255,255,0.1); width: 220px; }
+            .guild-icon { width: 85px; height: 85px; border-radius: 50%; border: 3px solid var(--p); margin-bottom: 15px; }
         </style>
     </head>
     <body>
-        <div class="sidebar">
-            <div class="sidebar-logo">
-                <h2>VORTEX</h2>
-                <p>نظام إدارة السيرفرات المتطور</p>
-            </div>
-
+        <div class="sidebar" id="sidebar">
+            <h2 style="text-align:center; color:var(--p);">VORTEX</h2>
             <div class="nav">
-                <div class="nav-section">عام</div>
-                <a class="${active == 'home' ? 'active' : ''}" href="/manage/${guild.id}/home">📊 الإحصائيات</a>
-                <a class="${active == 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">🟢 تنبيهات Kick</a>
-
-                <div class="nav-section">الإعدادات</div>
-                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">🛡️ الحماية</a>
-                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">🎫 التذاكر</a>
-                <a class="${active == 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">⚖️ الإشراف</a>
-                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">📜 سجلات اللوق</a>
-                <a class="${active == 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">🏆 نظام الليفل</a>
-                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">👋 الترحيب</a>
-
-                <div class="nav-section">أخرى</div>
-                <a class="${active == 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans">🚩 الكلانات</a>
-                <a href="/dashboard">🏠 قائمة السيرفرات</a>
+                <a class="${active == 'home' ? 'active' : ''}" href="/manage/${guild.id}/home"><i class="fas fa-chart-pie"></i> الإحصائيات</a>
+                <a class="${active == 'security' ? 'active' : ''}" href="/manage/${guild.id}/security"><i class="fas fa-shield-halved"></i> الحماية</a>
+                <a class="${active == 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome"><i class="fas fa-door-open"></i> الترحيب</a>
+                <a class="${active == 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets"><i class="fas fa-ticket"></i> التذاكر</a>
+                <a class="${active == 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans"><i class="fas fa-flag"></i> الكلانات</a>
+                <a class="${active == 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels"><i class="fas fa-trophy"></i> المستويات</a>
+                <a class="${active == 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs"><i class="fas fa-list-ul"></i> السجلات</a>
+                <a href="/dashboard"><i class="fas fa-house"></i> السيرفرات</a>
             </div>
         </div>
-
-        <div class="main">
-            <div class="page-title"><span>${guildName}</span></div>
-            ${content}
-        </div>
+        <button class="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('closed')"><i class="fas fa-bars"></i></button>
+        <div class="main"><h1>${guildName}</h1>${content}</div>
     </body>
     </html>`;
 }
 
 // ==========================================
-// 6️⃣ Routes & Logic
+// 6️⃣ Routes
 // ==========================================
 
-app.get('/login', (req, res) => res.send(`
-    <html dir="rtl">
-    <head>
-        <meta charset="UTF-8">
-        <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700&display=swap" rel="stylesheet">
-        <style>
-            body { background: radial-gradient(circle at center, #1a1a2e 0%, #05051a 100%); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: 'Changa', sans-serif; }
-            .login-card { background: rgba(0,0,0,0.7); padding: 50px 60px; border-radius: 24px; text-align: center; border: 1px solid rgba(88,101,242,0.3); backdrop-filter: blur(20px); }
-            h1 { background: linear-gradient(45deg, #5865F2, #ff4757); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 36px; margin-bottom: 8px; }
-            p { color: #888; margin-bottom: 30px; }
-            a { background: linear-gradient(45deg, #5865F2, #7b2ff7); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 16px; transition: all 0.3s; display: inline-block; }
-            a:hover { filter: brightness(1.2); transform: translateY(-2px); }
-        </style>
-    </head>
-    <body>
-        <div class="login-card">
-            <h1>VORTEX</h1>
-            <p>أقوى نظام لإدارة وحماية سيرفرات الديسكورد</p>
-            <a href="/auth/discord">🔑 تسجيل الدخول عبر Discord</a>
-        </div>
-    </body>
-    </html>
-`));
-
+app.get('/login', (req, res) => res.send(`<html dir="rtl"><head><link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700&display=swap" rel="stylesheet"></head><body style="background:#05051a; color:white; display:flex; justify-content:center; align-items:center; height:100vh;"><div style="text-align:center; padding:50px; border:1px solid #5865F2; border-radius:20px;"><h1>VORTEX</h1><a href="/auth/discord" style="background:#5865F2; color:white; padding:15px 30px; border-radius:10px; text-decoration:none; font-weight:bold;">دخول عبر Discord</a></div></body></html>`));
 app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => res.redirect('/dashboard'));
-app.get('/logout', (req, res) => { req.logout(() => res.redirect('/login')); });
-app.get('/', (req, res) => res.redirect('/dashboard'));
-
 app.get('/dashboard', checkAuth, (req, res) => {
     const adminGuilds = req.user.guilds.filter(g => (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8));
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
-    const cards = adminGuilds.map(g => {
-        const hasBot = client.guilds.cache.has(g.id);
-        const icon = g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256` : 'https://cdn.discordapp.com/embed/avatars/0.png';
-        return `
-        <div class="guild-card">
-            <img src="${icon}" class="guild-icon">
-            <h3 style="color:white; margin:8px 0; font-size:15px;">${g.name}</h3>
-            ${hasBot
-                ? `<a href="/manage/${g.id}/home" style="color:var(--p); text-decoration:none; font-weight:bold; font-size:13px;">⚙️ الإعدادات</a>`
-                : `<a href="${inviteLink}" target="_blank" style="color:var(--accent); text-decoration:none; font-weight:bold; font-size:13px;">➕ إضافة البوت</a>`
-            }
-        </div>`;
-    }).join('');
-
-    res.send(ui({ id: null }, 'home', `
-    <div style="text-align:center; padding-top:30px;">
-        <div style="font-size:42px; font-weight:bold; background:linear-gradient(45deg,#ff4d6d,#7b2ff7); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:10px;">VORTEX SYSTEM</div>
-        <p style="color:#666; margin-bottom:40px;">اختر السيرفر الذي تود إدارته</p>
-        <div class="guild-grid">${cards}</div>
-    </div>`));
+    const cards = adminGuilds.map(g => `<div class="guild-card"><img src="${g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="guild-icon"><h3>${g.name}</h3><a href="/manage/${g.id}/home" style="color:var(--p);">⚙️ الإعدادات</a></div>`).join('');
+    res.send(ui({ id: null }, 'home', `<div class="guild-grid">${cards}</div>`));
 });
 
-// --- [ Home Stats ] ---
+// --- [ Stats ] ---
 app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const stats = await Stats.findOne({ guildId: g.id }) || { messages: { total: 0 } };
-    const content = `
-    <div class="card">
-        <h3>📊 إحصائيات السيرفر العامة</h3>
-        <div class="grid-3">
-            <div class="stat-box">
-                <div class="stat-num">${stats.messages?.total || 0}</div>
-                <div class="stat-label">إجمالي الرسائل</div>
-            </div>
-            <div class="stat-box" style="--p:#00d2ff;">
-                <div class="stat-num" style="color:var(--accent);">${g.memberCount}</div>
-                <div class="stat-label">عدد الأعضاء</div>
-            </div>
-            <div class="stat-box" style="background:rgba(0,184,148,0.08); border-color:rgba(0,184,148,0.15);">
-                <div class="stat-num" style="color:#00b894;">${g.channels.cache.size}</div>
-                <div class="stat-label">عدد القنوات</div>
-            </div>
-        </div>
-    </div>`;
-    res.send(ui(g, 'home', content));
+    res.send(ui(g, 'home', `<div class="card"><h3>إحصائيات</h3><div class="grid-2"><div style="text-align:center;"><h1>${stats.messages.total}</h1><p>رسالة</p></div><div style="text-align:center;"><h1>${g.memberCount}</h1><p>عضو</p></div></div></div>`));
 });
 
-// --- [ Kick Notifications ] ---
-app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
-    const content = `
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="margin:0;">🟢 نظام تنبيهات Kick</h3>
-            <button onclick="document.getElementById('add-form').style.display = document.getElementById('add-form').style.display==='none'?'block':'none'" class="btn-save btn-sm" style="background:linear-gradient(45deg,#00b894,#00d2ff);">➕ إضافة ستريمر</button>
-        </div>
-
-        <div id="add-form" style="display:none; border:1px solid rgba(0,183,74,0.3); padding:20px; border-radius:12px; margin-bottom:24px; background:rgba(0,183,74,0.05);">
-            <form method="POST" action="/save/${g.id}/kick">
-                <label>اسم المستخدم في Kick:</label>
-                <input type="text" name="kickUser" placeholder="مثلاً: hook" required>
-                <label>قناة التنبيه:</label>
-                <select name="channelId">
-                    ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
-                </select>
-                <button class="btn-save btn-success">💾 إضافة</button>
-            </form>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>الستريمر</th>
-                    <th>القناة</th>
-                    <th>الحالة</th>
-                    <th>حذف</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${s.streamers.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:#555; padding:30px;">لا يوجد ستريمرز مضافين بعد</td></tr>' : ''}
-                ${s.streamers.map((st, i) => `
-                <tr>
-                    <td><b>${st.kickUsername}</b></td>
-                    <td>#${g.channels.cache.get(st.channelId)?.name || 'محذوفة'}</td>
-                    <td>${st.isLive ? '<span class="badge badge-online">🔴 مباشر</span>' : '<span class="badge badge-offline">⚫ غير مباشر</span>'}</td>
-                    <td><a href="/delete-kick/${g.id}/${i}" style="color:var(--s); text-decoration:none;" onclick="return confirm('حذف؟')">🗑️</a></td>
-                </tr>`).join('')}
-            </tbody>
-        </table>
-    </div>`;
-    res.send(ui(g, 'kick', content));
-});
-
-app.post('/save/:guildId/kick', checkAuth, async (req, res) => {
-    const { kickUser, channelId } = req.body;
-    await KickConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $push: { streamers: { kickUsername: kickUser, channelId, isLive: false } } }, { upsert: true });
-    res.redirect(`/manage/${req.params.guildId}/kick`);
-});
-
-app.get('/delete-kick/:guildId/:index', checkAuth, async (req, res) => {
-    const config = await KickConfig.findOne({ guildId: req.params.guildId });
-    if (config) { config.streamers.splice(req.params.index, 1); await config.save(); }
-    res.redirect(`/manage/${req.params.guildId}/kick`);
-});
-
-// --- [ Security Settings ] ---
+// --- [ Security ] ---
 app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
     const s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
-    const content = `
-    <form method="POST" action="/save/${g.id}/security">
-        <div class="card">
-            <h3>🛡️ إعدادات الحماية والرقابة</h3>
-
-            <div class="grid-2">
-                <div>
-                    <label>منع الروابط:</label>
-                    <select name="antiLinks">
-                        <option value="true" ${s.security?.antiLinks ? 'selected' : ''}>🟢 مفعّل</option>
-                        <option value="false" ${!s.security?.antiLinks ? 'selected' : ''}>🔴 معطّل</option>
-                    </select>
-                </div>
-                <div>
-                    <label>نوع العقوبة:</label>
-                    <select name="punishment">
-                        <option value="none" ${s.security?.punishment === 'none' ? 'selected' : ''}>حذف الرسالة فقط</option>
-                        <option value="warn" ${s.security?.punishment === 'warn' ? 'selected' : ''}>تحذير</option>
-                        <option value="timeout" ${s.security?.punishment === 'timeout' ? 'selected' : ''}>إسكات (Timeout)</option>
-                    </select>
-                </div>
-            </div>
-
-            <label>الكلمات الممنوعة (افصل بفاصلة):</label>
-            <textarea name="badWords" placeholder="كلمة1, كلمة2, كلمة3">${s.security?.badWords || ''}</textarea>
-            <p class="hint">💡 سيتم حذف أي رسالة تحتوي على هذه الكلمات تلقائياً</p>
-
-            <label>رتب الاستثناء (Bypass) - يمكن اختيار أكثر من رتبة:</label>
-            <select name="bypassRoles" multiple>
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
-                    `<option value="${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'selected' : ''}>${r.name}</option>`
-                ).join('')}
-            </select>
-
-            <button class="btn-save">💾 حفظ إعدادات الحماية</button>
-        </div>
-    </form>`;
-    res.send(ui(g, 'security', content));
+    res.send(ui(g, 'security', `<form method="POST" action="/save/${g.id}/security"><div class="card"><h3>الحماية</h3><label>منع الروابط:</label><select name="antiLinks"><option value="true" ${s.security.antiLinks?'selected':''}>مفعل</option><option value="false" ${!s.security.antiLinks?'selected':''}>معطل</option></select><label>الكلمات الممنوعة:</label><textarea name="badWords">${s.security.badWords||''}</textarea><label>الأيموجيات الممنوعة:</label><input name="badEmojis" value="${s.security.badEmojis||''}"><label>رتب الاستثناء:</label><div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">${g.roles.cache.filter(r=>r.name!=='@everyone').map(r=>`<label class="check-container"><input type="checkbox" name="bypassRoles" value="${r.id}" ${s.security.bypassRoles?.includes(r.id)?'checked':''}> <span class="checkmark"></span> ${r.name}</label>`).join('')}</div><button class="btn-save">حفظ</button></div></form>`));
 });
-
 app.post('/save/:guildId/security', checkAuth, async (req, res) => {
     const b = req.body;
-    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, {
-        $set: {
-            "security.antiLinks": b.antiLinks === 'true',
-            "security.punishment": b.punishment,
-            "security.badWords": b.badWords,
-            "security.bypassRoles": Array.isArray(b.bypassRoles) ? b.bypassRoles : [b.bypassRoles].filter(x => x)
-        }
-    }, { upsert: true });
+    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: { "security.antiLinks": b.antiLinks==='true', "security.badWords": b.badWords, "security.badEmojis": b.badEmojis, "security.bypassRoles": Array.isArray(b.bypassRoles)?b.bypassRoles:[b.bypassRoles].filter(x=>x) } }, { upsert: true });
     res.redirect(`/manage/${req.params.guildId}/security`);
 });
 
-// --- [ Ticket Settings ] ---
-app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
+// --- [ Welcome ] ---
+app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
-    let topImg = s.topImagePath ? `/uploads/${path.basename(s.topImagePath)}` : 'https://placehold.co/110x110?text=Top';
-    let bottomImg = s.bottomImagePath ? `/uploads/${path.basename(s.bottomImagePath)}` : 'https://placehold.co/110x110?text=Bottom';
-
-    const content = `
-    <form action="/save/${g.id}/tickets" method="POST" enctype="multipart/form-data">
-        <div class="card">
-            <h3>🎫 إعداد نظام التذاكر المتطور</h3>
-
-            <div style="display:flex; gap:30px; justify-content:center; margin-bottom:24px;">
-                <div style="text-align:center;">
-                    <p style="color:#aaa; font-size:12px; margin-bottom:8px;">الصورة العلوية</p>
-                    <img src="${topImg}" style="width:110px; height:110px; object-fit:cover; border-radius:12px; border:2px solid var(--p);">
-                    <label style="background:var(--p); padding:6px 12px; border-radius:8px; cursor:pointer; display:block; margin-top:8px; font-size:12px; text-align:center;">
-                        🔄 تغيير <input type="file" name="topImage" accept="image/*" style="display:none;">
-                    </label>
-                </div>
-                <div style="text-align:center;">
-                    <p style="color:#aaa; font-size:12px; margin-bottom:8px;">الصورة السفلية</p>
-                    <img src="${bottomImg}" style="width:110px; height:110px; object-fit:cover; border-radius:12px; border:2px solid var(--p);">
-                    <label style="background:var(--p); padding:6px 12px; border-radius:8px; cursor:pointer; display:block; margin-top:8px; font-size:12px; text-align:center;">
-                        🔄 تغيير <input type="file" name="bottomImage" accept="image/*" style="display:none;">
-                    </label>
-                </div>
-            </div>
-
-            <div class="grid-2">
-                <div>
-                    <label>عنوان التذكرة:</label>
-                    <input name="title" value="${s.title || ''}" placeholder="الدعم الفني">
-                </div>
-                <div>
-                    <label>لون الإيمباد (Hex):</label>
-                    <input name="color" value="${s.color || '#5865F2'}" placeholder="#5865F2">
-                </div>
-            </div>
-
-            <label>وصف التذكرة:</label>
-            <textarea name="description">${s.description || 'اضغط لفتح تذكرة'}</textarea>
-
-            <div class="grid-2">
-                <div>
-                    <label>رتبة الإدارة:</label>
-                    <select name="adminRole">
-                        <option value="">-- اختر رتبة الإدارة --</option>
-                        ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
-                            `<option value="${r.id}" ${s.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>📢 قناة الإرسال:</label>
-                    <select name="targetChannel">
-                        <option value="">-- لا ترسل الآن --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                            `<option value="${c.id}"># ${c.name}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-            </div>
-
-            <div class="divider"></div>
-            <h4 style="color:var(--accent); margin-bottom:12px;">🔘 الأزرار (حتى 4):</h4>
-            ${[0,1,2,3].map(i => `
-            <div class="grid-2" style="margin-bottom:8px;">
-                <input name="btn_label_${i}" value="${s.buttons?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
-                <input name="btn_emoji_${i}" value="${s.buttons?.[i]?.emoji || ''}" placeholder="إيموجي (اختياري)">
-            </div>`).join('')}
-
-            <button class="btn-save">💾 حفظ ونشر اللوحة</button>
-        </div>
-    </form>`;
-    res.send(ui(g, 'tickets', content));
+    const s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
+    res.send(ui(g, 'welcome', `<form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data"><div class="card"><h3>الترحيب</h3><label>القناة:</label><select name="channel">${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}" ${s.welcome.channel===c.id?'selected':''}># ${c.name}</option>`).join('')}</select><label>رسالة الترحيب:</label><textarea name="embedMessage">${s.welcome.embedMessage||''}</textarea><label>خلفية AI:</label><input id="aiPrompt" name="aiPrompt" value="${s.welcome.aiPrompt||''}"><button type="button" onclick="const p=document.getElementById('aiPrompt').value; document.getElementById('previewBg').src='https://image.pollinations.ai/prompt/'+encodeURIComponent(p)+'?width=800&height=400&nologo=true&seed='+Date.now(); document.getElementById('remoteBg').value=document.getElementById('previewBg').src;">توليد</button><input type="hidden" name="remoteBg" id="remoteBg"><div class="preview-container" id="co"><img src="${s.welcome.imagePath||''}" id="previewBg" style="width:100%; height:100%; object-fit:cover;"><div id="av" style="width:${s.welcome.avatarWidth||150}px; height:${s.welcome.avatarHeight||150}px; left:${s.welcome.avatarX||50}%; top:${s.welcome.avatarY||50}%; transform:translate(-50%,-50%); position:absolute; border:4px solid white; border-radius:50%;"></div></div><input type="hidden" name="avatarX" id="ax" value="${s.welcome.avatarX||50}"><input type="hidden" name="avatarY" id="ay" value="${s.welcome.avatarY||50}"><button class="btn-save">حفظ</button></div></form>`));
 });
-
-app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
+app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
     const b = req.body;
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.status(404).send("Guild not found");
-
-    let buttons = [];
-    for (let i = 0; i < 4; i++) {
-        if (b[`btn_label_${i}`]?.trim()) buttons.push({ label: b[`btn_label_${i}`], emoji: b[`btn_emoji_${i}`] || "" });
-    }
-
-    let data = { title: b.title, description: b.description, color: b.color || '#5865F2', adminRole: b.adminRole, buttons };
-    if (req.files?.topImage?.[0]) data.topImagePath = req.files.topImage[0].path;
-    if (req.files?.bottomImage?.[0]) data.bottomImagePath = req.files.bottomImage[0].path;
-
-    const config = await TicketConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: data }, { upsert: true, new: true });
-
-    if (b.targetChannel) {
-        const ch = g.channels.cache.get(b.targetChannel);
-        if (ch) {
-            const files = [];
-            const embed = new EmbedBuilder().setTitle(data.title || "TICKETS").setDescription(data.description || "اضغط للفتح").setColor(data.color);
-
-            if (config.topImagePath && fs.existsSync(config.topImagePath)) {
-                const topName = path.basename(config.topImagePath);
-                files.push(new AttachmentBuilder(config.topImagePath, { name: topName }));
-                embed.setThumbnail(`attachment://${topName}`);
-            }
-            if (config.bottomImagePath && fs.existsSync(config.bottomImagePath)) {
-                const bottomName = path.basename(config.bottomImagePath);
-                files.push(new AttachmentBuilder(config.bottomImagePath, { name: bottomName }));
-                embed.setImage(`attachment://${bottomName}`);
-            }
-
-            const components = [];
-            if (buttons.length > 0) {
-                const row = new ActionRowBuilder();
-                buttons.forEach((btn, i) => {
-                    const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
-                    if (btn.emoji?.trim()) {
-                        try { button.setEmoji(btn.emoji.trim()); } catch(e) {}
-                    }
-                    row.addComponents(button);
-                });
-                components.push(row);
-            } else {
-                components.push(new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة 🎫').setStyle(ButtonStyle.Primary)
-                ));
-            }
-            ch.send({ embeds: [embed], components, files }).catch(e => console.error("Discord Send Error:", e));
-        }
-    }
-    res.redirect(`/manage/${req.params.guildId}/tickets`);
-});
-
-// --- [ Jail / Mod Settings ] ---
-app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
-    const content = `
-    <form method="POST" action="/save/${g.id}/mod">
-        <div class="card">
-            <h3>⚖️ إعدادات نظام السجن</h3>
-
-            <div class="grid-2">
-                <div>
-                    <label>اسم أمر السجن:</label>
-                    <input name="jailCmd" value="${s.jail?.commandName || 'jail'}" placeholder="jail">
-                </div>
-                <div>
-                    <label>اسم أمر فك السجن:</label>
-                    <input name="unjailCmd" value="${s.jail?.unjailCommand || 'unjail'}" placeholder="unjail">
-                </div>
-            </div>
-
-            <label>رتبة السجن (Jail Role):</label>
-            <select name="jailRole">
-                <option value="">-- اختر رتبة السجن --</option>
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
-                    `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
-                ).join('')}
-            </select>
-
-            <label>قناة السجن:</label>
-            <select name="jailChannel">
-                <option value="">-- اختر قناة السجن --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
-                ).join('')}
-            </select>
-
-            <label>رتب الإدارة المسموح لها بالسجن:</label>
-            <select name="adminRoles" multiple>
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r =>
-                    `<option value="${r.id}" ${s.jail?.adminRoles?.includes(r.id) ? 'selected' : ''}>${r.name}</option>`
-                ).join('')}
-            </select>
-
-            <button class="btn-save">💾 حفظ إعدادات الإشراف</button>
-        </div>
-    </form>`;
-    res.send(ui(g, 'mod', content));
-});
-
-app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
-    const b = req.body;
-    await ModConfig.findOneAndUpdate({ guildId: req.params.guildId }, {
-        $set: {
-            "jail.commandName": b.jailCmd || 'jail',
-            "jail.unjailCommand": b.unjailCmd || 'unjail',
-            "jail.roleId": b.jailRole,
-            "jail.channelId": b.jailChannel,
-            "jail.adminRoles": Array.isArray(b.adminRoles) ? b.adminRoles : [b.adminRoles].filter(x => x)
-        }
-    }, { upsert: true });
-    res.redirect(`/manage/${req.params.guildId}/mod`);
-});
-
-// --- [ Logs ] ---
-app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
-    const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
-    const typeLabels = {
-        messages: '💬 الرسائل', moderation: '⚖️ الإشراف',
-        members: '👥 الأعضاء', channels: '📢 القنوات',
-        roles: '🎭 الرتب', voice: '🎙️ الصوت'
-    };
-
-    const content = `
-    <form method="POST" action="/save/${g.id}/logs">
-        <div class="card">
-            <h3>📜 نظام اللوق</h3>
-            ${types.map(t => `
-            <div class="toggle-row">
-                <span class="toggle-label">${typeLabels[t]}</span>
-                <input type="checkbox" name="${t}_st" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width:auto; margin:0; cursor:pointer; width:18px; height:18px;">
-                <select name="${t}_ch" style="flex:1; max-width:280px; margin:0;">
-                    <option value="">-- اختر القناة --</option>
-                    ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                        `<option value="${c.id}" ${s.logs?.[t]?.channel == c.id ? 'selected' : ''}># ${c.name}</option>`
-                    ).join('')}
-                </select>
-            </div>`).join('')}
-            <button class="btn-save">💾 حفظ إعدادات اللوق</button>
-        </div>
-    </form>`;
-    res.send(ui(g, 'logs', content));
-});
-
-app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
-    const b = req.body;
-    const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
-    let logData = {};
-    types.forEach(t => {
-        logData[`logs.${t}`] = { enabled: b[`${t}_st`] === 'on', channel: b[`${t}_ch`] };
-    });
-    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: logData }, { upsert: true });
-    res.redirect(`/manage/${req.params.guildId}/logs`);
+    let data = { 'welcome.channel': b.channel, 'welcome.embedMessage': b.embedMessage, 'welcome.avatarX': b.avatarX, 'welcome.avatarY': b.avatarY, 'welcome.aiPrompt': b.aiPrompt };
+    if (req.file) data['welcome.imagePath'] = req.file.path; else if (b.remoteBg) data['welcome.imagePath'] = b.remoteBg;
+    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: data }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/welcome`);
 });
 
 // --- [ Levels ] ---
 app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
-
-    const content = `
-    <form method="POST" action="/save/${g.id}/levels">
-        <div class="card">
-            <h3>🏆 إعدادات نظام المستويات</h3>
-            <div class="grid-2">
-                <div>
-                    <label>تشغيل النظام:</label>
-                    <select name="enabled">
-                        <option value="on" ${s.levels?.enabled ? 'selected' : ''}>🟢 مشغّل</option>
-                        <option value="off" ${!s.levels?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
-                    </select>
-                </div>
-                <div>
-                    <label>XP لكل رسالة:</label>
-                    <input type="number" name="xp" value="${s.levels?.xpPerMessage || 10}" min="1">
-                </div>
-            </div>
-            <label>قناة إعلانات الترقي:</label>
-            <select name="channel">
-                <option value="">-- نفس قناة الرسالة --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}" ${s.levels?.levelUpChannel === c.id ? 'selected' : ''}># ${c.name}</option>`
-                ).join('')}
-            </select>
-            <label>أمر قائمة المتصدرين:</label>
-            <input name="leaderboardCommand" value="${s.levels?.leaderboardCommand || '!levels'}" placeholder="!levels">
-            <button class="btn-save">💾 حفظ إعدادات الليفل</button>
-        </div>
-    </form>`;
-    res.send(ui(g, 'levels', content));
+    const s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
+    res.send(ui(g, 'levels', `<form method="POST" action="/save/${g.id}/levels"><div class="card"><h3>نظام الليفل</h3><label>تشغيل:</label><select name="enabled"><option value="true" ${s.levels.enabled?'selected':''}>مفعل</option><option value="false" ${!s.levels.enabled?'selected':''}>معطل</option></select><label>XP لكل رسالة:</label><input type="number" name="xp" value="${s.levels.xpPerMessage||10}"><button class="btn-save">حفظ</button></div></form>`));
 });
-
 app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
     const b = req.body;
-    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, {
-        $set: {
-            "levels.enabled": b.enabled === 'on',
-            "levels.xpPerMessage": Number(b.xp) || 10,
-            "levels.levelUpChannel": b.channel,
-            "levels.leaderboardCommand": b.leaderboardCommand || '!levels'
-        }
-    }, { upsert: true });
+    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: { "levels.enabled": b.enabled==='true', "levels.xpPerMessage": parseInt(b.xp) } }, { upsert: true });
     res.redirect(`/manage/${req.params.guildId}/levels`);
+});
+
+// --- [ Logs ] ---
+app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    const s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
+    const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
+    res.send(ui(g, 'logs', `<form method="POST" action="/save/${g.id}/logs"><div class="card"><h3>السجلات (Logs)</h3>${types.map(t=>`<div style="margin-bottom:15px;"><label>${t}:</label><select name="${t}_ch"><option value="">معطل</option>${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}" ${s.logs?.[t]?.channel===c.id?'selected':''}># ${c.name}</option>`).join('')}</select></div>`).join('')}<button class="btn-save">حفظ</button></div></form>`));
+});
+app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
+    const b = req.body;
+    let logData = {};
+    ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'].forEach(t => { logData[`logs.${t}`] = { enabled: !!b[`${t}_ch`], channel: b[`${t}_ch`] }; });
+    await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: logData }, { upsert: true });
+    res.redirect(`/manage/${req.params.guildId}/logs`);
 });
 
 // --- [ Clans ] ---
 app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
     const clans = await Clan.find({ guildId: g.id });
-
-    const content = `
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="margin:0;">🚩 نظام الكلانات</h3>
-            <a href="/manage/${g.id}/clans/add" class="btn-save btn-sm">➕ إضافة كلان</a>
-        </div>
-        ${clans.length === 0 ? '<p style="color:#555; text-align:center; padding:30px;">لا يوجد كلانات بعد</p>' : ''}
-        ${clans.map((clan, i) => `
-        <div style="padding:18px; background:rgba(255,255,255,0.02); border-radius:12px; margin-bottom:12px; border:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <b style="color:var(--accent);">${clan.clanName}</b>
-                <p style="color:#666; margin:4px 0 0; font-size:13px;">الأعضاء: ${clan.members?.length || 0} | النقاط: ${clan.points}</p>
-            </div>
-            <a href="/delete-clan/${g.id}/${clan._id}" style="color:var(--s); text-decoration:none;" onclick="return confirm('حذف الكلان؟')">🗑️ حذف</a>
-        </div>`).join('')}
-    </div>`;
-    res.send(ui(g, 'clans', content));
+    res.send(ui(g, 'clans', `<div class="card"><h3>الكلانات</h3><a href="/manage/${g.id}/clans/add">إضافة كلان</a><br><br>${clans.map(c=>`<div><b>${c.clanName}</b> - <a href="/delete-clan/${g.id}/${c._id}">حذف</a></div>`).join('')}</div>`));
 });
-
-app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const content = `
-    <form method="POST" action="/save/${g.id}/clans">
-        <div class="card">
-            <h3>🚩 إضافة كلان جديد</h3>
-            <label>اسم الكلان:</label>
-            <input name="clanName" required placeholder="مثلاً: VORTEX TEAM">
-            <label>ID القائد:</label>
-            <input name="leaderId" required placeholder="ايدي صاحب الكلان">
-            <label>رتبة الكلان:</label>
-            <select name="roleId">
-                <option value="">-- بدون رتبة --</option>
-                ${g.roles.cache.filter(r => r.name !== "@everyone").map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-            </select>
-            <label>📝 أسئلة التقديم (سؤال في كل سطر):</label>
-            <textarea name="questions" rows="4" placeholder="ما هو اسمك؟&#10;كم عمرك؟"></textarea>
-            <button class="btn-save">💾 حفظ الكلان</button>
-        </div>
-    </form>`;
-    res.send(ui(g, 'clans', content));
-});
-
-app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
-    const { clanName, leaderId, roleId, questions } = req.body;
-    const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== "") : [];
-    await Clan.create({ guildId: req.params.guildId, clanName, leaderId, roleId, questions: questionsArray, members: [] });
-    res.redirect(`/manage/${req.params.guildId}/clans`);
-});
-
-app.get('/delete-clan/:guildId/:clanId', checkAuth, async (req, res) => {
-    await Clan.findByIdAndDelete(req.params.clanId);
-    res.redirect(`/manage/${req.params.guildId}/clans`);
-});
+app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => { res.send(ui(client.guilds.cache.get(req.params.guildId), 'clans', `<form method="POST" action="/save/${req.params.guildId}/clans"><div class="card"><label>الاسم:</label><input name="clanName" required><label>القائد (ID):</label><input name="leaderId" required><button class="btn-save">حفظ</button></div></form>`)); });
+app.post('/save/:guildId/clans', checkAuth, async (req, res) => { await Clan.create({ ...req.body, guildId: req.params.guildId, members: [], assistantIds: [] }); res.redirect(`/manage/${req.params.guildId}/clans`); });
+app.get('/delete-clan/:guildId/:id', checkAuth, async (req, res) => { await Clan.findByIdAndDelete(req.params.id); res.redirect(`/manage/${req.params.guildId}/clans`); });
 
 // ==========================================
-// 7️⃣ Welcome System (Full - From File 2)
+// 7️⃣ Bot Logic
 // ==========================================
-app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
 
-    let img = s.welcome?.imagePath || 'https://placehold.co/800x400?text=No+Background';
+client.on('messageCreate', async (message) => {
+    if (!message.guild || message.author.bot) return;
+    const config = await GuildConfig.findOne({ guildId: message.guild.id });
+    if (!config) return;
 
-    const content = `
-    <style>
-        .preview-container {
-            position: relative; border: 2px solid var(--p);
-            border-radius: 12px; overflow: hidden;
-            background: #000; width: 100%; aspect-ratio: 2/1;
-            user-select: none; margin: 16px 0;
-        }
-        #previewAvatar {
-            position: absolute; border: 3px solid #fff;
-            border-radius: 50%; background-size: 100% 100%;
-            cursor: move; box-shadow: 0 0 20px rgba(0,0,0,0.6);
-        }
-        .resizer {
-            width: 12px; height: 12px; background: var(--p);
-            position: absolute; border: 2px solid #fff; border-radius: 3px;
-        }
-        .resizer.br { right: -6px; bottom: -6px; cursor: nwse-resize; }
-        .resizer.tr { right: -6px; top: -6px; cursor: nesw-resize; }
-        .resizer.bl { left: -6px; bottom: -6px; cursor: nesw-resize; }
-    </style>
-
-    <div class="card">
-        <h3>👋 إعدادات نظام الترحيب</h3>
-        <div class="grid-2">
-            <div>
-                <p style="color:#aaa; font-size:13px; margin:0;">الحالة الحالية:</p>
-                <p style="margin:4px 0 0;">${s.welcome?.enabled
-                    ? '<span class="badge badge-online">🟢 مشغّل</span>'
-                    : '<span class="badge badge-offline">🔴 مطفأ</span>'
-                }</p>
-            </div>
-            <div>
-                <p style="color:#aaa; font-size:13px; margin:0;">القناة:</p>
-                <p style="margin:4px 0 0; color:white;">${s.welcome?.channel ? `<#${s.welcome.channel}>` : 'لم تُحدد'}</p>
-            </div>
-        </div>
-    </div>
-
-    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" id="mainForm">
-        <div class="card">
-            <h3>⚙️ الإعدادات الأساسية</h3>
-            <div class="grid-2">
-                <div>
-                    <label>📍 قناة الترحيب:</label>
-                    <select name="channel" required>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                            `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>🔔 الحالة:</label>
-                    <select name="enabled">
-                        <option value="on" ${s.welcome?.enabled ? 'selected' : ''}>🟢 مشغّل</option>
-                        <option value="off" ${!s.welcome?.enabled ? 'selected' : ''}>🔴 مطفأ</option>
-                    </select>
-                </div>
-            </div>
-
-            <label>💬 رسالة الترحيب (نص الإيمباد):</label>
-            <textarea name="embedMessage" rows="4" placeholder="اكتب رسالة الترحيب... يمكنك استخدام {member} و {guild} و {count}">${s.welcome?.embedMessage || ''}</textarea>
-            <p class="hint">💡 المتغيرات المتاحة: {member} = منشن العضو | {guild} = اسم السيرفر | {count} = عدد الأعضاء</p>
-        </div>
-
-        <div class="card">
-            <h3>🖼️ خلفية صورة الترحيب</h3>
-
-            <label>🤖 توليد خلفية بالذكاء الاصطناعي:</label>
-            <div style="display:flex; gap:10px; margin-bottom:16px;">
-                <input type="text" id="aiPromptInput" name="aiPrompt"
-                    value="${s.welcome?.aiPrompt || ''}"
-                    placeholder="مثلاً: Galaxy background, blue stars, high quality"
-                    style="flex:1;">
-                <button type="button" onclick="generateAIImage()" class="btn-save btn-sm" style="background:linear-gradient(45deg,#7b2ff7,var(--accent)); margin-top:0; white-space:nowrap;">
-                    🚀 توليد AI
-                </button>
-            </div>
-            <input type="hidden" name="remoteBg" id="remoteBg">
-
-            <label>📁 أو ارفع صورة خلفية مخصصة:</label>
-            <input type="file" name="welcomeImage" accept="image/*" style="padding:10px; cursor:pointer;">
-            <p class="hint">💡 الصورة المرفوعة ستلغي الخلفية المولّدة بالذكاء الاصطناعي</p>
-
-            <div class="preview-container" id="container">
-                <img src="${img}" id="previewBg" style="width:100%; height:100%; object-fit:cover; pointer-events:none; opacity:0.75;">
-                <div id="previewAvatar" style="
-                    width: ${s.welcome?.avatarWidth || 150}px;
-                    height: ${s.welcome?.avatarHeight || 150}px;
-                    left: ${s.welcome?.avatarX || 50}%;
-                    top: ${s.welcome?.avatarY || 50}%;
-                    transform: translate(-50%, -50%);
-                    background-image: url('${client.user?.displayAvatarURL() || ''}');
-                ">
-                    <div class="resizer br"></div>
-                    <div class="resizer tr"></div>
-                    <div class="resizer bl"></div>
-                </div>
-            </div>
-
-            <p style="color:#666; font-size:12px; text-align:center; margin-top:8px;">
-                💡 اسحب الصورة لتحريكها، واستخدم المربعات الزرقاء في الزوايا لتغيير الحجم
-            </p>
-
-            <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
-            <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
-            <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
-            <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
-
-            <button type="submit" class="btn-save">💾 حفظ إعدادات الترحيب</button>
-        </div>
-    </form>
-
-    <script>
-        const avatar = document.getElementById('previewAvatar');
-        const container = document.getElementById('container');
-        let isDragging = false, isResizing = false, currentResizer = null;
-
-        avatar.addEventListener('mousedown', (e) => {
-            if (e.target.classList.contains('resizer')) return;
-            isDragging = true;
-            e.preventDefault();
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            const rect = container.getBoundingClientRect();
-            if (isDragging) {
-                let x = ((e.clientX - rect.left) / rect.width) * 100;
-                let y = ((e.clientY - rect.top) / rect.height) * 100;
-                x = Math.max(0, Math.min(100, x));
-                y = Math.max(0, Math.min(100, y));
-                avatar.style.left = x + '%';
-                avatar.style.top = y + '%';
-                document.getElementById('avatarX').value = Math.round(x);
-                document.getElementById('avatarY').value = Math.round(y);
-            }
-            if (isResizing) {
-                const avatarRect = avatar.getBoundingClientRect();
-                if (currentResizer.classList.contains('br')) {
-                    avatar.style.width = (e.clientX - avatarRect.left) + 'px';
-                    avatar.style.height = (e.clientY - avatarRect.top) + 'px';
-                } else if (currentResizer.classList.contains('tr')) {
-                    avatar.style.width = (e.clientX - avatarRect.left) + 'px';
-                    avatar.style.height = (avatarRect.bottom - e.clientY) + 'px';
-                } else if (currentResizer.classList.contains('bl')) {
-                    avatar.style.width = (avatarRect.right - e.clientX) + 'px';
-                    avatar.style.height = (e.clientY - avatarRect.top) + 'px';
-                }
-                document.getElementById('avatarWidth').value = Math.round(avatar.offsetWidth);
-                document.getElementById('avatarHeight').value = Math.round(avatar.offsetHeight);
-            }
-        });
-
-        window.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
-
-        document.querySelectorAll('.resizer').forEach(resizer => {
-            resizer.addEventListener('mousedown', (e) => {
-                isResizing = true;
-                currentResizer = e.target;
-                e.stopPropagation();
-                e.preventDefault();
-            });
-        });
-
-        async function generateAIImage() {
-            const prompt = document.getElementById('aiPromptInput').value;
-            if (!prompt) return alert('اكتب وصفاً للخلفية أولاً!');
-            const btn = event.target;
-            btn.textContent = '⏳ جاري التوليد...';
-            btn.disabled = true;
-            const url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt + ", no text, high quality, wide landscape") + '?width=800&height=400&nologo=true&seed=' + Date.now();
-            document.getElementById('previewBg').src = url;
-            document.getElementById('remoteBg').value = url;
-            document.getElementById('previewBg').onload = () => {
-                btn.textContent = '✅ تم التوليد';
-                setTimeout(() => { btn.textContent = '🚀 توليد AI'; btn.disabled = false; }, 2000);
-            };
-        }
-    </script>
-    `;
-    res.send(ui(g, 'welcome', content));
-});
-
-app.post('/save/:guildId/welcome', checkAuth, upload.single('welcomeImage'), async (req, res) => {
-    try {
-        const { guildId } = req.params;
-        const b = req.body;
-
-        let updateData = {
-            'welcome.enabled': b.enabled === 'on',
-            'welcome.channel': b.channel,
-            'welcome.embedMessage': b.embedMessage,
-            'welcome.avatarX': parseInt(b.avatarX) || 50,
-            'welcome.avatarY': parseInt(b.avatarY) || 50,
-            'welcome.avatarWidth': parseInt(b.avatarWidth) || 150,
-            'welcome.avatarHeight': parseInt(b.avatarHeight) || 150,
-            'welcome.aiPrompt': b.aiPrompt
-        };
-
-        if (req.file) {
-            updateData['welcome.imagePath'] = req.file.path;
-        } else if (b.remoteBg) {
-            updateData['welcome.imagePath'] = b.remoteBg;
-        }
-
-        await GuildConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true, new: true });
-        res.redirect(`/manage/${guildId}/welcome`);
-    } catch (err) {
-        console.error("Welcome Save Error:", err);
-        res.status(500).send("خطأ في حفظ الإعدادات");
+    // Security
+    const isBypass = message.member.roles.cache.some(r => config.security?.bypassRoles?.includes(r.id));
+    if (!isBypass && config.security) {
+        let bad = false;
+        if (config.security.antiLinks && /https?:\/\//.test(message.content)) bad = true;
+        if (config.security.badWords?.split(',').some(w => message.content.includes(w.trim()))) bad = true;
+        if (config.security.badEmojis?.split('').some(e => message.content.includes(e))) bad = true;
+        if (bad) { message.delete().catch(()=>{}); return; }
     }
-});
 
-// ==========================================
-// 8️⃣ Discord Events Logic
-// ==========================================
-
-client.on('ready', () => console.log(`🚀 VORTEX SYSTEM ONLINE: ${client.user.tag}`));
-
-// --- [ Welcome Event ] ---
-client.on('guildMemberAdd', async (member) => {
-    const config = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (!config?.welcome?.enabled || !config.welcome.channel) return;
-
-    const welcomeChannel = member.guild.channels.cache.get(config.welcome.channel);
-    if (!welcomeChannel) return;
-
-    try {
-        const canvas = createCanvas(800, 400);
-        const ctx = canvas.getContext('2d');
-
-        let bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400?text=Welcome';
-        const background = await loadImage(bgUrl);
-        ctx.drawImage(background, 0, 0, 800, 400);
-
-        const avW = config.welcome.avatarWidth || 150;
-        const avH = config.welcome.avatarHeight || 150;
-        const x = (config.welcome.avatarX / 100) * 800;
-        const y = (config.welcome.avatarY / 100) * 400;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-
-        const avatarImg = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 512 }));
-        ctx.drawImage(avatarImg, x - (avW / 2), y - (avH / 2), avW, avH);
-        ctx.restore();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
-
-        const welcomeMsg = (config.welcome.embedMessage || "مرحباً {member} في سيرفرنا!")
-            .replace(/{member}/g, `<@${member.id}>`)
-            .replace(/{guild}/g, member.guild.name)
-            .replace(/{count}/g, member.guild.memberCount.toString());
-
-        const welcomeEmbed = new EmbedBuilder()
-            .setTitle(`✨ عضو جديد انضم إلينا!`)
-            .setDescription(welcomeMsg)
-            .setColor('#5865F2')
-            .setImage('attachment://welcome-image.png')
-            .setTimestamp()
-            .setFooter({ text: `VORTEX System • العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
-
-        welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
-
-    } catch (err) {
-        console.error("Welcome Error:", err);
+    // Levels
+    if (config.levels?.enabled) {
+        let u = await UserLevel.findOne({ guildId: message.guild.id, userId: message.author.id });
+        if (!u) u = new UserLevel({ guildId: message.guild.id, userId: message.author.id });
+        u.xp += config.levels.xpPerMessage || 10;
+        if (u.xp >= u.level * 100) { u.level++; message.channel.send(`مبروك <@${message.author.id}> وصلت ليفل ${u.level}!`); }
+        await u.save();
     }
-});
 
-// --- [ Jail Logic ] ---
-client.on('interactionCreate', async (interaction) => {
-    try {
-        if (!interaction.guild) return;
-
-        // Ticket Buttons
-        if (interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) {
-            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!tConfig) return interaction.reply({ content: "⚠️ لم يتم العثور على إعدادات التذاكر.", ephemeral: true });
-            let ticketType = "تذكرة دعم";
-            if (interaction.customId.startsWith('ticket_btn_')) {
-                const btnIndex = parseInt(interaction.customId.replace('ticket_btn_', ''));
-                if (tConfig.buttons?.[btnIndex]) ticketType = tConfig.buttons[btnIndex].label;
-            }
-            await openTicket(interaction, tConfig, ticketType);
-            return;
-        }
-
-        // Ticket Control Select Menu
-        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
-            const selected = interaction.values[0];
-            const ticket = await TicketData.findOne({ channelId: interaction.channel.id });
-            if (!ticket) return interaction.reply({ content: "❌ لم يتم العثور على بيانات التكت.", ephemeral: true });
-
-            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!tConfig) return;
-
-            const isAdmin = interaction.member.roles.cache.has(tConfig.adminRole);
-            const adminActions = ['claim_ticket', 'close_ticket', 'add_member', 'remove_member', 'summon_member'];
-            if (!isAdmin && adminActions.includes(selected)) {
-                return interaction.reply({ content: "❌ هذه القائمة للإدارة فقط!", ephemeral: true });
-            }
-
-            if (selected === 'claim_ticket') {
-                if (ticket.claimedBy) return interaction.reply({ content: "⚠️ التكت مستلم بالفعل!", ephemeral: true });
-                ticket.claimedBy = interaction.user.id;
-                await ticket.save();
-                return interaction.reply({ content: `📌 تم استلام التكت بواسطة ${interaction.user}` });
-            }
-
-            if (selected === 'close_ticket') {
-                ticket.closedAt = new Date();
-                ticket.closedBy = interaction.user.id;
-                await ticket.save();
-                await interaction.reply({ content: "🔒 سيتم حذف التكت خلال 5 ثوانٍ..." });
-                setTimeout(() => { interaction.channel.delete().catch(() => {}); }, 5000);
-                return;
-            }
-
-            if (selected === 'add_member') {
-                const userSelect = new UserSelectMenuBuilder().setCustomId('add_user_menu').setPlaceholder('اختر الشخص').setMaxValues(1);
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
-            }
-
-            if (selected === 'remove_member') {
-                const userSelect = new UserSelectMenuBuilder().setCustomId('remove_user_menu').setPlaceholder('اختر الشخص').setMaxValues(1);
-                return interaction.reply({ components: [new ActionRowBuilder().addComponents(userSelect)], ephemeral: true });
-            }
-
-            if (selected === 'summon_member') {
-                return interaction.channel.send(`🔔 <@${ticket.ownerId}> الأدمن ${interaction.user} يستدعيك!`);
-            }
-        }
-
-        // User Select Menus (Add/Remove from Ticket)
-        if (interaction.isUserSelectMenu()) {
-            const targetId = interaction.values[0];
-            const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
-            if (!targetMember) return interaction.reply({ content: "❌ لم يتم العثور على العضو.", ephemeral: true });
-
-            if (interaction.customId === 'add_user_menu') {
-                await interaction.channel.permissionOverwrites.edit(targetMember, { ViewChannel: true, SendMessages: true });
-                return interaction.update({ content: `✅ تم إضافة ${targetMember} للتكت.`, components: [] });
-            }
-
-            if (interaction.customId === 'remove_user_menu') {
-                await interaction.channel.permissionOverwrites.edit(targetMember, { ViewChannel: false });
-                return interaction.update({ content: `❌ تم إزالة ${targetMember} من التكت.`, components: [] });
-            }
-        }
-
-        // Slash Commands
-        if (interaction.isChatInputCommand()) {
-            if (interaction.commandName === 'jail') {
-                const modConfig = await ModConfig.findOne({ guildId: interaction.guild.id });
-                const target = interaction.options.getMember('user');
-                for (const [id, channel] of interaction.guild.channels.cache) {
-                    if (channel.id === modConfig?.jail?.channelId) continue;
-                    await channel.permissionOverwrites.edit(target.id, { ViewChannel: false }).catch(() => {});
-                }
-                await target.roles.set([modConfig.jail.roleId]).catch(() => {});
-                interaction.reply(`✅ تم سجن <@${target.id}> وإخفاء كافة الرومات عنه.`);
-            }
-        }
-
-    } catch (err) {
-        console.error("❌ Interaction Error:", err);
-        if (interaction.isRepliable && !interaction.replied && !interaction.deferred) {
-            interaction.reply({ content: "❌ حدث خطأ غير متوقع.", ephemeral: true }).catch(() => {});
+    // Clan Control
+    if (message.content === 'تحكم') {
+        const clan = await Clan.findOne({ guildId: message.guild.id, $or: [{ leaderId: message.author.id }, { assistantIds: message.author.id }] });
+        if (clan) {
+            const options = [{ label: 'إحصائيات', value: 'stats' }, { label: 'إضافة عضو', value: 'add_mem' }, { label: 'طرد عضو', value: 'kick_mem' }];
+            if (message.author.id === clan.leaderId) options.push({ label: 'إضافة مساعد', value: 'add_assist' }, { label: 'طرد مساعد', value: 'kick_assist' });
+            const row = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`clan_ctrl:${clan._id}`).addOptions(options));
+            message.reply({ content: `لوحة تحكم كلان ${clan.clanName}`, components: [row] });
         }
     }
 });
 
-// ==========================================
-// 9️⃣ openTicket Helper
-// ==========================================
-async function openTicket(interaction, config, type) {
-    try {
-        if (!interaction.deferred && !interaction.replied) await interaction.deferReply({ ephemeral: true });
+// Log Events
+client.on('messageDelete', async (m) => {
+    if (!m.guild) return;
+    const c = await GuildConfig.findOne({ guildId: m.guild.id });
+    const logCh = m.guild.channels.cache.get(c?.logs?.messages?.channel);
+    if (logCh) logCh.send({ embeds: [new EmbedBuilder().setTitle('رسالة محذوفة').setDescription(`المؤلف: ${m.author}\nالمحتوى: ${m.content}`).setColor('Red')] });
+});
 
-        const updatedConfig = await TicketConfig.findOneAndUpdate(
-            { guildId: interaction.guild.id },
-            { $inc: { ticketCount: 1 } },
-            { new: true }
-        );
-        const ticketNumber = updatedConfig?.ticketCount || 1;
-
-        const channel = await interaction.guild.channels.create({
-            name: `ticket-${ticketNumber}`,
-            type: ChannelType.GuildText,
-            permissionOverwrites: [
-                { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-                { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
-                ...(config.adminRole ? [{ id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }] : []),
-            ],
-        });
-
-        const embed = new EmbedBuilder()
-            .setTitle("🎫 تذكرتك الجديدة")
-            .setDescription(`مرحباً ${interaction.user}\nتم فتح التكت بنجاح\n\n📌 النوع: **${type}**`)
-            .setColor(config.color || "#5865F2")
-            .setTimestamp();
-
-        const controlRow = new ActionRowBuilder().addComponents(
-            new StringSelectMenuBuilder()
-                .setCustomId('ticket_control_menu')
-                .setPlaceholder('🎫 اختر إجراء التكت')
-                .addOptions([
-                    { label: 'استلام التكت', value: 'claim_ticket', emoji: '📌' },
-                    { label: 'إغلاق التكت', value: 'close_ticket', emoji: '🔒' },
-                    { label: 'إضافة عضو', value: 'add_member', emoji: '➕' },
-                    { label: 'إزالة عضو', value: 'remove_member', emoji: '➖' },
-                    { label: 'استدعاء صاحب التكت', value: 'summon_member', emoji: '🔔' }
-                ])
-        );
-
-        await channel.send({
-            content: `${interaction.user}${config.adminRole ? ` | <@&${config.adminRole}>` : ''}`,
-            embeds: [embed],
-            components: [controlRow]
-        });
-
-        await TicketData.create({
-            guildId: interaction.guild.id,
-            channelId: channel.id,
-            ownerId: interaction.user.id,
-            openedAt: new Date()
-        });
-
-        await interaction.editReply({ content: `✅ تم فتح تذكرتك بنجاح: ${channel}` });
-
-    } catch (err) {
-        console.error("❌ Error in openTicket:", err);
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply("❌ حدث خطأ تقني أثناء فتح التكت.").catch(() => {});
-        }
+// Interaction Handling
+client.on('interactionCreate', async (i) => {
+    if (i.isStringSelectMenu() && i.customId.startsWith('clan_ctrl:')) {
+        const action = i.values[0];
+        const clanId = i.customId.split(':')[1];
+        const clan = await Clan.findById(clanId);
+        if (action === 'stats') return i.reply({ content: `النقاط: ${clan.points}\nالأعضاء: ${clan.members.length}`, ephemeral: true });
+        const modal = new ModalBuilder().setCustomId(`clan_modal:${action}:${clanId}`).setTitle('إجراء الكلان').addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('tid').setLabel('ايدي العضو').setStyle(TextInputStyle.Short)));
+        await i.showModal(modal);
     }
-}
-
-// --- [ Kick Monitoring ] ---
-setInterval(async () => {
-    const configs = await KickConfig.find();
-    for (const config of configs) {
-        const guild = client.guilds.cache.get(config.guildId);
-        if (!guild) continue;
-        for (const streamer of config.streamers) {
-            try {
-                const res = await axios.get(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
-                    headers: { 'Accept': 'application/json' }, timeout: 5000
-                });
-                const isLive = res.data?.livestream !== null && res.data?.livestream !== undefined;
-                if (isLive && !streamer.isLive) {
-                    const ch = guild.channels.cache.get(streamer.channelId);
-                    if (ch) {
-                        const embed = new EmbedBuilder()
-                            .setTitle(`🔴 ${streamer.kickUsername} بدأ البث الآن!`)
-                            .setURL(`https://kick.com/${streamer.kickUsername}`)
-                            .setColor('#00E701').setTimestamp();
-                        ch.send({ embeds: [embed] });
-                    }
-                    streamer.isLive = true;
-                } else if (!isLive) { streamer.isLive = false; }
-            } catch (e) {}
-        }
-        await config.save();
+    if (i.isModalSubmit() && i.customId.startsWith('clan_modal:')) {
+        const [_, action, cid] = i.customId.split(':');
+        const tid = i.fields.getTextInputValue('tid');
+        const clan = await Clan.findById(cid);
+        if (action === 'add_mem') clan.members.push(tid);
+        if (action === 'kick_mem') clan.members = clan.members.filter(id => id !== tid);
+        if (action === 'add_assist') clan.assistantIds.push(tid);
+        if (action === 'kick_assist') clan.assistantIds = clan.assistantIds.filter(id => id !== tid);
+        await clan.save();
+        i.reply(`تم الإجراء بنجاح.`);
     }
-}, 60000);
+});
 
-// ==========================================
-// 🔟 Start Server
-// ==========================================
-process.on('unhandledRejection', err => console.error("❌ Unhandled Rejection:", err));
-process.on('uncaughtException', err => console.error("❌ Uncaught Exception:", err));
-
-mongoose.connect(process.env.MONGO_CONNECTION_STRING)
-    .then(() => console.log('✅ Connected to MongoDB'))
-    .catch(err => console.error("❌ DB Error:", err));
-
+mongoose.connect(process.env.MONGO_CONNECTION_STRING).then(() => console.log('DB OK'));
 client.login(process.env.TOKEN);
-app.listen(PORT, () => console.log(`🌐 VORTEX Dashboard Running on Port ${PORT}`));
+app.listen(PORT, () => console.log(`PORT ${PORT}`));
