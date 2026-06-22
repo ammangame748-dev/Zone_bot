@@ -2991,10 +2991,6 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 
-// ==========================================
-// 13. Helper Functions
-// ==========================================
-
 async function openTicket(interaction, tConfig, ticketType) {
     const existingTicket = await TicketData.findOne({ guildId: interaction.guild.id, ownerId: interaction.user.id, closedAt: null });
     if (existingTicket) {
