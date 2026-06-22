@@ -325,13 +325,20 @@ const upload = multer({ storage });
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
+
+const CLIENT_ID = (process.env.CLIENT_ID || '').trim();
+const CLIENT_SECRET = (process.env.CLIENT_SECRET || '').trim();
+const CALLBACK_URL = (process.env.CALLBACK_URL || '').trim();
+
 passport.use(new Strategy({
-    clientID: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
-    callbackURL: process.env.CALLBACK_URL,
+    clientID: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+    callbackURL: CALLBACK_URL,
     proxy: true,
     scope: ['identify', 'guilds']
-}, (accessToken, refreshToken, profile, done) => done(null, profile)));
+}, (accessToken, refreshToken, profile, done) => {
+    process.nextTick(() => done(null, profile));
+}));
 
 app.use(session({
     secret: process.env.SESSION_SECRET || 'vortex-ultra-secret-2024',
@@ -348,8 +355,27 @@ const checkAuth = (req, res, next) => {
 };
 
 app.get('/auth/discord', passport.authenticate('discord'));
-app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
-    res.redirect('/dashboard');
+app.get('/callback', (req, res, next) => {
+    passport.authenticate('discord', (err, user, info) => {
+        if (err) {
+            console.error('[OAuth Error Detail]:', err);
+            return res.status(500).send(`
+                <div dir='rtl' style='background:#111;color:#fff;padding:40px;font-family:sans-serif;text-align:center;'>
+                    <h1 style='color:#ff4444;'>فشل استلام البيانات من ديسكورد</h1>
+                    <p>هذا يعني أن الـ <b>Client Secret</b> أو الـ <b>Callback URL</b> غير صحيح في إعدادات Render.</p>
+                    <div style='background:#222;padding:20px;border-radius:10px;text-align:left;display:inline-block;'>
+                        <code>${JSON.stringify(err, null, 2)}</code>
+                    </div>
+                    <p><a href='/login' style='color:#1e90ff;'>الرجوع لمحاولة تسجيل الدخول</a></p>
+                </div>
+            `);
+        }
+        if (!user) return res.redirect('/login');
+        req.logIn(user, (err) => {
+            if (err) return next(err);
+            res.redirect('/dashboard');
+        });
+    })(req, res, next);
 });
 
 app.get('/logout', (req, res) => {
@@ -896,7 +922,12 @@ function ui(guild, active, content) {
 
 // --- [ Dashboard - Server List ] ---
 app.get('/dashboard', checkAuth, (req, res) => {
-    const adminGuilds = req.user.guilds.filter(g => (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8));
+    if (!req.user || !req.user.guilds) return res.redirect('/login');
+    const adminGuilds = req.user.guilds.filter(g => {
+        try {
+            return (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8);
+        } catch(e) { return false; }
+    });
     const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
     const cards = adminGuilds.map(g => {
