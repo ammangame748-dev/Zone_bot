@@ -19,7 +19,7 @@ const {
     AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
     StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, PermissionFlagsBits,
     ModalBuilder, TextInputBuilder, TextInputStyle, ActivityType,
-    REST, Routes, SlashCommandBuilder
+    REST, Routes, SlashCommandBuilder, MessageFlags
 } = require('discord.js');
 
 // ==========================================
@@ -236,8 +236,8 @@ const client = new Client({
 });
 
 const commands = [
-    new SlashCommandBuilder().setName('setbanner').setDescription('رفع صورة الخط').addAttachmentOption(o => o.setName('image').setDescription('صورة البنر').setRequired(true)),
-    new SlashCommandBuilder().setName('rename_panel').setDescription('لوحة تغيير الاسم').addStringOption(o => o.setName('name').setRequired(true).setDescription('الاسم')).addAttachmentOption(o => o.setName('image').setDescription('صورة اختيارية'))
+    new SlashCommandBuilder, MessageFlags().setName('setbanner').setDescription('رفع صورة الخط').addAttachmentOption(o => o.setName('image').setDescription('صورة البنر').setRequired(true)),
+    new SlashCommandBuilder, MessageFlags().setName('rename_panel').setDescription('لوحة تغيير الاسم').addStringOption(o => o.setName('name').setRequired(true).setDescription('الاسم')).addAttachmentOption(o => o.setName('image').setDescription('صورة اختيارية'))
 ].map(c => c.toJSON());
 
 // ==========================================
@@ -2738,7 +2738,7 @@ client.on('interactionCreate', async (interaction) => {
                     { $set: { 'welcome.bannerURL': image.url } },
                     { upsert: true }
                 );
-                return interaction.reply({ content: 'تم حفظ البنر بنجاح!', ephemeral: true });
+                return interaction.reply({ content: 'تم حفظ البنر بنجاح!', flags: [MessageFlags.Ephemeral] });
             }
 
             if (interaction.commandName === 'rename_panel') {
@@ -2756,7 +2756,7 @@ client.on('interactionCreate', async (interaction) => {
                     new ButtonBuilder().setCustomId('reset_name').setLabel('إرجاع الاسم الأصلي').setStyle(ButtonStyle.Secondary)
                 );
                 await interaction.channel.send({ embeds: [embed], components: [row] });
-                return interaction.reply({ content: 'تم إرسال اللوحة!', ephemeral: true });
+                return interaction.reply({ content: 'تم إرسال اللوحة!', flags: [MessageFlags.Ephemeral] });
             }
         }
 
@@ -2764,7 +2764,7 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
             const clanId = interaction.customId.replace('apply_clan_', '');
             const clan = await Clan.findById(clanId).catch(() => null);
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', flags: [MessageFlags.Ephemeral] });
 
             const thread = await interaction.channel.threads.create({
                 name: `تقديم-${clan.clanName}-${interaction.user.username}`,
@@ -2778,10 +2778,10 @@ client.on('interactionCreate', async (interaction) => {
                 }).catch(() => null);
             });
 
-            if (!thread) return interaction.reply({ content: 'فشل إنشاء قناة التقديم.', ephemeral: true });
+            if (!thread) return interaction.reply({ content: 'فشل إنشاء قناة التقديم.', flags: [MessageFlags.Ephemeral] });
 
             await thread.members.add(interaction.user.id);
-            await interaction.reply({ content: `تم فتح قناة التقديم: ${thread}`, ephemeral: true });
+            await interaction.reply({ content: `تم فتح قناة التقديم: ${thread}`, flags: [MessageFlags.Ephemeral] });
             await askNextQuestion(thread, interaction.user, clan, 0, interaction.guild);
             return;
         }
@@ -2793,7 +2793,7 @@ client.on('interactionCreate', async (interaction) => {
             const clanId = parts[2];
             const qIndex = parseInt(parts[3]);
             const clan = await Clan.findById(clanId).catch(() => null);
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', flags: [MessageFlags.Ephemeral] });
 
             await interaction.message.delete().catch(() => {});
             if (status === 'yes') {
@@ -2812,22 +2812,22 @@ client.on('interactionCreate', async (interaction) => {
             
             // تحقق صارم من وجود القيمة وتحويلها
             if (!parts[2] || isNaN(parseInt(parts[2]))) {
-                return interaction.reply({ content: '❌ خطأ: لم يتم العثور على رقم الكلان في هذا الزر.', ephemeral: true });
+                return interaction.reply({ content: '❌ خطأ: لم يتم العثور على رقم الكلان في هذا الزر.', flags: [MessageFlags.Ephemeral] });
             }
             const clanIdx = parseInt(parts[2]);
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', flags: [MessageFlags.Ephemeral] });
 
             if (interaction.user.id !== clan.leaderId) {
-                return interaction.reply({ content: 'أنت لست قائد هذا الكلان!', ephemeral: true });
+                return interaction.reply({ content: 'أنت لست قائد هذا الكلان!', flags: [MessageFlags.Ephemeral] });
             }
 
             await interaction.deferUpdate();
             const targetUser = await client.users.fetch(targetId).catch(() => null);
 
             if (action === 'accept_member') {
-                if (clan.members.length >= 10) return interaction.followUp({ content: 'الكلان ممتلئ (10 أعضاء كحد أقصى)!', ephemeral: true });
+                if (clan.members.length >= 10) return interaction.followUp({ content: 'الكلان ممتلئ (10 أعضاء كحد أقصى)!', flags: [MessageFlags.Ephemeral] });
                 if (!clan.members.includes(targetId)) {
                     clan.members.push(targetId);
                     await clan.save();
@@ -2916,22 +2916,22 @@ client.on('interactionCreate', async (interaction) => {
             const action = parts[1];
             
             if (!parts[2] || isNaN(parseInt(parts[2]))) {
-                return interaction.reply({ content: 'خطأ في معالجة بيانات رقم الكلان من النموذج.', ephemeral: true });
+                return interaction.reply({ content: 'خطأ في معالجة بيانات رقم الكلان من النموذج.', flags: [MessageFlags.Ephemeral] });
             }
             const clanIdx = parseInt(parts[2]);
             const memberId = interaction.fields.getTextInputValue('member_id').trim();
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', flags: [MessageFlags.Ephemeral] });
 
             if (action === 'add_mem') {
-                if (clan.members.length >= 10) return interaction.reply({ content: 'الكلان ممتلئ!', ephemeral: true });
-                if (clan.members.includes(memberId)) return interaction.reply({ content: 'العضو موجود مسبقاً.', ephemeral: true });
+                if (clan.members.length >= 10) return interaction.reply({ content: 'الكلان ممتلئ!', flags: [MessageFlags.Ephemeral] });
+                if (clan.members.includes(memberId)) return interaction.reply({ content: 'العضو موجود مسبقاً.', flags: [MessageFlags.Ephemeral] });
                 clan.members.push(memberId);
                 await clan.save();
                 const mem = await interaction.guild.members.fetch(memberId).catch(() => null);
                 if (mem && clan.roleId) await mem.roles.add(clan.roleId).catch(() => {});
-                return interaction.reply({ content: `تمت إضافة <@${memberId}> للكلان بنجاح.`, ephemeral: true });
+                return interaction.reply({ content: `تمت إضافة <@${memberId}> للكلان بنجاح.`, flags: [MessageFlags.Ephemeral] });
             }
             
             if (action === 'kick_mem') {
@@ -2940,21 +2940,21 @@ client.on('interactionCreate', async (interaction) => {
                 await clan.save();
                 const mem = await interaction.guild.members.fetch(memberId).catch(() => null);
                 if (mem && clan.roleId) await mem.roles.remove(clan.roleId).catch(() => {});
-                return interaction.reply({ content: `تم طرد <@${memberId}> من الكلان.`, ephemeral: true });
+                return interaction.reply({ content: `تم طرد <@${memberId}> من الكلان.`, flags: [MessageFlags.Ephemeral] });
             }
 
             if (action === 'add_assist') {
-                if (!clan.members.includes(memberId)) return interaction.reply({ content: 'العضو ليس في الكلان، أضفه أولاً.', ephemeral: true });
+                if (!clan.members.includes(memberId)) return interaction.reply({ content: 'العضو ليس في الكلان، أضفه أولاً.', flags: [MessageFlags.Ephemeral] });
                 if (!clan.assistantIds) clan.assistantIds = [];
                 if (!clan.assistantIds.includes(memberId)) clan.assistantIds.push(memberId);
                 await clan.save();
-                return interaction.reply({ content: `تمت ترقية <@${memberId}> لمساعد بنجاح.`, ephemeral: true });
+                return interaction.reply({ content: `تمت ترقية <@${memberId}> لمساعد بنجاح.`, flags: [MessageFlags.Ephemeral] });
             }
 
             if (action === 'remove_assist') {
                 clan.assistantIds = (clan.assistantIds || []).filter(id => id !== memberId);
                 await clan.save();
-                return interaction.reply({ content: `تم سحب رتبة المساعد من <@${memberId}>.`, ephemeral: true });
+                return interaction.reply({ content: `تم سحب رتبة المساعد من <@${memberId}>.`, flags: [MessageFlags.Ephemeral] });
             }
         }
 
@@ -2963,18 +2963,18 @@ client.on('interactionCreate', async (interaction) => {
             try {
                 const roleId = interaction.customId.replace('role_', '');
                 const role = interaction.guild.roles.cache.get(roleId);
-                if (!role) return interaction.reply({ content: 'الرتبة غير موجودة.', ephemeral: true });
+                if (!role) return interaction.reply({ content: 'الرتبة غير موجودة.', flags: [MessageFlags.Ephemeral] });
 
                 const guildData = await GuildConfig.findOne({ guildId: interaction.guild.id });
                 const allPanelRoles = (guildData?.rolesPanel || []).map(r => r.roleId);
 
                 if (interaction.member.roles.cache.has(roleId)) {
                     await interaction.member.roles.remove(roleId).catch(() => {});
-                    return interaction.reply({ content: `تم سحب رتبة **${role.name}** منك.`, ephemeral: true });
+                    return interaction.reply({ content: `تم سحب رتبة **${role.name}** منك.`, flags: [MessageFlags.Ephemeral] });
                 }
 
                 if (role.position >= interaction.guild.members.me.roles.highest.position) {
-                    return interaction.reply({ content: 'رتبة البوت أقل من الرتبة المطلوبة.', ephemeral: true });
+                    return interaction.reply({ content: 'رتبة البوت أقل من الرتبة المطلوبة.', flags: [MessageFlags.Ephemeral] });
                 }
 
                 if (allPanelRoles.length > 0) {
@@ -2983,10 +2983,10 @@ client.on('interactionCreate', async (interaction) => {
                 }
 
                 await interaction.member.roles.add(roleId);
-                return interaction.reply({ content: `تم إعطاؤك رتبة **${role.name}**.`, ephemeral: true });
+                return interaction.reply({ content: `تم إعطاؤك رتبة **${role.name}**.`, flags: [MessageFlags.Ephemeral] });
             } catch (err) {
                 console.error('[Role Error]', err);
-                if (!interaction.replied) interaction.reply({ content: 'حدث خطأ، جرب مرة أخرى.', ephemeral: true });
+                if (!interaction.replied) interaction.reply({ content: 'حدث خطأ، جرب مرة أخرى.', flags: [MessageFlags.Ephemeral] });
             }
         }
 
@@ -2994,20 +2994,20 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton() && interaction.customId.startsWith('rename_user:')) {
             const newName = interaction.customId.split(':')[1];
             const setResult = await interaction.member.setNickname(newName).catch(() => null);
-            if (!setResult) return interaction.reply({ content: 'ما بقدر أغير الاسم (تأكد من صلاحياتي)', ephemeral: true });
-            return interaction.reply({ content: `تم تغيير اسمك إلى: ${newName}`, ephemeral: true });
+            if (!setResult) return interaction.reply({ content: 'ما بقدر أغير الاسم (تأكد من صلاحياتي)', flags: [MessageFlags.Ephemeral] });
+            return interaction.reply({ content: `تم تغيير اسمك إلى: ${newName}`, flags: [MessageFlags.Ephemeral] });
         }
 
         if (interaction.isButton() && interaction.customId === 'reset_name') {
             const setResult = await interaction.member.setNickname(null).catch(() => null);
-            if (!setResult) return interaction.reply({ content: 'ما بقدر أرجع الاسم', ephemeral: true });
-            return interaction.reply({ content: 'تم ارجاع اسمك الأصلي', ephemeral: true });
+            if (!setResult) return interaction.reply({ content: 'ما بقدر أرجع الاسم', flags: [MessageFlags.Ephemeral] });
+            return interaction.reply({ content: 'تم ارجاع اسمك الأصلي', flags: [MessageFlags.Ephemeral] });
         }
 
         // --- [ Ticket Buttons ] ---
         if (interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) {
             const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            if (!tConfig) return interaction.reply({ content: 'لم يتم العثور على إعدادات التذاكر.', ephemeral: true });
+            if (!tConfig) return interaction.reply({ content: 'لم يتم العثور على إعدادات التذاكر.', flags: [MessageFlags.Ephemeral] });
 
             let ticketType = 'تذكرة دعم';
             if (interaction.customId.startsWith('ticket_btn_')) {
@@ -3025,7 +3025,7 @@ client.on('interactionCreate', async (interaction) => {
 async function openTicket(interaction, tConfig, ticketType) {
     const existingTicket = await TicketData.findOne({ guildId: interaction.guild.id, ownerId: interaction.user.id, closedAt: null });
     if (existingTicket) {
-        return interaction.reply({ content: `لديك تكت مفتوح بالفعل: <#${existingTicket.channelId}>`, ephemeral: true });
+        return interaction.reply({ content: `لديك تكت مفتوح بالفعل: <#${existingTicket.channelId}>`, flags: [MessageFlags.Ephemeral] });
     }
 
     const ticketCount = await TicketData.countDocuments({ guildId: interaction.guild.id }) + 1;
@@ -3045,7 +3045,7 @@ async function openTicket(interaction, tConfig, ticketType) {
         permissionOverwrites: permOverwrites
     }).catch(() => null);
 
-    if (!ticketChannel) return interaction.reply({ content: 'فشل إنشاء قناة التكت.', ephemeral: true });
+    if (!ticketChannel) return interaction.reply({ content: 'فشل إنشاء قناة التكت.', flags: [MessageFlags.Ephemeral] });
 
     const ticketDoc = await TicketData.create({
         guildId: interaction.guild.id,
@@ -3097,7 +3097,7 @@ async function openTicket(interaction, tConfig, ticketType) {
         files
     }).catch(e => console.error('[Ticket Channel Send Error]', e));
 
-    return interaction.reply({ content: `تم فتح تكتك: ${ticketChannel}`, ephemeral: true });
+    return interaction.reply({ content: `تم فتح تكتك: ${ticketChannel}`, flags: [MessageFlags.Ephemeral] });
 }
 
 async function askNextQuestion(thread, user, clan, questionIndex, guild) {
@@ -3240,11 +3240,11 @@ setInterval(checkKickLive, 60000);
 
 async function registerSlashCommands() {
     const commands = [
-        new SlashCommandBuilder()
+        new SlashCommandBuilder, MessageFlags()
             .setName('setbanner')
             .setDescription('ضبط بنر الترحيب')
             .addAttachmentOption(opt => opt.setName('image').setDescription('صورة البنر').setRequired(true)),
-        new SlashCommandBuilder()
+        new SlashCommandBuilder, MessageFlags()
             .setName('rename_panel')
             .setDescription('إرسال لوحة تغيير الاسم')
             .addStringOption(opt => opt.setName('name').setDescription('الاسم الجديد').setRequired(true))
