@@ -578,6 +578,7 @@ function ui(guild, active, content) {
             color: var(--text);
             min-height: 100vh;
             display: flex;
+            flex-direction: row-reverse;
             direction: rtl;
         }
 
@@ -604,13 +605,15 @@ function ui(guild, active, content) {
             width: var(--sidebar-w);
             background: rgba(7,7,15,0.95);
             border-left: 1px solid var(--border);
-            position: fixed; right: 0; top: 0; height: 100vh;
+            position: relative;
             display: flex; flex-direction: column;
             z-index: 100;
             backdrop-filter: blur(20px);
             overflow-y: auto;
             scrollbar-width: thin;
             scrollbar-color: var(--blue) transparent;
+            flex-shrink: 0;
+            height: 100vh;
         }
         .sidebar::-webkit-scrollbar { width: 4px; }
         .sidebar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 10px; }
@@ -676,10 +679,11 @@ function ui(guild, active, content) {
 
         /* ===== MAIN CONTENT ===== */
         .main {
-            margin-right: ${guild.id ? 'var(--sidebar-w)' : '0'};
+            margin-right: 0;
             padding: 40px 50px;
-            width: 100%;
+            flex: 1;
             min-height: 100vh;
+            overflow-y: auto;
         }
 
         .page-header {
@@ -1243,7 +1247,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
             <div class="preview-container" id="previewContainer">
                 <img src="${img}" id="bgPreview" style="width:100%; height:100%; object-fit:cover; position:absolute;">
-                <div id="previewAvatar" style="width:${s.welcome?.avatarWidth || 150}px; height:${s.welcome?.avatarHeight || 150}px; left:${(s.welcome?.avatarX || 50) - (s.welcome?.avatarWidth || 150) / 2 / 8}%; top:${(s.welcome?.avatarY || 50) - (s.welcome?.avatarHeight || 150) / 2 / 4}%; background-image:url('${client.user?.displayAvatarURL() || ''}');">
+                <div id="previewAvatar" style="width:${s.welcome?.avatarWidth || 150}px; height:${s.welcome?.avatarHeight || 150}px; left:calc(${(s.welcome?.avatarX || 50)}% - ${(s.welcome?.avatarWidth || 150) / 2}px); top:calc(${(s.welcome?.avatarY || 50)}% - ${(s.welcome?.avatarHeight || 150) / 2}px); background-image:url('${client.user?.displayAvatarURL() || ''}'); background-size: cover; background-position: center;">
                     <div class="resizer br" id="resizer"></div>
                 </div>
             </div>
@@ -1261,12 +1265,13 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
         const bgPreview = document.getElementById('bgPreview');
         let dragging = false, resizing = false, startX, startY, startW, startH, startLeft, startTop;
 
-        avatar.addEventListener('mousedown', e => { if (e.target.id === 'resizer') return; dragging = true; startX = e.clientX - avatar.offsetLeft; startY = e.clientY - avatar.offsetTop; e.preventDefault(); });
+        avatar.addEventListener('mousedown', e => { if (e.target.id === 'resizer') return; dragging = true; startX = e.clientX - avatar.getBoundingClientRect().left; startY = e.clientY - avatar.getBoundingClientRect().top; e.preventDefault(); });
         document.getElementById('resizer').addEventListener('mousedown', e => { resizing = true; startX = e.clientX; startY = e.clientY; startW = avatar.offsetWidth; startH = avatar.offsetHeight; e.preventDefault(); e.stopPropagation(); });
         document.addEventListener('mousemove', e => {
             if (dragging) {
-                let newLeft = Math.max(0, Math.min(e.clientX - startX, container.offsetWidth - avatar.offsetWidth));
-                let newTop = Math.max(0, Math.min(e.clientY - startY, container.offsetHeight - avatar.offsetHeight));
+                const rect = container.getBoundingClientRect();
+                let newLeft = Math.max(0, Math.min(e.clientX - rect.left - startX, container.offsetWidth - avatar.offsetWidth));
+                let newTop = Math.max(0, Math.min(e.clientY - rect.top - startY, container.offsetHeight - avatar.offsetHeight));
                 avatar.style.left = newLeft + 'px'; avatar.style.top = newTop + 'px';
                 document.getElementById('avatarX').value = Math.round(((newLeft + avatar.offsetWidth/2) / container.offsetWidth) * 100);
                 document.getElementById('avatarY').value = Math.round(((newTop + avatar.offsetHeight/2) / container.offsetHeight) * 100);
@@ -2845,15 +2850,15 @@ client.on('interactionCreate', async (interaction) => {
             const clanIdx = parseInt(interaction.customId.split('_').pop());
 
             if (isNaN(clanIdx)) {
-                return interaction.reply({ content: '❌ خطأ: لم يتم التعرف على رقم الكلان بشكل صحيح.', flags: ['Ephemeral'] });
+                return interaction.reply({ content: '❌ خطأ: لم يتم التعرف على رقم الكلان بشكل صحيح.', ephemeral: true });
             }
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', flags: ['Ephemeral'] });
+            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
 
             const isLeader = clan.leaderId === interaction.user.id;
             const isAssistant = clan.assistantIds?.includes(interaction.user.id);
-            if (!isLeader && !isAssistant) return interaction.reply({ content: 'ليس لديك صلاحية.', flags: ['Ephemeral'] });
+            if (!isLeader && !isAssistant) return interaction.reply({ content: 'ليس لديك صلاحية.', ephemeral: true });
 
             const selected = interaction.values[0];
 
@@ -2874,7 +2879,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp()
                     .setFooter({ text: 'VORTEX System - Clans' });
 
-                return interaction.reply({ embeds: [embed], flags: ['Ephemeral'] });
+                return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
             const modalTitle = {
@@ -2886,7 +2891,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (modalTitle) {
                 if ((selected === 'add_assist' || selected === 'remove_assist') && !isLeader) {
-                    return interaction.reply({ content: 'هذا الخيار للقائد فقط.', flags: ['Ephemeral'] });
+                    return interaction.reply({ content: 'هذا الخيار للقائد فقط.', ephemeral: true });
                 }
 
                 const modal = new ModalBuilder()
@@ -2999,6 +3004,74 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: 'تم ارجاع اسمك الأصلي', ephemeral: true });
         }
 
+        // --- [ Ticket Control Menu ] ---
+        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
+            const selected = interaction.values[0];
+            const ticketData = await TicketData.findOne({ channelId: interaction.channelId });
+            if (!ticketData) return interaction.reply({ content: 'لم يتم العثور على بيانات التكت.', ephemeral: true });
+
+            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+            const adminRole = tConfig?.adminRole;
+            const isAdmin = adminRole && interaction.member.roles.cache.has(adminRole);
+            const isOwner = ticketData.ownerId === interaction.user.id;
+
+            if (selected === 'claim_ticket') {
+                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم استلام التكت.', ephemeral: true });
+                ticketData.claimedBy = interaction.user.id;
+                await ticketData.save();
+                return interaction.reply({ content: `تم استلام التكت بواسطة ${interaction.user}.`, ephemeral: false });
+            }
+
+            if (selected === 'close_ticket') {
+                if (!isAdmin && !isOwner) return interaction.reply({ content: 'ليس لديك صلاحية لإغلاق التكت.', ephemeral: true });
+                ticketData.closedAt = new Date();
+                ticketData.closedBy = interaction.user.id;
+                await ticketData.save();
+                await interaction.reply({ content: 'سيتم حذف التكت خلال 5 ثوان...', ephemeral: false });
+                setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+                return;
+            }
+
+            if (selected === 'add_member') {
+                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم إضافة أعضاء.', ephemeral: true });
+                const modal = new ModalBuilder().setCustomId('ticket_add_member').setTitle('إضافة عضو للتكت');
+                modal.addComponents(new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('member_id').setLabel('ID العضو').setStyle(TextInputStyle.Short).setRequired(true)
+                ));
+                return interaction.showModal(modal);
+            }
+
+            if (selected === 'remove_member') {
+                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم إزالة أعضاء.', ephemeral: true });
+                const modal = new ModalBuilder().setCustomId('ticket_remove_member').setTitle('إزالة عضو من التكت');
+                modal.addComponents(new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('member_id').setLabel('ID العضو').setStyle(TextInputStyle.Short).setRequired(true)
+                ));
+                return interaction.showModal(modal);
+            }
+
+            if (selected === 'summon_member') {
+                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم استدعاء الأعضاء.', ephemeral: true });
+                await interaction.reply({ content: `<@${ticketData.ownerId}> تم استدعاؤك!`, ephemeral: false });
+                return;
+            }
+        }
+
+        // --- [ Ticket Modals ] ---
+        if (interaction.isModalSubmit() && (interaction.customId === 'ticket_add_member' || interaction.customId === 'ticket_remove_member')) {
+            const memberId = interaction.fields.getTextInputValue('member_id').trim();
+            const member = await interaction.guild.members.fetch(memberId).catch(() => null);
+            if (!member) return interaction.reply({ content: 'العضو غير موجود.', ephemeral: true });
+
+            if (interaction.customId === 'ticket_add_member') {
+                await interaction.channel.permissionOverwrites.create(memberId, { ViewChannel: true, SendMessages: true }).catch(() => {});
+                return interaction.reply({ content: `تم إضافة ${member.user.tag} للتكت.`, ephemeral: true });
+            } else {
+                await interaction.channel.permissionOverwrites.delete(memberId).catch(() => {});
+                return interaction.reply({ content: `تم إزالة ${member.user.tag} من التكت.`, ephemeral: true });
+            }
+        }
+
         // --- [ Ticket Buttons ] ---
         if (interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) {
             const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
@@ -3022,81 +3095,86 @@ client.on('interactionCreate', async (interaction) => {
 // ==========================================
 
 async function openTicket(interaction, tConfig, ticketType) {
-    const existingTicket = await TicketData.findOne({ guildId: interaction.guild.id, ownerId: interaction.user.id, closedAt: null });
-    if (existingTicket) {
-        return interaction.reply({ content: `لديك تكت مفتوح بالفعل: <#${existingTicket.channelId}>`, ephemeral: true });
+    try {
+        const existingTicket = await TicketData.findOne({ guildId: interaction.guild.id, ownerId: interaction.user.id, closedAt: null });
+        if (existingTicket) {
+            return interaction.reply({ content: `لديك تكت مفتوح بالفعل: <#${existingTicket.channelId}>`, ephemeral: true });
+        }
+
+        const ticketCount = await TicketData.countDocuments({ guildId: interaction.guild.id }) + 1;
+        const channelName = `ticket-${ticketCount}-${interaction.user.username}`.substring(0, 100);
+
+        const permOverwrites = [
+            { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+            { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+        ];
+        if (tConfig.adminRole) {
+            permOverwrites.push({ id: tConfig.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] });
+        }
+
+        const ticketChannel = await interaction.guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            permissionOverwrites: permOverwrites
+        }).catch(() => null);
+
+        if (!ticketChannel) return interaction.reply({ content: 'فشل إنشاء قناة التكت.', ephemeral: true });
+
+        const ticketDoc = await TicketData.create({
+            guildId: interaction.guild.id,
+            channelId: ticketChannel.id,
+            ownerId: interaction.user.id,
+            ticketType,
+            openedAt: new Date()
+        });
+
+        const files = [];
+        const embed = new EmbedBuilder()
+            .setTitle(`تكت ${ticketType} | #${ticketCount}`)
+            .setDescription(`مرحباً ${interaction.user}!\n\nالإدارة ستتواصل معك قريباً. يرجى شرح مشكلتك بالتفصيل.`)
+            .setColor(0x1e90ff)
+            .addFields(
+                { name: 'صاحب التكت', value: `${interaction.user}`, inline: true },
+                { name: 'النوع', value: ticketType, inline: true }
+            )
+            .setThumbnail(interaction.user.displayAvatarURL())
+            .setTimestamp()
+            .setFooter({ text: 'VORTEX System - Tickets' });
+
+        if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
+            const topName = path.basename(tConfig.topImagePath);
+            files.push(new AttachmentBuilder(tConfig.topImagePath, { name: topName }));
+            embed.setThumbnail(`attachment://${topName}`);
+        }
+        if (tConfig.bottomImagePath && fs.existsSync(tConfig.bottomImagePath)) {
+            const bottomName = path.basename(tConfig.bottomImagePath);
+            files.push(new AttachmentBuilder(tConfig.bottomImagePath, { name: bottomName }));
+            embed.setImage(`attachment://${bottomName}`);
+        }
+
+        const controlMenu = new StringSelectMenuBuilder()
+            .setCustomId('ticket_control_menu')
+            .setPlaceholder('لوحة التحكم بالتكت')
+            .addOptions([
+                { label: 'استلام التكت', value: 'claim_ticket', description: 'استلام التكت للمعالجة' },
+                { label: 'اغلاق التكت', value: 'close_ticket', description: 'اغلاق وحذف التكت' },
+                { label: 'اضافة شخص', value: 'add_member', description: 'اضافة شخص للتكت' },
+                { label: 'ازالة شخص', value: 'remove_member', description: 'ازالة شخص من التكت' },
+                { label: 'استدعاء صاحب التكت', value: 'summon_member', description: 'منشن صاحب التكت' }
+            ]);
+
+        await ticketChannel.send({
+            content: `${interaction.user} ${tConfig.adminRole ? `<@&${tConfig.adminRole}>` : ''}`,
+            embeds: [embed],
+            components: [new ActionRowBuilder().addComponents(controlMenu)],
+            files
+        }).catch(e => console.error('[Ticket Channel Send Error]', e));
+
+        return interaction.reply({ content: `تم فتح تكتك: ${ticketChannel}`, ephemeral: true });
+    } catch (err) {
+        console.error('[Ticket Error]', err);
+        return interaction.reply({ content: 'حدث خطأ عند فتح التكت.', ephemeral: true });
     }
-
-    const ticketCount = await TicketData.countDocuments({ guildId: interaction.guild.id }) + 1;
-    const channelName = `ticket-${ticketCount}-${interaction.user.username}`;
-
-    const permOverwrites = [
-        { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
-    ];
-    if (tConfig.adminRole) {
-        permOverwrites.push({ id: tConfig.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] });
-    }
-
-    const ticketChannel = await interaction.guild.channels.create({
-        name: channelName,
-        type: ChannelType.GuildText,
-        permissionOverwrites: permOverwrites
-    }).catch(() => null);
-
-    if (!ticketChannel) return interaction.reply({ content: 'فشل إنشاء قناة التكت.', ephemeral: true });
-
-    const ticketDoc = await TicketData.create({
-        guildId: interaction.guild.id,
-        channelId: ticketChannel.id,
-        ownerId: interaction.user.id,
-        ticketType,
-        openedAt: new Date()
-    });
-
-    const files = [];
-    const embed = new EmbedBuilder()
-        .setTitle(`تكت ${ticketType} | #${ticketCount}`)
-        .setDescription(`مرحباً ${interaction.user}!\n\nالإدارة ستتواصل معك قريباً. يرجى شرح مشكلتك بالتفصيل.`)
-        .setColor(0x1e90ff)
-        .addFields(
-            { name: 'صاحب التكت', value: `${interaction.user}`, inline: true },
-            { name: 'النوع', value: ticketType, inline: true }
-        )
-        .setThumbnail(interaction.user.displayAvatarURL())
-        .setTimestamp()
-        .setFooter({ text: 'VORTEX System - Tickets' });
-
-    if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
-        const topName = path.basename(tConfig.topImagePath);
-        files.push(new AttachmentBuilder(tConfig.topImagePath, { name: topName }));
-        embed.setThumbnail(`attachment://${topName}`);
-    }
-    if (tConfig.bottomImagePath && fs.existsSync(tConfig.bottomImagePath)) {
-        const bottomName = path.basename(tConfig.bottomImagePath);
-        files.push(new AttachmentBuilder(tConfig.bottomImagePath, { name: bottomName }));
-        embed.setImage(`attachment://${bottomName}`);
-    }
-
-    const controlMenu = new StringSelectMenuBuilder()
-        .setCustomId('ticket_control_menu')
-        .setPlaceholder('لوحة التحكم بالتكت')
-        .addOptions([
-            { label: 'استلام التكت', value: 'claim_ticket', description: 'استلام التكت للمعالجة' },
-            { label: 'اغلاق التكت', value: 'close_ticket', description: 'اغلاق وحذف التكت' },
-            { label: 'اضافة شخص', value: 'add_member', description: 'اضافة شخص للتكت' },
-            { label: 'ازالة شخص', value: 'remove_member', description: 'ازالة شخص من التكت' },
-            { label: 'استدعاء صاحب التكت', value: 'summon_member', description: 'منشن صاحب التكت' }
-        ]);
-
-    await ticketChannel.send({
-        content: `${interaction.user} ${tConfig.adminRole ? `<@&${tConfig.adminRole}>` : ''}`,
-        embeds: [embed],
-        components: [new ActionRowBuilder().addComponents(controlMenu)],
-        files
-    }).catch(e => console.error('[Ticket Channel Send Error]', e));
-
-    return interaction.reply({ content: `تم فتح تكتك: ${ticketChannel}`, ephemeral: true });
 }
 
 async function askNextQuestion(thread, user, clan, questionIndex, guild) {
