@@ -1303,7 +1303,7 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (r
         'welcome.avatarWidth': Number(b.avatarWidth),
         'welcome.avatarHeight': Number(b.avatarHeight)
     };
-    if (req.file) updateData['welcome.imagePath'] = `${process.env.BASE_URL || ''}/uploads/${req.file.filename}`;
+   if (req.file) updateData['welcome.imagePath'] = `/uploads/${req.file.filename}`;
     await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: updateData }, { upsert: true });
     res.redirect(`/manage/${req.params.guildId}/welcome`);
 });
@@ -2587,8 +2587,11 @@ client.on('guildMemberAdd', async (member) => {
             const canvas = createCanvas(800, 400);
             const ctx = canvas.getContext('2d');
 
-            const bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400/050510/1e90ff?text=Welcome';
-            const background = await loadImage(bgUrl).catch(() => loadImage('https://placehold.co/800x400/050510/1e90ff?text=Welcome'));
+            let bgUrl = config.welcome.imagePath;
+if (!bgUrl) bgUrl = 'https://placehold.co/800x400/050510/1e90ff?text=Welcome';
+if (!bgUrl.startsWith('http' )) bgUrl = `${process.env.BASE_URL || 'http://localhost:3000'}${bgUrl}`;
+const background = await loadImage(bgUrl ).catch(() => loadImage('https://placehold.co/800x400/050510/1e90ff?text=Welcome' ));
+
             ctx.drawImage(background, 0, 0, 800, 400);
 
             const avW = parseFloat(config.welcome.avatarWidth) || 150;
@@ -3071,6 +3074,22 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: `تم إزالة ${member.user.tag} من التكت.`, ephemeral: true });
             }
         }
+// --- [ Ticket Panel Select Menu ] ---
+if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') {
+    const selected = interaction.values[0];
+    const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
+    if (!tConfig) return interaction.reply({ content: 'لم يتم العثور على إعدادات التذاكر.', ephemeral: true });
+
+    // استخراج رقم الخيار من الـ value (مثلاً ticket_opt_0 → 0)
+    const optIndex = parseInt(selected.replace('ticket_opt_', ''));
+    let ticketType = 'تذكرة دعم';
+    if (tConfig.menuOptions?.[optIndex]) {
+        ticketType = tConfig.menuOptions[optIndex].label;
+    }
+
+    await openTicket(interaction, tConfig, ticketType);
+    return;
+}
 
         // --- [ Ticket Buttons ] ---
         if (interaction.isButton() && (interaction.customId === 'open_ticket' || interaction.customId.startsWith('ticket_btn_'))) {
