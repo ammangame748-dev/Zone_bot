@@ -896,7 +896,10 @@ function ui(guild, active, content) {
 
 // --- [ Dashboard - Server List ] ---
 app.get('/dashboard', checkAuth, (req, res) => {
-    const adminGuilds = req.user.guilds.filter(g => (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8));
+    const adminGuilds = req.user.guilds.filter(g => {
+        const p = BigInt(g.permissions);
+        return (p & 8n) === 8n || (p & 32n) === 32n;
+    });
     const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
     const cards = adminGuilds.map(g => {
@@ -923,8 +926,28 @@ app.get('/dashboard', checkAuth, (req, res) => {
             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
             margin-bottom:10px;">VORTEX</div>
         <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
+        <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
+            <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
+        </div>
     </div>
-    <div class="guild-grid">${cards}</div>`;
+    <div class="guild-grid" id="guildGrid">${cards}</div>
+    <script>
+        function filterGuilds() {
+            const input = document.getElementById('guildSearch');
+            const filter = input.value.toLowerCase();
+            const grid = document.getElementById('guildGrid');
+            const cards = grid.getElementsByClassName('guild-card');
+            for (let i = 0; i < cards.length; i++) {
+                const h3 = cards[i].getElementsByTagName('h3')[0];
+                const txtValue = h3.textContent || h3.innerText;
+                if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                    cards[i].style.display = "";
+                } else {
+                    cards[i].style.display = "none";
+                }
+            }
+        }
+    </script>`;
 
     res.send(ui({ id: null, name: 'قائمة السيرفرات' }, 'home', content));
 });
@@ -2519,58 +2542,29 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
 });
 
 client.on('guildMemberAdd', async (member) => {
-    // إحصائيات
-    await Stats.findOneAndUpdate(
-        { guildId: member.guild.id },
-        { $push: { 'membersLog.joined': new Date() } },
-        { upsert: true }
-    );
-
-    // لوق الأعضاء
-    const logEmbed = new EmbedBuilder()
-        .setTitle('عضو جديد انضم')
-        .setColor(0x00c853)
-        .setThumbnail(member.user.displayAvatarURL())
-        .addFields({ name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true })
-        .setTimestamp();
-    await sendLog(member.guild, 'members', logEmbed);
-
-    // نظام الترحيب
-    const config = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (!config?.welcome?.enabled || !config.welcome.channel) return;
-
-    const welcomeChannel = member.guild.channels.cache.get(config.welcome.channel);
-    if (!welcomeChannel) return;
-
     try {
-        const canvas = createCanvas(800, 400);
-        const ctx = canvas.getContext('2d');
+        // إحصائيات
+        await Stats.findOneAndUpdate(
+            { guildId: member.guild.id },
+            { $push: { 'membersLog.joined': new Date() } },
+            { upsert: true }
+        ).catch(() => {});
 
-        const bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400/050510/1e90ff?text=Welcome';
-        const background = await loadImage(bgUrl);
-        ctx.drawImage(background, 0, 0, 800, 400);
+        // لوق الأعضاء
+        const logEmbed = new EmbedBuilder()
+            .setTitle('عضو جديد انضم')
+            .setColor(0x00c853)
+            .setThumbnail(member.user.displayAvatarURL())
+            .addFields({ name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true })
+            .setTimestamp();
+        await sendLog(member.guild, 'members', logEmbed);
 
-        const avW = config.welcome.avatarWidth || 150;
-        const avH = config.welcome.avatarHeight || 150;
-        const x = (config.welcome.avatarX / 100) * 800;
-        const y = (config.welcome.avatarY / 100) * 400;
+        // نظام الترحيب
+        const config = await GuildConfig.findOne({ guildId: member.guild.id });
+        if (!config?.welcome?.enabled || !config.welcome.channel) return;
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-        const avatar = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 512 }));
-        ctx.drawImage(avatar, x - (avW / 2), y - (avH / 2), avW, avH);
-        ctx.restore();
-
-        ctx.strokeStyle = '#1e90ff';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
+        const welcomeChannel = await member.guild.channels.fetch(config.welcome.channel).catch(() => null);
+        if (!welcomeChannel) return;
 
         const welcomeMsg = (config.welcome.embedMessage || 'مرحباً بك {member} في سيرفر {guild}!')
             .replace(/{member}/g, `<@${member.id}>`)
@@ -2581,13 +2575,46 @@ client.on('guildMemberAdd', async (member) => {
             .setTitle('عضو جديد انضم إلينا')
             .setDescription(welcomeMsg)
             .setColor(0x1e90ff)
-            .setImage('attachment://welcome-image.png')
             .setTimestamp()
             .setFooter({ text: `VORTEX System - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
-        welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
+        try {
+            const canvas = createCanvas(800, 400);
+            const ctx = canvas.getContext('2d');
+
+            const bgUrl = config.welcome.imagePath || 'https://placehold.co/800x400/050510/1e90ff?text=Welcome';
+            const background = await loadImage(bgUrl).catch(() => loadImage('https://placehold.co/800x400/050510/1e90ff?text=Welcome'));
+            ctx.drawImage(background, 0, 0, 800, 400);
+
+            const avW = parseFloat(config.welcome.avatarWidth) || 150;
+            const avH = parseFloat(config.welcome.avatarHeight) || 150;
+            const x = (parseFloat(config.welcome.avatarX) || 50) / 100 * 800;
+            const y = (parseFloat(config.welcome.avatarY) || 50) / 100 * 400;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            const avatar = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 512 })).catch(() => null);
+            if (avatar) ctx.drawImage(avatar, x - (avW / 2), y - (avH / 2), avW, avH);
+            ctx.restore();
+
+            ctx.strokeStyle = '#1e90ff';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
+            welcomeEmbed.setImage('attachment://welcome-image.png');
+            await welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
+        } catch (canvasErr) {
+            console.error('[Canvas Welcome Error]', canvasErr);
+            await welcomeChannel.send({ embeds: [welcomeEmbed] });
+        }
     } catch (err) {
-        console.error('[Welcome Error]', err);
+        console.error('[General Welcome Error]', err);
     }
 });
 
@@ -2815,8 +2842,7 @@ client.on('interactionCreate', async (interaction) => {
           // --- [ Clan Control Select Menu ] ---
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
             // استخراج الأرقام فقط من الـ customId لمنع خطأ NaN نهائياً
-            const cleanNumbers = interaction.customId.replace(/[^0-9]/g, '');
-            const clanIdx = parseInt(cleanNumbers);
+            const clanIdx = parseInt(interaction.customId.split('_').pop());
 
             if (isNaN(clanIdx)) {
                 return interaction.reply({ content: '❌ خطأ: لم يتم التعرف على رقم الكلان بشكل صحيح.', flags: ['Ephemeral'] });
