@@ -2923,7 +2923,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setTitle(modalTitle);
                 
                 const input = new TextInputBuilder()
-                    .setCustomId('member_id')
+                    .setCustomId(`member_input_${clanIdx}`)
                     .setLabel('ID العضو / المساعد')
                     .setStyle(TextInputStyle.Short)
                     .setPlaceholder('ادخل الـ ID هنا...')
@@ -2938,12 +2938,13 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isModalSubmit() && interaction.customId.startsWith('clmod_')) {
             const parts = interaction.customId.split('_');
             const action = parts[1];
+            const clanIdxStr = parts[parts.length - 1];
+            const clanIdx = parseInt(clanIdxStr);
             
-            if (!parts[2] || isNaN(parseInt(parts[2]))) {
+            if (isNaN(clanIdx)) {
                 return interaction.reply({ content: 'خطأ في معالجة بيانات رقم الكلان من النموذج.', ephemeral: true });
             }
-            const clanIdx = parseInt(parts[2]);
-            const memberId = interaction.fields.getTextInputValue('member_id').trim();
+            const memberId = interaction.fields.getTextInputValue(`member_input_${clanIdx}`).trim();
 
             const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
             if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
