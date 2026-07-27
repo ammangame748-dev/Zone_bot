@@ -347,6 +347,19 @@ const checkAuth = (req, res, next) => {
     res.redirect('/login');
 };
 
+const checkGuildAdmin = (req, res, next) => {
+    if (!req.isAuthenticated()) return res.redirect('/login');
+    const guildId = req.params.guildId;
+    if (!guildId) return next();
+    const userGuild = req.user.guilds.find(g => g.id === guildId);
+    if (!userGuild) return res.status(403).send('Forbidden: You are not in this guild.');
+    const p = BigInt(userGuild.permissions);
+    if ((p & 8n) === 8n || (p & 32n) === 32n) {
+        return next();
+    }
+    return res.status(403).send('Forbidden: You do not have admin permissions in this guild.');
+};
+
 app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
     res.redirect('/dashboard');
@@ -957,7 +970,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
 });
 
 // --- [ Home / Stats ] ---
-app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, home', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
@@ -1009,7 +1022,7 @@ app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
 });
 
 // --- [ Kick Notifications ] ---
-app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, kick', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
@@ -1079,7 +1092,7 @@ app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
     res.send(ui(g, 'kick', content));
 });
 
-app.post('/save/:guildId/kick', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, kick', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { kickUser, channelId, roleId, msg } = req.body;
@@ -1095,7 +1108,7 @@ app.post('/save/:guildId/kick', checkAuth, async (req, res) => {
     }
 });
 
-app.get('/delete-kick/:guildId/:index', checkAuth, async (req, res) => {
+app.get('/delete-kick/:guildId/', checkGuildAdmin, :index', checkAuth, async (req, res) => {
     const { guildId, index } = req.params;
     const config = await KickConfig.findOne({ guildId });
     if (config) { config.streamers.splice(index, 1); await config.save(); }
@@ -1103,7 +1116,7 @@ app.get('/delete-kick/:guildId/:index', checkAuth, async (req, res) => {
 });
 
 // --- [ Streaks ] ---
-app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, streaks', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const s = await StreakConfig.findOne({ guildId: g.id }) || {};
@@ -1137,7 +1150,7 @@ app.get('/manage/:guildId/streaks', checkAuth, async (req, res) => {
     res.send(ui(g, 'streaks', content));
 });
 
-app.post('/save/:guildId/streaks', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, streaks', checkAuth, async (req, res) => {
     await StreakConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         { $set: { requiredMessages: Number(req.body.reqMsgs), streakRole: req.body.streakRole, streakChannel: req.body.streakChannel } },
@@ -1152,7 +1165,7 @@ app.post('/reset-streaks/:guildId', checkAuth, async (req, res) => {
 });
 
 // --- [ Logs ] ---
-app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, logs', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
@@ -1193,7 +1206,7 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
     res.send(ui(g, 'logs', content));
 });
 
-app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, logs', checkAuth, async (req, res) => {
     const b = req.body;
     const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
     let logData = {};
@@ -1206,7 +1219,7 @@ app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
 
 
 // --- [ Welcome ] ---
-app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
@@ -1292,7 +1305,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     res.send(ui(g, 'welcome', content));
 });
 
-app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, welcome', checkAuth, upload.single('bgImage'), async (req, res) => {
     const b = req.body;
     let updateData = {
         'welcome.enabled': b.enabled === 'on',
@@ -1309,7 +1322,7 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (r
 });
 
 // --- [ Security ] ---
-app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, security', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
@@ -1342,7 +1355,7 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
     res.send(ui(g, 'security', content));
 });
 
-app.post('/save/:guildId/security', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, security', checkAuth, async (req, res) => {
     const b = req.body;
     const bypassRoles = Array.isArray(b.bypassRoles) ? b.bypassRoles : (b.bypassRoles ? [b.bypassRoles] : []);
     await GuildConfig.findOneAndUpdate(
@@ -1354,7 +1367,7 @@ app.post('/save/:guildId/security', checkAuth, async (req, res) => {
 });
 
 // --- [ Auto Reply ] ---
-app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, autoreply', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { autoReply: [] };
@@ -1384,7 +1397,7 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     res.send(ui(g, 'autoreply', content));
 });
 
-app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, autoreply', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const finalData = [];
@@ -1402,7 +1415,7 @@ app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
 });
 
 // --- [ Giveaway ] ---
-app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, giveaway', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const activeGiveaways = await Giveaway.find({ guildId: g.id, ended: false });
@@ -1455,7 +1468,7 @@ app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
     res.send(ui(g, 'giveaway', content));
 });
 
-app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, giveaway', checkAuth, async (req, res) => {
     const { prize, duration, winners, channel, description } = req.body;
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.status(404).send('السيرفر غير موجود');
@@ -1478,7 +1491,7 @@ app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
 });
 
 // --- [ Tickets ] ---
-app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, tickets', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
@@ -1557,7 +1570,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
     res.send(ui(g, 'tickets', content));
 });
 
-app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
     try {
         const b = req.body;
         const g = client.guilds.cache.get(req.params.guildId);
@@ -1643,7 +1656,7 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
 });
 
 // --- [ Levels ] ---
-app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
@@ -1677,7 +1690,7 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     res.send(ui(g, 'levels', content));
 });
 
-app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, levels', checkAuth, async (req, res) => {
     const b = req.body;
     await GuildConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
@@ -1688,7 +1701,7 @@ app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
 });
 
 // --- [ Roles Panel ] ---
-app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, roles', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { rolesPanel: [] };
@@ -1726,7 +1739,7 @@ app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
 
     res.send(ui(g, 'roles', content));
 });
-app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, roles', checkAuth, async (req, res) => {
     const b = req.body;
     const rolesPanel = [];
     for (let i = 0; i < 10; i++) {
@@ -1766,7 +1779,7 @@ app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
 
 
 // --- [ Mod / Jail Config ] ---
-app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, mod', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
@@ -1812,7 +1825,7 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
     res.send(ui(g, 'mod', content));
 });
 
-app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, mod', checkAuth, async (req, res) => {
     await ModConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         { $set: {
@@ -1828,7 +1841,7 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
 
 
 // --- [ Clans ] ---
-app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, clans', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const clans = await Clan.find({ guildId: g.id }).sort({ clanIndex: 1 });
@@ -1862,7 +1875,7 @@ app.get('/manage/:guildId/clans', checkAuth, async (req, res) => {
     res.send(ui(g, 'clans', content));
 });
 
-app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, clans/add', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
@@ -1916,7 +1929,7 @@ app.get('/manage/:guildId/clans/add', checkAuth, async (req, res) => {
     res.send(ui(g, 'clans', content));
 });
 
-app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
+app.post('/save/:guildId/', checkGuildAdmin, clans', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { clanName, leaderId, roleId, resultsChannelId, applyChannelId, clanIndex, questions } = req.body;
@@ -1954,7 +1967,7 @@ app.post('/save/:guildId/clans', checkAuth, async (req, res) => {
     }
 });
 
-app.get('/manage/:guildId/clans/delete/:index', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, clans/delete/:index', checkAuth, async (req, res) => {
     const clanIdx = parseInt(req.params.index);
     
     // التأكد من أن الـ Index رقم صحيح قبل محاولة الحذف
@@ -1971,7 +1984,7 @@ app.get('/manage/:guildId/clans/delete/:index', checkAuth, async (req, res) => {
 });
 
 
-app.get('/manage/:guildId/clans/edit/:index', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/', checkGuildAdmin, clans/edit/:index', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const clan = await Clan.findOne({ guildId: g.id, clanIndex: parseInt(req.params.index) });
@@ -2018,7 +2031,7 @@ app.get('/manage/:guildId/clans/edit/:index', checkAuth, async (req, res) => {
     res.send(ui(g, 'clans', content));
 });
 
-app.post('/update/:guildId/clans/:index', checkAuth, async (req, res) => {
+app.post('/update/:guildId/', checkGuildAdmin, clans/:index', checkAuth, async (req, res) => {
     const { clanName, leaderId, roleId, resultsChannelId, questions } = req.body;
     const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== '') : [];
     await Clan.findOneAndUpdate(
@@ -2037,7 +2050,11 @@ client.on('messageCreate', async (msg) => {
     if (!msg.guild || msg.author.bot) return;
 
     const s = await GuildConfig.findOne({ guildId: msg.guild.id });
-    if (!s) return;
+    if (!s) {
+        // Create default config if it doesn't exist
+        await GuildConfig.create({ guildId: msg.guild.id });
+        return;
+    }
 
     // --- [ أمر قائمة المتصدرين ] ---
     if (s.levels?.enabled && s.levels.leaderboardCommand) {
@@ -2108,7 +2125,9 @@ client.on('messageCreate', async (msg) => {
             const forbiddenWords = s.security.badWords.split(',').map(w => w.trim()).filter(Boolean);
             const hasBadWord = forbiddenWords.some(word => {
                 try {
-                    const regex = new RegExp(`(?<=^|[^أ-يa-zA-Z0-9])${word}(?=[^أ-يa-zA-Z0-9]|$)`, 'iu');
+                    // Escape special characters in the word to prevent RegExp crash
+                    const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`(?<=^|[^أ-يa-zA-Z0-9])${escapedWord}(?=[^أ-يa-zA-Z0-9]|$)`, 'iu');
                     return regex.test(msg.content);
                 } catch { return msg.content.includes(word); }
             });
@@ -2424,7 +2443,7 @@ client.on('messageCreate', async (msg) => {
             const target = msg.mentions.members.first();
             const timeInput = args.find(arg => /\d+[smhdw]/.test(arg));
 
-            if (!target || !timeInput) return msg.reply(`الاستخدام الصحيح: \`!${command} @user 1h\``);
+            if (!target || !timeInput) return msg.reply(`الاستخدام الصحيح: \`${prefix}${command} @user 1h\``);
             if (target.id === msg.author.id) return msg.reply('لا يمكنك سجن نفسك!');
             if (target.user.bot) return msg.reply('لا يمكنك سجن البوتات!');
 
@@ -2850,7 +2869,9 @@ client.on('interactionCreate', async (interaction) => {
           // --- [ Clan Control Select Menu ] ---
         if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
             // استخراج الأرقام فقط من الـ customId لمنع خطأ NaN نهائياً
-            const clanIdx = parseInt(interaction.customId.split('_').pop());
+            const parts = interaction.customId.split('_');
+            const clanIdxStr = parts[parts.length - 1];
+            const clanIdx = parseInt(clanIdxStr);
 
             if (isNaN(clanIdx)) {
                 return interaction.reply({ content: '❌ خطأ: لم يتم التعرف على رقم الكلان بشكل صحيح.', ephemeral: true });
@@ -3277,7 +3298,12 @@ async function checkKickLive() {
                     });
 
                     if (!response.ok) continue;
-                    const data = await response.json();
+                    let data;
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        continue;
+                    }
                     const isLive = data?.livestream !== null && data?.livestream !== undefined;
 
                     if (isLive && !streamer.isLive) {
@@ -3367,15 +3393,22 @@ client.once('ready', async () => {
         status: 'online'
     });
 
-    // استئناف السجون المنتهية
+    // استئناف السجون المنتهية والنشطة
     try {
         const now = new Date();
-        const expiredJails = await JailData.find({ endAt: { $lte: now } });
-        for (const jailEntry of expiredJails) {
+        const allJails = await JailData.find({});
+        for (const jailEntry of allJails) {
             const guild = client.guilds.cache.get(jailEntry.guildId);
             if (!guild) continue;
             const member = await guild.members.fetch(jailEntry.userId).catch(() => null);
-            if (member) await handleUnjail(member, jailEntry.guildId);
+            if (member) {
+                if (jailEntry.endAt <= now) {
+                    await handleUnjail(member, jailEntry.guildId);
+                } else {
+                    const remaining = jailEntry.endAt.getTime() - now.getTime();
+                    setTimeout(async () => { await handleUnjail(member, jailEntry.guildId); }, remaining);
+                }
+            }
         }
     } catch (err) {
         console.error('[Jail Resume Error]', err);
