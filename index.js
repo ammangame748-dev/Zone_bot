@@ -970,7 +970,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
 });
 
 // --- [ Home / Stats ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, home', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/home', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
@@ -1022,7 +1022,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, home', checkAuth, async (req, res)
 });
 
 // --- [ Kick Notifications ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, kick', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
@@ -1092,7 +1092,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, kick', checkAuth, async (req, res)
     res.send(ui(g, 'kick', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, kick', checkAuth, async (req, res) => {
+app.post('/save/:guildId/kick', checkGuildAdmin, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { kickUser, channelId, roleId, msg } = req.body;
@@ -1108,7 +1108,7 @@ app.post('/save/:guildId/', checkGuildAdmin, kick', checkAuth, async (req, res) 
     }
 });
 
-app.get('/delete-kick/:guildId/', checkGuildAdmin, :index', checkAuth, async (req, res) => {
+app.get('/delete-kick/:guildId/:index', checkGuildAdmin, async (req, res) => {
     const { guildId, index } = req.params;
     const config = await KickConfig.findOne({ guildId });
     if (config) { config.streamers.splice(index, 1); await config.save(); }
@@ -1116,7 +1116,7 @@ app.get('/delete-kick/:guildId/', checkGuildAdmin, :index', checkAuth, async (re
 });
 
 // --- [ Streaks ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, streaks', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/streaks', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const s = await StreakConfig.findOne({ guildId: g.id }) || {};
@@ -1150,7 +1150,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, streaks', checkAuth, async (req, r
     res.send(ui(g, 'streaks', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, streaks', checkAuth, async (req, res) => {
+app.post('/save/:guildId/streaks', checkGuildAdmin, async (req, res) => {
     await StreakConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         { $set: { requiredMessages: Number(req.body.reqMsgs), streakRole: req.body.streakRole, streakChannel: req.body.streakChannel } },
@@ -1165,7 +1165,7 @@ app.post('/reset-streaks/:guildId', checkAuth, async (req, res) => {
 });
 
 // --- [ Logs ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, logs', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/logs', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
@@ -1206,7 +1206,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, logs', checkAuth, async (req, res)
     res.send(ui(g, 'logs', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, logs', checkAuth, async (req, res) => {
+app.post('/save/:guildId/logs', checkGuildAdmin, async (req, res) => {
     const b = req.body;
     const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
     let logData = {};
@@ -1219,7 +1219,7 @@ app.post('/save/:guildId/', checkGuildAdmin, logs', checkAuth, async (req, res) 
 
 
 // --- [ Welcome ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, welcome', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/welcome', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
@@ -1305,7 +1305,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, welcome', checkAuth, async (req, r
     res.send(ui(g, 'welcome', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, welcome', checkAuth, upload.single('bgImage'), async (req, res) => {
+app.post('/save/:guildId/welcome', checkGuildAdmin, upload.single('bgImage'), async (req, res) => {
     const b = req.body;
     let updateData = {
         'welcome.enabled': b.enabled === 'on',
@@ -1322,7 +1322,7 @@ app.post('/save/:guildId/', checkGuildAdmin, welcome', checkAuth, upload.single(
 });
 
 // --- [ Security ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, security', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/security', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
@@ -1355,7 +1355,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, security', checkAuth, async (req, 
     res.send(ui(g, 'security', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, security', checkAuth, async (req, res) => {
+app.post('/save/:guildId/security', checkGuildAdmin, async (req, res) => {
     const b = req.body;
     const bypassRoles = Array.isArray(b.bypassRoles) ? b.bypassRoles : (b.bypassRoles ? [b.bypassRoles] : []);
     await GuildConfig.findOneAndUpdate(
@@ -1367,7 +1367,7 @@ app.post('/save/:guildId/', checkGuildAdmin, security', checkAuth, async (req, r
 });
 
 // --- [ Auto Reply ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, autoreply', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { autoReply: [] };
@@ -1397,7 +1397,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, autoreply', checkAuth, async (req,
     res.send(ui(g, 'autoreply', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, autoreply', checkAuth, async (req, res) => {
+app.post('/save/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
     try {
         const { guildId } = req.params;
         const finalData = [];
@@ -1415,7 +1415,7 @@ app.post('/save/:guildId/', checkGuildAdmin, autoreply', checkAuth, async (req, 
 });
 
 // --- [ Giveaway ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, giveaway', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const activeGiveaways = await Giveaway.find({ guildId: g.id, ended: false });
@@ -1468,7 +1468,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, giveaway', checkAuth, async (req, 
     res.send(ui(g, 'giveaway', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, giveaway', checkAuth, async (req, res) => {
+app.post('/save/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
     const { prize, duration, winners, channel, description } = req.body;
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.status(404).send('السيرفر غير موجود');
@@ -1491,7 +1491,7 @@ app.post('/save/:guildId/', checkGuildAdmin, giveaway', checkAuth, async (req, r
 });
 
 // --- [ Tickets ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, tickets', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/tickets', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
@@ -1570,7 +1570,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, tickets', checkAuth, async (req, r
     res.send(ui(g, 'tickets', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
+app.post('/save/:guildId/tickets', checkGuildAdmin, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
     try {
         const b = req.body;
         const g = client.guilds.cache.get(req.params.guildId);
@@ -1656,7 +1656,7 @@ app.post('/save/:guildId/', checkGuildAdmin, tickets', checkAuth, upload.fields(
 });
 
 // --- [ Levels ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, levels', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/levels', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
@@ -1690,7 +1690,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, levels', checkAuth, async (req, re
     res.send(ui(g, 'levels', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, levels', checkAuth, async (req, res) => {
+app.post('/save/:guildId/levels', checkGuildAdmin, async (req, res) => {
     const b = req.body;
     await GuildConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
@@ -1701,7 +1701,7 @@ app.post('/save/:guildId/', checkGuildAdmin, levels', checkAuth, async (req, res
 });
 
 // --- [ Roles Panel ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, roles', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/roles', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { rolesPanel: [] };
@@ -1739,7 +1739,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, roles', checkAuth, async (req, res
 
     res.send(ui(g, 'roles', content));
 });
-app.post('/save/:guildId/', checkGuildAdmin, roles', checkAuth, async (req, res) => {
+app.post('/save/:guildId/roles', checkGuildAdmin, async (req, res) => {
     const b = req.body;
     const rolesPanel = [];
     for (let i = 0; i < 10; i++) {
@@ -1779,7 +1779,7 @@ app.post('/save/:guildId/', checkGuildAdmin, roles', checkAuth, async (req, res)
 
 
 // --- [ Mod / Jail Config ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, mod', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/mod', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
@@ -1825,7 +1825,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, mod', checkAuth, async (req, res) 
     res.send(ui(g, 'mod', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, mod', checkAuth, async (req, res) => {
+app.post('/save/:guildId/mod', checkGuildAdmin, async (req, res) => {
     await ModConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         { $set: {
@@ -1841,7 +1841,7 @@ app.post('/save/:guildId/', checkGuildAdmin, mod', checkAuth, async (req, res) =
 
 
 // --- [ Clans ] ---
-app.get('/manage/:guildId/', checkGuildAdmin, clans', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/clans', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const clans = await Clan.find({ guildId: g.id }).sort({ clanIndex: 1 });
@@ -1875,7 +1875,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, clans', checkAuth, async (req, res
     res.send(ui(g, 'clans', content));
 });
 
-app.get('/manage/:guildId/', checkGuildAdmin, clans/add', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/clans/add', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
@@ -1929,7 +1929,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, clans/add', checkAuth, async (req,
     res.send(ui(g, 'clans', content));
 });
 
-app.post('/save/:guildId/', checkGuildAdmin, clans', checkAuth, async (req, res) => {
+app.post('/save/:guildId/clans', checkGuildAdmin, async (req, res) => {
     try {
         const { guildId } = req.params;
         const { clanName, leaderId, roleId, resultsChannelId, applyChannelId, clanIndex, questions } = req.body;
@@ -1967,7 +1967,7 @@ app.post('/save/:guildId/', checkGuildAdmin, clans', checkAuth, async (req, res)
     }
 });
 
-app.get('/manage/:guildId/', checkGuildAdmin, clans/delete/:index', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/clans/delete/:index', checkGuildAdmin, async (req, res) => {
     const clanIdx = parseInt(req.params.index);
     
     // التأكد من أن الـ Index رقم صحيح قبل محاولة الحذف
@@ -1984,7 +1984,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, clans/delete/:index', checkAuth, a
 });
 
 
-app.get('/manage/:guildId/', checkGuildAdmin, clans/edit/:index', checkAuth, async (req, res) => {
+app.get('/manage/:guildId/clans/edit/:index', checkGuildAdmin, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const clan = await Clan.findOne({ guildId: g.id, clanIndex: parseInt(req.params.index) });
@@ -2031,7 +2031,7 @@ app.get('/manage/:guildId/', checkGuildAdmin, clans/edit/:index', checkAuth, asy
     res.send(ui(g, 'clans', content));
 });
 
-app.post('/update/:guildId/', checkGuildAdmin, clans/:index', checkAuth, async (req, res) => {
+app.post('/update/:guildId/clans/:index', checkGuildAdmin, async (req, res) => {
     const { clanName, leaderId, roleId, resultsChannelId, questions } = req.body;
     const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== '') : [];
     await Clan.findOneAndUpdate(
