@@ -1166,27 +1166,25 @@ app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
         <script>
             let categoryCount = 1;
             function addCategoryAlertField() {
-                const container = document.getElementById(\'category-alerts-container\');
-                const newField = `
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:10px;">
-                        <div>
-                            <label>اسم الفئة</label>
-                            <input type="text" name="categoryName_${categoryCount}" placeholder="مثلاً: Just Chatting">
-                        </div>
-                        <div>
-                            <label>رسالة الفئة المخصصة</label>
-                            <input type="text" name="categoryCustomMessage_${categoryCount}" placeholder="%name% بدأ بث %category%!">
-                        </div>
-                        <div>
-                            <label>رتبة الفئة للمنشن</label>
-                            <select name="categoryRoleId_${categoryCount}">
-                                <option value="">-- بدون منشن --</option>
-                                ${g.roles.cache.filter(r => r.name !== \'@everyone\').map(r => `<option value="${r.id}">${r.name}</option>`).join(\'\')}
-                            </select>
-                        </div>
-                    </div>
-                `;
-                container.insertAdjacentHTML(\'beforeend\', newField);
+                const container = document.getElementById('category-alerts-container');
+                const count = categoryCount;
+                const newField = '<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:10px;">' +
+                    '<div>' +
+                    '<label>اسم الفئة</label>' +
+                    '<input type="text" name="categoryName_' + count + '" placeholder="مثلاً: Just Chatting">' +
+                    '</div>' +
+                    '<div>' +
+                    '<label>رسالة الفئة المخصصة</label>' +
+                    '<input type="text" name="categoryCustomMessage_' + count + '" placeholder="%name% بدأ بث %category%!">' +
+                    '</div>' +
+                    '<div>' +
+                    '<label>رتبة الفئة للمنشن</label>' +
+                    '<select name="categoryRoleId_' + count + '">' +
+                    '<option value="">-- بدون منشن --</option>' +
+                    '</select>' +
+                    '</div>' +
+                    '</div>';
+                container.insertAdjacentHTML('beforeend', newField);
                 categoryCount++;
             }
         </script>
