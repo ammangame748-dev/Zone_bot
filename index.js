@@ -43,7 +43,8 @@ const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
             startedAt: Date,
             thumbnail: String
         }
-    }]
+    }],
+    language: { type: String, default: "ar" }
 }));
 
 const TicketData = mongoose.model('TicketData', new mongoose.Schema({
@@ -515,10 +516,19 @@ const strings = {
     ar: {
         stats: 'الإحصائيات', security: 'الحماية', kick: 'تنبيهات Kick', streaks: 'الستريك', 
         logs: 'اللوق', tickets: 'التذاكر', autoreply: 'الرد الآلي', levels: 'المستويات', 
-        welcome: 'الترحيب', giveaway: 'القيف اواي', roles: 'الرتب', mod: 'الإشراف', clans: 'الكلانات',
+        welcome: 'الترحيب', giveaway: 'القيف اواي', roles: 'الرتب', mod: 'أوامر الإشراف', clans: 'نظام الكلانات',
         add_streamer: 'إضافة ستريمر', kick_user: 'اسم المستخدم', channel: 'القناة', 
         mention_role: 'رتبة المنشن', custom_msg: 'رسالة مخصصة', cats: 'كاتيقوريات المنشن',
-        save: 'حفظ الإعدادات', delete: 'حذف', viewers: 'المشاهدين', duration: 'مدة البث'
+        save: 'حفظ الإعدادات', delete: 'حذف', viewers: 'المشاهدين', duration: 'مدة البث',
+        logout: 'تسجيل الخروج', settings: 'الإعدادات', select_guild: 'اختر سيرفر',
+        kick_desc: 'إعداد تنبيهات البث المباشر لمنصة Kick',
+        category_mention: 'تنبيه التصنيفات',
+        mention_all: 'منشن الجميع عند البث',
+        started_at: 'بدأ في',
+        stream_link: 'رابط البث',
+        dashboard: 'لوحة التحكم',
+        live_now: 'بث مباشر الآن!',
+        category_alert: 'تنبيه كاتيقوري'
     },
     en: {
         stats: 'Statistics', security: 'Security', kick: 'Kick Alerts', streaks: 'Streaks', 
@@ -526,17 +536,429 @@ const strings = {
         welcome: 'Welcome', giveaway: 'Giveaway', roles: 'Roles', mod: 'Moderation', clans: 'Clans',
         add_streamer: 'Add Streamer', kick_user: 'Kick Username', channel: 'Channel', 
         mention_role: 'Mention Role', custom_msg: 'Custom Message', cats: 'Mention Categories',
-        save: 'Save Settings', delete: 'Delete', viewers: 'Viewers', duration: 'Duration'
+        save: 'Save Settings', delete: 'Delete', viewers: 'Viewers', duration: 'Duration',
+        logout: 'Logout', settings: 'Settings', select_guild: 'Select Guild',
+        kick_desc: 'Setup Kick.com live stream notifications',
+        category_mention: 'Category Mention',
+        mention_all: 'Mention all when live',
+        started_at: 'Started at',
+        stream_link: 'Stream Link',
+        dashboard: 'Dashboard',
+        live_now: 'Live Now!',
+        category_alert: 'Category Alert'
     }
 };
 function t(key, lang = 'ar') { return strings[lang]?.[key] || strings['ar'][key] || key; }
 
 function ui(guild, active, content, lang = 'ar') {
     const showNav = guild.id ? 'flex' : 'none';
-    const guildName = guild.name || 'قائمة السيرفرات';
+    const guildName = guild.name || (lang === 'ar' ? 'قائمة السيرفرات' : 'Servers List');
 
     const navItems = guild.id ? `
         <a class="${active === 'home' ? 'active' : ''}" href="/manage/${guild.id}/home">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            ${t('stats', lang)}
+        </a>
+        <a class="${active === 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            ${t('security', lang)}
+        </a>
+        <a class="${active === 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
+            ${t('kick', lang)}
+        </a>
+        <a class="${active === 'streaks' ? 'active' : ''}" href="/manage/${guild.id}/streaks">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            ${t('streaks', lang)}
+        </a>
+        <a class="${active === 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            ${t('logs', lang)}
+        </a>
+        <a class="${active === 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/></svg>
+            ${t('tickets', lang)}
+        </a>
+        <a class="${active === 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            ${t('autoreply', lang)}
+        </a>
+        <a class="${active === 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
+            ${t('levels', lang)}
+        </a>
+        <a class="${active === 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            ${t('welcome', lang)}
+        </a>
+        <a class="${active === 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="20,12 20,22 4,22 4,12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+            ${t('giveaway', lang)}
+        </a>
+        <a class="${active === 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            ${t('roles', lang)}
+        </a>
+        <a class="${active === 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            ${t('mod', lang)}
+        </a>
+        <a class="${active === 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+            ${t('clans', lang)}
+        </a>
+    ` : '';
+
+    return `<!DOCTYPE html>
+<html dir="${lang === 'ar' ? 'rtl' : 'ltr'}" lang="${lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VORTEX Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --blue: #1e90ff;
+            --blue-dark: #0a6ecc;
+            --blue-glow: rgba(30,144,255,0.15);
+            --red: #e63946;
+            --red-light: #ff6b6b;
+            --red-glow: rgba(230,57,70,0.12);
+            --black: #050508;
+            --dark: #0a0a14;
+            --darker: #07070f;
+            --card: rgba(10,10,22,0.8);
+            --card-hover: rgba(15,15,30,0.9);
+            --border: rgba(30,144,255,0.18);
+            --border-red: rgba(230,57,70,0.18);
+            --text: #e8eaf6;
+            --text-muted: rgba(255,255,255,0.45);
+            --sidebar-w: 280px;
+        }
+
+        body {
+            font-family: 'Changa', sans-serif;
+            background: var(--black);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            direction: ${lang === 'ar' ? 'rtl' : 'ltr'};
+        }
+
+        /* ===== BACKGROUND ===== */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: -2;
+            background:
+                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.07) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
+        }
+        body::after {
+            content: '';
+            position: fixed; inset: 0; z-index: -1;
+            background-image:
+                linear-gradient(rgba(30,144,255,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(30,144,255,0.025) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* ===== SIDEBAR (Fixed & On Other Side) ===== */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: rgba(7,7,15,0.95);
+            border-${lang === 'ar' ? 'left' : 'right'}: 1px solid var(--border);
+            position: fixed;
+            ${lang === 'ar' ? 'left: 0;' : 'right: 0;'}
+            top: 0;
+            bottom: 0;
+            display: flex; flex-direction: column;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--blue) transparent;
+            height: 100vh;
+        }
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 10px; }
+
+        .sidebar-header {
+            padding: 30px 20px 20px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .sidebar-logo {
+            font-size: 32px; font-weight: 800; letter-spacing: 5px;
+            background: linear-gradient(135deg, var(--blue), #ffffff 50%, var(--red));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            display: block;
+            animation: logoShimmer 4s ease-in-out infinite alternate;
+        }
+        @keyframes logoShimmer {
+            from { filter: drop-shadow(0 0 8px rgba(30,144,255,0.4)); }
+            to   { filter: drop-shadow(0 0 20px rgba(30,144,255,0.8)); }
+        }
+        .sidebar-tagline {
+            font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
+            margin-top: 4px; text-transform: uppercase;
+        }
+
+        .nav {
+            display: ${showNav};
+            flex-direction: column;
+            gap: 4px;
+            padding: 20px 12px 30px;
+            flex: 1;
+        }
+        .nav a {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: 12px;
+            color: var(--text-muted); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            transition: all 0.25s ease;
+            border: 1px solid transparent;
+            position: relative; overflow: hidden;
+        }
+        .nav a svg { flex-shrink: 0; opacity: 0.6; transition: opacity 0.25s; }
+        .nav a:hover {
+            background: var(--blue-glow);
+            color: white;
+            border-color: var(--border);
+        }
+        .nav a:hover svg { opacity: 1; }
+        .nav a.active {
+            background: linear-gradient(135deg, rgba(30,144,255,0.2), rgba(30,144,255,0.08));
+            color: var(--blue);
+            border-color: rgba(30,144,255,0.35);
+            font-weight: 700;
+        }
+        .nav a.active svg { opacity: 1; color: var(--blue); }
+        .nav a.active::before {
+            content: '';
+            position: absolute; ${lang === 'ar' ? 'right' : 'left'}: 0; top: 20%; bottom: 20%;
+            width: 3px; background: var(--blue);
+            border-radius: 3px 0 0 3px;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            margin-${lang === 'ar' ? 'left' : 'right'
+            margin-${lang === "ar" ? "left" : "right"}: var(--sidebar-w);
+        }: var(--sidebar-w);
+            padding: 40px 50px;
+            flex: 1;
+            min-height: 100vh;
+        }
+
+        .lang-menu {
+            position: fixed;
+            top: 20px;
+            ${lang === 'ar' ? 'right: 20px;' : 'left: 20px;'}
+            z-index: 1100;
+            display: flex;
+            gap: 10px;
+        }
+        .lang-btn {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: 'Changa', sans-serif;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        .lang-btn:hover {
+            border-color: var(--blue);
+            background: var(--blue-glow);
+        }
+        .lang-btn img {
+            width: 20px;
+            height: 15px;
+            object-fit: cover;
+            border-radius: 2px;
+        }
+
+        /* ===== STAT BOXES ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px; margin-top: 16px;
+        }
+        .stat-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px;
+            text-align: center; transition: all 0.3s;
+        }
+        .stat-box:hover { border-color: var(--blue); transform: translateY(-3px); }
+        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); }
+        .stat-box .stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+        /* ===== GUILD GRID (Dashboard) ===== */
+        .guild-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px; max-width: 1000px; margin: 0 auto;
+        }
+        .guild-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px; padding: 28px 20px;
+            text-align: center; transition: all 0.35s;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+        }
+        .guild-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--blue);
+            box-shadow: 0 10px 30px rgba(30,144,255,0.15);
+        }
+        .guild-icon {
+            width: 85px; height: 85px; border-radius: 50%;
+            margin-bottom: 18px; border: 3px solid var(--border);
+            transition: 0.3s;
+        }
+        .guild-card:hover .guild-icon { border-color: var(--blue); transform: scale(1.05); }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(15px);
+            transition: border-color 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--blue), transparent);
+            opacity: 0.5;
+        }
+        .card:hover { border-color: rgba(30,144,255,0.35); }
+        .card h3 {
+            color: white; font-size: 17px; font-weight: 700;
+            margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+        }
+        .card h3 svg { color: var(--blue); }
+
+        label {
+            display: block; color: var(--text-muted); font-size: 13px;
+            margin-bottom: 6px; margin-top: 16px; font-weight: 500;
+        }
+        input, select, textarea {
+            width: 100%; padding: 12px 16px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; color: white;
+            font-family: 'Changa', sans-serif; font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(30,144,255,0.12);
+        }
+        select option { background: #0d0d1a; color: white; }
+        textarea { resize: vertical; min-height: 100px; }
+
+        .btn-save {
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            color: white; border: none; padding: 13px 24px;
+            border-radius: 12px; cursor: pointer; font-weight: 700;
+            font-size: 14px; font-family: 'Changa', sans-serif;
+            transition: all 0.3s; display: inline-block; text-decoration: none;
+            text-align: center; width: 100%;
+            box-shadow: 0 4px 20px rgba(30,144,255,0.25);
+        }
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(30,144,255,0.4);
+            filter: brightness(1.1);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, var(--red), #c0392b);
+            box-shadow: 0 4px 20px rgba(230,57,70,0.25);
+        }
+        .btn-danger:hover { box-shadow: 0 8px 30px rgba(230,57,70,0.4); }
+        .btn-sm { padding: 8px 16px; font-size: 13px; width: auto; border-radius: 8px; }
+        .btn-green {
+            background: linear-gradient(135deg, #00c853, #00a040);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.25);
+        }
+
+        .toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .page-header {
+            display: flex; align-items: center; gap: 15px;
+            margin-bottom: 35px; padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .page-header h1 {
+            font-size: 24px; font-weight: 700; color: white;
+        }
+        .page-header .badge {
+            background: var(--blue-glow); border: 1px solid var(--border);
+            color: var(--blue); padding: 4px 12px; border-radius: 20px; font-size: 12px;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: ${lang === 'ar' ? 'right' : 'left'}; color: var(--text-muted); font-size: 12px; padding: 10px; border-bottom: 1px solid var(--border); }
+        td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="lang-menu">
+        <a href="/set-lang/ar" class="lang-btn">
+            <img src="https://flagcdn.com/w40/sa.png" alt="Arabic">
+            العربية
+        </a>
+        <a href="/set-lang/en" class="lang-btn">
+            <img src="https://flagcdn.com/w40/us.png" alt="English">
+            English
+        </a>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">VORTEX</span>
+            <div class="sidebar-tagline">Advanced System</div>
+        </div>
+        <div class="nav">
+            ${navItems}
+        </div>
+        <div style="padding: 20px; border-top: 1px solid var(--border);">
+            <a href="/logout" style="display:flex; align-items:center; gap:10px; color:var(--red); text-decoration:none; font-size:14px; font-weight:700;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                ${lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}
+            </a>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="page-header">
+            <h1>${guildName}</h1>
+            <span class="badge">V2.5 Online</span>
+        </div>
+        ${content}
+    </div>
+</body>
+</html>`;
+}" href="/manage/${guild.id}/home">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
             الإحصائيات
         </a>
@@ -730,6 +1152,8 @@ function ui(guild, active, content, lang = 'ar') {
             flex: 1;
             min-height: 100vh;
             overflow-y: auto;
+        
+            margin-${lang === "ar" ? "left" : "right"}: var(--sidebar-w);
         }
 
         .page-header {
@@ -914,7 +1338,9 @@ function ui(guild, active, content, lang = 'ar') {
         /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .sidebar { width: 240px; }
-            .main { margin-right: 240px; padding: 20px; }
+            .main { margin-right: 240px; padding: 20px; 
+            margin-${lang === "ar" ? "left" : "right"}: var(--sidebar-w);
+        }
         }
     </style>
 </head>
@@ -945,11 +1371,52 @@ function ui(guild, active, content, lang = 'ar') {
 // ==========================================
 
 // --- [ Dashboard - Server List ] ---
+app.get('/set-lang/:lang', (req, res) => {
+    const lang = req.params.lang;
+    if (['ar', 'en'].includes(lang)) {
+        req.session.lang = lang;
+    }
+    res.redirect('back');
+});
+
 app.get('/dashboard', checkAuth, (req, res) => {
+    const lang = req.session.lang || 'ar';
     const adminGuilds = req.user.guilds.filter(g => {
         const p = BigInt(g.permissions);
         return (p & 8n) === 8n || (p & 32n) === 32n;
     });
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
+
+    const cards = adminGuilds.map(g => {
+        const hasBot = client.guilds.cache.has(g.id);
+        const iconURL = g.icon
+            ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
+            : 'https://placehold.co/80/0d0d1a/1e90ff?text=' + g.name[0];
+
+        return `
+        <a href="${hasBot ? '/manage/' + g.id + '/home' : inviteLink}" class="guild-card">
+            <img src="${iconURL}" class="guild-icon" alt="${g.name}">
+            <h3>${g.name}</h3>
+            ${hasBot
+                ? `<div style="color:var(--blue);">${lang === 'ar' ? 'الإعدادات' : 'Settings'}</div>`
+                : `<div style="color:#00c853;">${lang === 'ar' ? 'اضافة البوت' : 'Add Bot'}</div>`
+            }
+        </a>`;
+    }).join('');
+
+    const content = `
+    <div class="card">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            ${t('select_guild', lang)}
+        </h3>
+        <div class="guild-grid">
+            ${cards}
+        </div>
+    </div>`;
+
+    res.send(ui({}, 'home', content, lang));
+});
     const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
     const cards = adminGuilds.map(g => {
@@ -1004,7 +1471,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
 
 // --- [ Home / Stats ] ---
 app.get('/manage/:guildId/home', checkGuildAdmin, async (req, res) => {
-    const lang = req.query.lang || 'ar';
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     
@@ -1023,17 +1490,14 @@ app.get('/manage/:guildId/home', checkGuildAdmin, async (req, res) => {
 
 // --- [ Kick Notifications ] ---
 app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
-    const lang = req.query.lang || 'ar';
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
     let s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
     
     // Kick Categories including GTA
-    const categories = [
-        'Grand Theft Auto V', 'GTA RP', 'Just Chatting', 'Gaming', 'Music', 
-        'Creative', 'Sports', 'ASMR', 'Talk Shows', 'IRL', 'Crypto', 'Slots'
-    ];
+    const categories = ['Just Chatting', 'Grand Theft Auto V', 'Slots & Casino', 'Pools, Hot Tubs & Beaches', 'Music', 'IRL', 'Crypto', 'Talk Shows & Podcasts', 'Gaming', 'Call of Duty: Warzone', 'Fortnite', 'League of Legends', 'VALORANT', 'Apex Legends', 'Counter-Strike 2', 'Minecraft', 'Roblox', 'FIFA 24', 'Overwatch 2', 'Dead by Daylight', 'ASMR', 'Creative', 'Sports', 'Chess', 'Art', 'Software Development', 'Body Art', 'IRL Events', 'Makers & Crafting', 'Food & Drink', 'ASMR', 'Beauty & Body Art', 'Special Events', 'Politics', 'News', 'Education', 'Science & Technology'];
     const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
 
     const streamerRows = s.streamers.map((st, i) => `
@@ -1098,22 +1562,26 @@ app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
 app.post('/save/:guildId/kick', checkGuildAdmin, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { kickUser, channelId, roleId, mentionCats } = req.body;
+        const { kickUser, channelId, roleId, mentionCategories } = req.body;
+        const lang = req.session.lang || 'ar';
         const username = kickUser.replace('https://kick.com', '').replace('/', '').trim();
-        const cats = Array.isArray(mentionCats) ? mentionCats : (mentionCats ? [mentionCats] : []);
+        const cats = Array.isArray(mentionCategories) ? mentionCategories : (mentionCategories ? [mentionCategories] : []);
         
         await KickConfig.findOneAndUpdate(
             { guildId },
-            { $push: { streamers: { 
-                kickUsername: username, 
-                channelId, 
-                roleId, 
-                mentionCategories: cats, 
-                isLive: false 
-            } } },
+            { 
+                $set: { language: lang },
+                $push: { streamers: { 
+                    kickUsername: username, 
+                    channelId, 
+                    roleId, 
+                    mentionCategories: cats, 
+                    isLive: false 
+                } } 
+            },
             { upsert: true }
         );
-        res.redirect(`/manage/${guildId}/kick?lang=${req.query.lang || 'ar'}`);
+        res.redirect(`/manage/${guildId}/kick`);
     } catch (err) { res.status(500).send('Error'); }
 });
 
@@ -1126,6 +1594,7 @@ app.get('/delete-kick/:guildId/:index', checkGuildAdmin, async (req, res) => {
 
 // --- [ Streaks ] ---
 app.get('/manage/:guildId/streaks', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const s = await StreakConfig.findOne({ guildId: g.id }) || {};
@@ -1175,6 +1644,7 @@ app.post('/reset-streaks/:guildId', checkAuth, async (req, res) => {
 
 // --- [ Logs ] ---
 app.get('/manage/:guildId/logs', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
@@ -1229,6 +1699,7 @@ app.post('/save/:guildId/logs', checkGuildAdmin, async (req, res) => {
 
 // --- [ Welcome ] ---
 app.get('/manage/:guildId/welcome', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
@@ -1332,6 +1803,7 @@ app.post('/save/:guildId/welcome', checkGuildAdmin, upload.single('bgImage'), as
 
 // --- [ Security ] ---
 app.get('/manage/:guildId/security', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
@@ -1377,6 +1849,7 @@ app.post('/save/:guildId/security', checkGuildAdmin, async (req, res) => {
 
 // --- [ Auto Reply ] ---
 app.get('/manage/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { autoReply: [] };
@@ -1425,6 +1898,7 @@ app.post('/save/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
 
 // --- [ Giveaway ] ---
 app.get('/manage/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const activeGiveaways = await Giveaway.find({ guildId: g.id, ended: false });
@@ -1501,6 +1975,7 @@ app.post('/save/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
 
 // --- [ Tickets ] ---
 app.get('/manage/:guildId/tickets', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
@@ -1666,6 +2141,7 @@ app.post('/save/:guildId/tickets', checkGuildAdmin, upload.fields([{ name: 'topI
 
 // --- [ Levels ] ---
 app.get('/manage/:guildId/levels', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
@@ -1711,6 +2187,7 @@ app.post('/save/:guildId/levels', checkGuildAdmin, async (req, res) => {
 
 // --- [ Roles Panel ] ---
 app.get('/manage/:guildId/roles', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { rolesPanel: [] };
@@ -1789,6 +2266,7 @@ app.post('/save/:guildId/roles', checkGuildAdmin, async (req, res) => {
 
 // --- [ Mod / Jail Config ] ---
 app.get('/manage/:guildId/mod', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
@@ -1851,6 +2329,7 @@ app.post('/save/:guildId/mod', checkGuildAdmin, async (req, res) => {
 
 // --- [ Clans ] ---
 app.get('/manage/:guildId/clans', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const clans = await Clan.find({ guildId: g.id }).sort({ clanIndex: 1 });
@@ -1885,6 +2364,7 @@ app.get('/manage/:guildId/clans', checkGuildAdmin, async (req, res) => {
 });
 
 app.get('/manage/:guildId/clans/add', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
@@ -1977,6 +2457,7 @@ app.post('/save/:guildId/clans', checkGuildAdmin, async (req, res) => {
 });
 
 app.get('/manage/:guildId/clans/delete/:index', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const clanIdx = parseInt(req.params.index);
     
     // التأكد من أن الـ Index رقم صحيح قبل محاولة الحذف
@@ -1994,6 +2475,7 @@ app.get('/manage/:guildId/clans/delete/:index', checkGuildAdmin, async (req, res
 
 
 app.get('/manage/:guildId/clans/edit/:index', checkGuildAdmin, async (req, res) => {
+    const lang = req.session.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const clan = await Clan.findOne({ guildId: g.id, clanIndex: parseInt(req.params.index) });
@@ -3292,6 +3774,7 @@ async function askNextQuestion(thread, user, clan, questionIndex, guild) {
 async function checkKickLive() {
     const configs = await KickConfig.find({});
     for (const config of configs) {
+        const lang = config.language || "ar";
         const guild = client.guilds.cache.get(config.guildId);
         if (!guild) continue;
         for (let i = 0; i < config.streamers.length; i++) {
@@ -3311,13 +3794,14 @@ async function checkKickLive() {
                     const channel = guild.channels.cache.get(s.channelId);
                     if (channel) {
                         const embed = new EmbedBuilder()
-                            .setTitle(`🔴 ${s.kickUsername} بدأ البث الآن!`)
+                            .setTitle(`🔴 ${s.kickUsername} ${t('live_now', lang)}`)
                             .setURL(`https://kick.com/${s.kickUsername}`)
                             .setColor(0x53fc18)
                             .addFields(
-                                { name: 'العنوان', value: data.livestream.session_title || 'بدون عنوان', inline: false },
-                                { name: 'الكاتيقوري', value: currentCat || 'غير معروف', inline: true },
-                                { name: 'المشاهدين', value: `${data.livestream.viewer_count}`, inline: true }
+                                { name: t('title', lang) || 'العنوان', value: data.livestream.session_title || 'بدون عنوان', inline: false },
+                                { name: t('stats', lang) || 'الكاتيقوري', value: currentCat || 'غير معروف', inline: true },
+                                { name: t('viewers', lang), value: `${data.livestream.viewer_count}`, inline: true },
+                                { name: t('started_at', lang), value: new Date(data.livestream.created_at).toLocaleTimeString('ar-SA'), inline: true }
                             )
                             .setImage(data.livestream.thumbnail?.url || data.user.profile_pic)
                             .setTimestamp();
@@ -3335,13 +3819,14 @@ async function checkKickLive() {
                     if (channel) {
                         const mention = s.roleId ? `<@&${s.roleId}>` : '';
                         const embed = new EmbedBuilder()
-                            .setTitle(`🔥 تنبيه كاتيقوري: ${currentCat}`)
-                            .setDescription(`${s.kickUsername} يلعب الآن **${currentCat}**!`)
+                            .setTitle(`🔥 ${t('category_alert', lang)}: ${currentCat}`)
+                            .setDescription(`${s.kickUsername} ${lang === 'ar' ? 'يلعب الآن' : 'is now playing'} **${currentCat}**!`)
                             .setURL(`https://kick.com/${s.kickUsername}`)
                             .setColor(0xffac33)
                             .addFields(
-                                { name: 'العنوان', value: data.livestream.session_title || 'بدون عنوان', inline: false },
-                                { name: 'المشاهدين', value: `${data.livestream.viewer_count}`, inline: true }
+                                { name: t('title', lang) || 'العنوان', value: data.livestream.session_title || 'بدون عنوان', inline: false },
+                                { name: t('viewers', lang), value: `${data.livestream.viewer_count}`, inline: true },
+                                { name: t('duration', lang), value: Math.floor((Date.now() - new Date(data.livestream.created_at).getTime()) / 60000) + ' ' + (lang === 'ar' ? 'دقيقة' : 'mins'), inline: true }
                             )
                             .setImage(data.livestream.thumbnail?.url || data.user.profile_pic)
                             .setTimestamp();
