@@ -33,7 +33,15 @@ const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
         channelId: String,
         roleId: String,
         customMessage: String,
-        isLive: { type: Boolean, default: false }
+        isLive: { type: Boolean, default: false },
+        selectedCategories: [String],
+        lastLiveData: {
+            title: String,
+            category: String,
+            viewers: Number,
+            startedAt: Date,
+            thumbnail: String
+        }
     }]
 }));
 
@@ -498,7 +506,74 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // ==========================================
 // 8. UI Helper Function
 // ==========================================
-function ui(guild, active, content) {
+
+const strings = {
+    ar: {
+        login_title: 'VORTEX - تسجيل الدخول',
+        login_btn: 'تسجيل الدخول عبر Discord',
+        dashboard_title: 'لوحة التحكم',
+        select_server: 'اختر السيرفر لإدارته',
+        statistics: 'الإحصائيات',
+        security: 'الحماية',
+        kick_alerts: 'تنبيهات Kick',
+        streaks: 'الستريك',
+        logs: 'اللوق',
+        tickets: 'التذاكر',
+        autoreply: 'الرد الآلي',
+        levels: 'المستويات',
+        welcome: 'الترحيب',
+        giveaway: 'القيف اواي',
+        roles: 'الرتب',
+        moderation: 'أوامر الإشراف',
+        clans: 'الكلانات',
+        kick_notifications: 'نظام تنبيهات Kick',
+        add_streamer: 'اضافة ستريمر',
+        kick_user: 'اسم المستخدم',
+        alert_channel: 'قناة التنبيه',
+        mention_role: 'الرتبة للمنشن',
+        custom_msg: 'رسالة مخصصة',
+        categories: 'الكاتيقوريات',
+        save: 'حفظ الإعدادات',
+        delete: 'حذف',
+        hours_live: 'مدة البث',
+        viewers: 'المشاهدون',
+        started_at: 'بدأ في'
+    },
+    en: {
+        login_title: 'VORTEX - Login',
+        login_btn: 'Login with Discord',
+        dashboard_title: 'Dashboard',
+        select_server: 'Select a server to manage',
+        statistics: 'Statistics',
+        security: 'Security',
+        kick_alerts: 'Kick Alerts',
+        streaks: 'Streaks',
+        logs: 'Logs',
+        tickets: 'Tickets',
+        autoreply: 'Auto Reply',
+        levels: 'Levels',
+        welcome: 'Welcome',
+        giveaway: 'Giveaway',
+        roles: 'Roles',
+        moderation: 'Moderation',
+        clans: 'Clans',
+        kick_notifications: 'Kick Notifications System',
+        add_streamer: 'Add Streamer',
+        kick_user: 'Kick Username',
+        alert_channel: 'Alert Channel',
+        mention_role: 'Mention Role',
+        custom_msg: 'Custom Message',
+        categories: 'Categories',
+        save: 'Save Settings',
+        delete: 'Delete',
+        hours_live: 'Hours Live',
+        viewers: 'Viewers',
+        started_at: 'Started At'
+    }
+};
+function t(key, lang = 'ar') { return strings[lang]?.[key] || strings['ar'][key] || key; }
+
+function ui(guild, active, content, lang = 'ar') {
     const showNav = guild.id ? 'flex' : 'none';
     const guildName = guild.name || 'قائمة السيرفرات';
 
@@ -1023,89 +1098,55 @@ app.get('/manage/:guildId/home', checkGuildAdmin, async (req, res) => {
 
 // --- [ Kick Notifications ] ---
 app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
+    const lang = req.query.lang || 'ar';
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
     let s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
+    const categories = ['Gaming', 'Just Chatting', 'Music', 'Creative', 'Sports', 'ASMR', 'Talk Shows', 'IRL', 'Crypto'];
+    const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
 
     const streamerRows = s.streamers.map((st, i) => `
     <tr>
         <td><span class="tag tag-blue">${st.kickUsername}</span></td>
         <td style="color:var(--text-muted);">#${g.channels.cache.get(st.channelId)?.name || 'قناة محذوفة'}</td>
-        <td>${st.roleId ? `<span class="tag tag-red">@${g.roles.cache.get(st.roleId)?.name || 'رتبة محذوفة'}</span>` : '<span class="tag" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">بدون منشن</span>'}</td>
+        <td>${st.selectedCategories?.join(', ') || 'All'}</td>
         <td>
-            <a href="/delete-kick/${g.id}/${i}" class="btn-save btn-danger btn-sm" style="text-decoration:none;" onclick="return confirm('حذف الستريمر؟')">حذف</a>
+            <a href="/delete-kick/${g.id}/${i}?lang=${lang}" class="btn-save btn-danger btn-sm" style="text-decoration:none;" onclick="return confirm('حذف الستريمر؟')">حذف</a>
         </td>
     </tr>`).join('');
 
     const content = `
     <div class="card">
-        <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
-            نظام تنبيهات Kick
-        </h3>
-
-        <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:24px;">
-            <h4 style="color:var(--blue); margin-bottom:18px; font-size:15px;">اضافة ستريمر جديد</h4>
-            <form method="POST" action="/save/${g.id}/kick">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                    <div>
-                        <label>اسم المستخدم في Kick</label>
-                        <input type="text" name="kickUser" placeholder="مثلاً: username" required>
-                    </div>
-                    <div>
-                        <label>قناة التنبيه</label>
-                        <select name="channelId">
-                            ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label>الرتبة للمنشن (اختياري)</label>
-                        <select name="roleId">
-                            <option value="">-- بدون منشن --</option>
-                            ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label>رسالة مخصصة (استخدم %name% للاسم)</label>
-                        <input type="text" name="msg" placeholder="%name% بدأ البث الآن!">
-                    </div>
-                </div>
-                <button class="btn-save btn-green" style="margin-top:16px; width:auto; padding:12px 30px;">اضافة الستريمر</button>
-            </form>
-        </div>
-
-        ${s.streamers.length > 0 ? `
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>الستريمر</th>
-                    <th>القناة</th>
-                    <th>المنشن</th>
-                    <th>الإجراء</th>
-                </tr>
-            </thead>
-            <tbody>${streamerRows}</tbody>
-        </table>` : `<p style="color:var(--text-muted); text-align:center; padding:30px 0;">لا يوجد ستريمرات مضافة بعد.</p>`}
+        <h3>${t('kick_notifications', lang)}</h3>
+        <form method="POST" action="/save/${g.id}/kick?lang=${lang}">
+            <div class="stats-grid">
+                <div><label>${t('kick_user', lang)}</label><input name="kickUser" required></div>
+                <div><label>${t('alert_channel', lang)}</label><select name="channelId">${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}</select></div>
+                <div><label>${t('mention_role', lang)}</label><select name="roleId"><option value="">None</option>${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}">${r.name}</option>`).join('')}</select></div>
+            </div>
+            <label>${t('categories', lang)} (Hold Ctrl to select multiple)</label>
+            <select name="categories" multiple style="height:100px;">${catOptions}</select>
+            <button class="btn-save">${t('add_streamer', lang)}</button>
+        </form>
+        <table><thead><tr><th>User</th><th>Channel</th><th>Categories</th><th>Action</th></tr></thead><tbody>${streamerRows}</tbody></table>
     </div>`;
-
-    res.send(ui(g, 'kick', content));
+    res.send(ui(g, 'kick', content, lang));
 });
 
 app.post('/save/:guildId/kick', checkGuildAdmin, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { kickUser, channelId, roleId, msg } = req.body;
+        const { kickUser, channelId, roleId, categories } = req.body;
         const username = kickUser.replace('https://kick.com', '').replace('/', '').trim();
+        const cats = Array.isArray(categories) ? categories : (categories ? [categories] : []);
         await KickConfig.findOneAndUpdate(
             { guildId },
-            { $push: { streamers: { kickUsername: username, channelId, roleId, customMessage: msg, isLive: false } } },
+            { $push: { streamers: { kickUsername: username, channelId, roleId, selectedCategories: cats, isLive: false } } },
             { upsert: true }
         );
-        res.redirect(`/manage/${guildId}/kick`);
-    } catch (err) {
-        res.status(500).send('خطأ في إضافة الستريمر');
-    }
+        res.redirect(`/manage/${guildId}/kick?lang=${req.query.lang || 'ar'}`);
+    } catch (err) { res.status(500).send('Error'); }
 });
 
 app.get('/delete-kick/:guildId/:index', checkGuildAdmin, async (req, res) => {
@@ -3281,80 +3322,51 @@ async function askNextQuestion(thread, user, clan, questionIndex, guild) {
 // ==========================================
 
 async function checkKickLive() {
-    try {
-        const allConfigs = await KickConfig.find({});
-        for (const config of allConfigs) {
-            if (!config.streamers || config.streamers.length === 0) continue;
+    const configs = await KickConfig.find({});
+    for (const config of configs) {
+        const guild = client.guilds.cache.get(config.guildId);
+        if (!guild) continue;
+        for (let i = 0; i < config.streamers.length; i++) {
+            const s = config.streamers[i];
+            try {
+                const res = await axios.get(`https://kick.com/api/v1/channels/${s.kickUsername}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                const data = res.data;
+                const isLive = data.livestream !== null;
+                const currentCat = data.livestream?.categories?.[0]?.name;
 
-            const guild = client.guilds.cache.get(config.guildId);
-            if (!guild) continue;
-
-            for (let i = 0; i < config.streamers.length; i++) {
-                const streamer = config.streamers[i];
-                if (!streamer.kickUsername) continue;
-
-                try {
-                    const response = await fetch(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
-                        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-                    });
-
-                    if (!response.ok) continue;
-                    let data;
-                    try {
-                        data = await response.json();
-                    } catch (e) {
-                        continue;
-                    }
-                    const isLive = data?.livestream !== null && data?.livestream !== undefined;
-
-                    if (isLive && !streamer.isLive) {
-                        config.streamers[i].isLive = true;
-                        config.markModified('streamers');
-                        await config.save();
-
-                        const channel = guild.channels.cache.get(streamer.channelId);
-                        if (!channel) continue;
-
-                        const streamTitle = data.livestream?.session_title || 'بث مباشر';
-                        const streamCategory = data.livestream?.categories?.[0]?.name || 'غير محدد';
-                        const thumbnailUrl = data.user?.profile_pic || '';
-                        const viewers = data.livestream?.viewer_count || 0;
-
+                if (isLive && !s.isLive) {
+                    if (s.selectedCategories?.length > 0 && !s.selectedCategories.includes(currentCat)) continue;
+                    config.streamers[i].isLive = true;
+                    await config.save();
+                    const channel = guild.channels.cache.get(s.channelId);
+                    if (channel) {
+                        const start = new Date(data.livestream.created_at).getTime();
+                        const diff = Date.now() - start;
+                        const hours = Math.floor(diff / 3600000);
+                        const mins = Math.floor((diff % 3600000) / 60000);
                         const embed = new EmbedBuilder()
-                            .setTitle(`${streamer.kickUsername} بدأ البث المباشر`)
-                            .setDescription(
-                                (streamer.customMessage || '%name% بدأ البث الآن!').replace(/%name%/g, streamer.kickUsername)
-                            )
-                            .setURL(`https://kick.com/${streamer.kickUsername}`)
+                            .setTitle(`${s.kickUsername} is LIVE!`)
+                            .setURL(`https://kick.com/${s.kickUsername}`)
                             .setColor(0x53fc18)
                             .addFields(
-                                { name: 'عنوان البث', value: streamTitle, inline: true },
-                                { name: 'الفئة', value: streamCategory, inline: true },
-                                { name: 'المشاهدون', value: `${viewers}`, inline: true }
+                                { name: 'Title', value: data.livestream.session_title || 'No Title', inline: false },
+                                { name: 'Category', value: currentCat || 'Unknown', inline: true },
+                                { name: 'Viewers', value: `${data.livestream.viewer_count}`, inline: true },
+                                { name: 'Duration', value: `${hours}h ${mins}m`, inline: true }
                             )
-                            .setTimestamp()
-                            .setFooter({ text: 'VORTEX System - Kick Notifications' });
-
-                        if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
-
-                        const mentionContent = streamer.roleId ? `<@&${streamer.roleId}>` : '';
-                        await channel.send({ content: mentionContent || undefined, embeds: [embed] });
-
-                    } else if (!isLive && streamer.isLive) {
-                        config.streamers[i].isLive = false;
-                        config.markModified('streamers');
-                        await config.save();
+                            .setImage(data.livestream.thumbnail?.url || data.user.profile_pic)
+                            .setTimestamp();
+                        const mention = s.roleId ? `<@&${s.roleId}>` : '';
+                        channel.send({ content: mention, embeds: [embed] });
                     }
-                } catch (err) {
-                    // تجاهل أخطاء API كيك الفردية
+                } else if (!isLive && s.isLive) {
+                    config.streamers[i].isLive = false;
+                    await config.save();
                 }
-            }
+            } catch (e) {}
         }
-    } catch (err) {
-        console.error('[Kick Checker Error]', err);
     }
 }
-
 setInterval(checkKickLive, 60000);
 
 // ==========================================
