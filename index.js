@@ -512,6 +512,7 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // ==========================================
 // [ Vortex Translation System ]
 // ==========================================
+
 const strings = {
     ar: {
         stats: 'الإحصائيات', security: 'الحماية', kick: 'تنبيهات Kick', streaks: 'الستريك', 
@@ -528,7 +529,8 @@ const strings = {
         stream_link: 'رابط البث',
         dashboard: 'لوحة التحكم',
         live_now: 'بث مباشر الآن!',
-        category_alert: 'تنبيه كاتيقوري'
+        category_alert: 'تنبيه كاتيقوري',
+        title: 'العنوان'
     },
     en: {
         stats: 'Statistics', security: 'Security', kick: 'Kick Alerts', streaks: 'Streaks', 
@@ -545,10 +547,59 @@ const strings = {
         stream_link: 'Stream Link',
         dashboard: 'Dashboard',
         live_now: 'Live Now!',
-        category_alert: 'Category Alert'
+        category_alert: 'Category Alert',
+        title: 'Title'
     }
 };
+
 function t(key, lang = 'ar') { return strings[lang]?.[key] || strings['ar'][key] || key; }
+
+app.get('/set-lang/:lang', (req, res) => {
+    const lang = req.params.lang;
+    if (['ar', 'en'].includes(lang)) {
+        req.session.lang = lang;
+    }
+    res.redirect('back');
+});
+
+app.get('/dashboard', checkAuth, (req, res) => {
+    const lang = req.session.lang || 'ar';
+    const adminGuilds = req.user.guilds.filter(g => {
+        const p = BigInt(g.permissions);
+        return (p & 8n) === 8n || (p & 32n) === 32n;
+    });
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
+
+    const cards = adminGuilds.map(g => {
+        const hasBot = client.guilds.cache.has(g.id);
+        const iconURL = g.icon
+            ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
+            : 'https://placehold.co/80/0d0d1a/1e90ff?text=' + g.name[0];
+
+        return `
+        <a href="${hasBot ? '/manage/' + g.id + '/home' : inviteLink}" class="guild-card">
+            <img src="${iconURL}" class="guild-icon" alt="${g.name}">
+            <h3>${g.name}</h3>
+            ${hasBot
+                ? `<div style="color:var(--blue);">${lang === 'ar' ? 'الإعدادات' : 'Settings'}</div>`
+                : `<div style="color:#00c853;">${lang === 'ar' ? 'اضافة البوت' : 'Add Bot'}</div>`
+            }
+        </a>`;
+    }).join('');
+
+    const content = `
+    <div class="card">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            ${t('select_guild', lang)}
+        </h3>
+        <div class="guild-grid">
+            ${cards}
+        </div>
+    </div>`;
+
+    res.send(ui({}, 'home', content, lang));
+});
 
 function ui(guild, active, content, lang = 'ar') {
     const showNav = guild.id ? 'flex' : 'none';
@@ -745,9 +796,7 @@ function ui(guild, active, content, lang = 'ar') {
 
         /* ===== MAIN CONTENT ===== */
         .main {
-            margin-${lang === 'ar' ? 'left' : 'right'
-            margin-${lang === "ar" ? "left" : "right"}: var(--sidebar-w);
-        }: var(--sidebar-w);
+            margin-${lang === 'ar' ? 'left' : 'right'}: var(--sidebar-w);
             padding: 40px 50px;
             flex: 1;
             min-height: 100vh;
@@ -958,517 +1007,7 @@ function ui(guild, active, content, lang = 'ar') {
     </div>
 </body>
 </html>`;
-}" href="/manage/${guild.id}/home">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-            الإحصائيات
-        </a>
-        <a class="${active === 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            الحماية
-        </a>
-        <a class="${active === 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
-            تنبيهات Kick
-        </a>
-        <a class="${active === 'streaks' ? 'active' : ''}" href="/manage/${guild.id}/streaks">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            الستريك
-        </a>
-        <a class="${active === 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-            اللوق
-        </a>
-        <a class="${active === 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/></svg>
-            التذاكر
-        </a>
-        <a class="${active === 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            الرد الآلي
-        </a>
-        <a class="${active === 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
-            المستويات
-        </a>
-        <a class="${active === 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            الترحيب
-        </a>
-        <a class="${active === 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="20,12 20,22 4,22 4,12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
-            القيف اواي
-        </a>
-        <a class="${active === 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            الرتب
-        </a>
-        <a class="${active === 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            أوامر الإشراف
-        </a>
-        <a class="${active === 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-            نظام الكلانات
-        </a>
-    ` : '';
-
-    return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --blue: #1e90ff;
-            --blue-dark: #0a6ecc;
-            --blue-glow: rgba(30,144,255,0.15);
-            --red: #e63946;
-            --red-light: #ff6b6b;
-            --red-glow: rgba(230,57,70,0.12);
-            --black: #050508;
-            --dark: #0a0a14;
-            --darker: #07070f;
-            --card: rgba(10,10,22,0.8);
-            --card-hover: rgba(15,15,30,0.9);
-            --border: rgba(30,144,255,0.18);
-            --border-red: rgba(230,57,70,0.18);
-            --text: #e8eaf6;
-            --text-muted: rgba(255,255,255,0.45);
-            --sidebar-w: 280px;
-        }
-
-        body {
-            font-family: 'Changa', sans-serif;
-            background: var(--black);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: row-reverse;
-            direction: rtl;
-        }
-
-        /* ===== BACKGROUND ===== */
-        body::before {
-            content: '';
-            position: fixed; inset: 0; z-index: -2;
-            background:
-                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.07) 0%, transparent 50%),
-                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.05) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
-        }
-        body::after {
-            content: '';
-            position: fixed; inset: 0; z-index: -1;
-            background-image:
-                linear-gradient(rgba(30,144,255,0.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(30,144,255,0.025) 1px, transparent 1px);
-            background-size: 60px 60px;
-        }
-
-        /* ===== SIDEBAR ===== */
-        .sidebar {
-            width: var(--sidebar-w);
-            background: rgba(7,7,15,0.95);
-            border-left: 1px solid var(--border);
-            position: relative;
-            display: flex; flex-direction: column;
-            z-index: 100;
-            backdrop-filter: blur(20px);
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--blue) transparent;
-            flex-shrink: 0;
-            height: 100vh;
-        }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 10px; }
-
-        .sidebar-header {
-            padding: 30px 20px 20px;
-            border-bottom: 1px solid var(--border);
-            text-align: center;
-            flex-shrink: 0;
-        }
-        .sidebar-logo {
-            font-size: 32px; font-weight: 800; letter-spacing: 5px;
-            background: linear-gradient(135deg, var(--blue), #ffffff 50%, var(--red));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            display: block;
-            animation: logoShimmer 4s ease-in-out infinite alternate;
-        }
-        @keyframes logoShimmer {
-            from { filter: drop-shadow(0 0 8px rgba(30,144,255,0.4)); }
-            to   { filter: drop-shadow(0 0 20px rgba(30,144,255,0.8)); }
-        }
-        .sidebar-tagline {
-            font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
-            margin-top: 4px; text-transform: uppercase;
-        }
-
-        .nav {
-            display: ${showNav};
-            flex-direction: column;
-            gap: 4px;
-            padding: 20px 12px 30px;
-            flex: 1;
-        }
-        .nav a {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 16px; border-radius: 12px;
-            color: var(--text-muted); text-decoration: none;
-            font-size: 14px; font-weight: 500;
-            transition: all 0.25s ease;
-            border: 1px solid transparent;
-            position: relative; overflow: hidden;
-        }
-        .nav a svg { flex-shrink: 0; opacity: 0.6; transition: opacity 0.25s; }
-        .nav a:hover {
-            background: var(--blue-glow);
-            color: white;
-            border-color: var(--border);
-        }
-        .nav a:hover svg { opacity: 1; }
-        .nav a.active {
-            background: linear-gradient(135deg, rgba(30,144,255,0.2), rgba(30,144,255,0.08));
-            color: var(--blue);
-            border-color: rgba(30,144,255,0.35);
-            font-weight: 700;
-        }
-        .nav a.active svg { opacity: 1; color: var(--blue); }
-        .nav a.active::before {
-            content: '';
-            position: absolute; right: 0; top: 20%; bottom: 20%;
-            width: 3px; background: var(--blue);
-            border-radius: 3px 0 0 3px;
-        }
-
-        /* ===== MAIN CONTENT ===== */
-        .main {
-            margin-right: 0;
-            padding: 40px 50px;
-            flex: 1;
-            min-height: 100vh;
-            overflow-y: auto;
-        
-            margin-${lang === "ar" ? "left" : "right"}: var(--sidebar-w);
-        }
-
-        .page-header {
-            display: flex; align-items: center; gap: 15px;
-            margin-bottom: 35px; padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-        }
-        .page-header h1 {
-            font-size: 24px; font-weight: 700; color: white;
-        }
-        .page-header .badge {
-            background: var(--blue-glow); border: 1px solid var(--border);
-            color: var(--blue); padding: 4px 12px; border-radius: 20px; font-size: 12px;
-        }
-
-        /* ===== CARDS ===== */
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 28px;
-            margin-bottom: 24px;
-            backdrop-filter: blur(15px);
-            transition: border-color 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .card::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--blue), transparent);
-            opacity: 0.5;
-        }
-        .card:hover { border-color: rgba(30,144,255,0.35); }
-        .card h3 {
-            color: white; font-size: 17px; font-weight: 700;
-            margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
-        }
-        .card h3 svg { color: var(--blue); }
-
-        /* ===== FORMS ===== */
-        label {
-            display: block; color: var(--text-muted); font-size: 13px;
-            margin-bottom: 6px; margin-top: 16px; font-weight: 500;
-        }
-        input, select, textarea {
-            width: 100%; padding: 12px 16px;
-            background: rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px; color: white;
-            font-family: 'Changa', sans-serif; font-size: 14px;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            outline: none;
-        }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--blue);
-            box-shadow: 0 0 0 3px rgba(30,144,255,0.12);
-        }
-        select option { background: #0d0d1a; color: white; }
-        textarea { resize: vertical; min-height: 100px; }
-
-        /* ===== BUTTONS ===== */
-        .btn-save {
-            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
-            color: white; border: none; padding: 13px 24px;
-            border-radius: 12px; cursor: pointer; font-weight: 700;
-            font-size: 14px; font-family: 'Changa', sans-serif;
-            transition: all 0.3s; display: inline-block; text-decoration: none;
-            text-align: center; width: 100%;
-            box-shadow: 0 4px 20px rgba(30,144,255,0.25);
-        }
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(30,144,255,0.4);
-            filter: brightness(1.1);
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, var(--red), #c0392b);
-            box-shadow: 0 4px 20px rgba(230,57,70,0.25);
-        }
-        .btn-danger:hover { box-shadow: 0 8px 30px rgba(230,57,70,0.4); }
-        .btn-sm { padding: 8px 16px; font-size: 13px; width: auto; border-radius: 8px; }
-        .btn-green {
-            background: linear-gradient(135deg, #00c853, #00a040);
-            box-shadow: 0 4px 20px rgba(0,200,83,0.25);
-        }
-
-        /* ===== STAT BOXES ===== */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px; margin-top: 16px;
-        }
-        .stat-box {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border);
-            border-radius: 14px; padding: 20px;
-            text-align: center; transition: all 0.3s;
-        }
-        .stat-box:hover { border-color: var(--blue); transform: translateY(-3px); }
-        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); }
-        .stat-box .stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
-
-        /* ===== GUILD GRID (Dashboard) ===== */
-        .guild-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 20px; max-width: 1000px; margin: 0 auto;
-        }
-        .guild-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 18px; padding: 28px 20px;
-            text-align: center; transition: all 0.35s;
-            cursor: pointer;
-        }
-        .guild-card:hover {
-            transform: translateY(-8px);
-            border-color: var(--blue);
-            box-shadow: 0 20px 50px rgba(30,144,255,0.15);
-        }
-        .guild-icon {
-            width: 75px; height: 75px; border-radius: 50%;
-            border: 2px solid var(--border); margin-bottom: 14px;
-            transition: border-color 0.3s;
-        }
-        .guild-card:hover .guild-icon { border-color: var(--blue); }
-        .guild-card h3 { color: white; font-size: 15px; margin-bottom: 12px; }
-        .guild-card a { font-size: 13px; font-weight: 600; text-decoration: none; }
-
-        /* ===== TABLE ===== */
-        .data-table { width: 100%; border-collapse: collapse; }
-        .data-table th {
-            padding: 12px 16px; text-align: right;
-            color: var(--text-muted); font-size: 12px; font-weight: 600;
-            border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 1px;
-        }
-        .data-table td {
-            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-size: 14px; color: var(--text);
-        }
-        .data-table tr:hover td { background: rgba(30,144,255,0.04); }
-
-        /* ===== BADGE ===== */
-        .tag {
-            display: inline-block; padding: 3px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 600;
-        }
-        .tag-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid var(--border); }
-        .tag-red { background: var(--red-glow); color: var(--red-light); border: 1px solid var(--border-red); }
-        .tag-green { background: rgba(0,200,83,0.1); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
-
-        /* ===== DIVIDER ===== */
-        .section-divider {
-            height: 1px; background: var(--border);
-            margin: 24px 0;
-        }
-
-        /* ===== TOGGLE SWITCH ===== */
-        .toggle-row {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .toggle-row label { margin: 0; color: var(--text); font-size: 14px; }
-
-        /* ===== ANIMATIONS ===== */
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-        .card { animation: fadeInUp 0.4s ease both; }
-        .card:nth-child(2) { animation-delay: 0.05s; }
-        .card:nth-child(3) { animation-delay: 0.1s; }
-        .card:nth-child(4) { animation-delay: 0.15s; }
-
-        /* ===== SCROLLBAR ===== */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(30,144,255,0.3); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
-
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            .sidebar { width: 240px; }
-            .main { margin-right: 240px; padding: 20px; 
-            margin-${lang === "ar" ? "left" : "right"}: var(--sidebar-w);
-        }
-        }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <span class="sidebar-logo">VORTEX</span>
-            <div class="sidebar-tagline">Bot Dashboard</div>
-        </div>
-        <nav class="nav">
-            ${navItems}
-        </nav>
-    </div>
-    <div class="main">
-        <div class="page-header">
-            <h1>${guildName}</h1>
-            ${guild.id ? `<span class="badge">مدير</span>` : ''}
-        </div>
-        ${content}
-    </div>
-</body>
-</html>`;
 }
-
-
-// ==========================================
-// 9. Dashboard Routes
-// ==========================================
-
-// --- [ Dashboard - Server List ] ---
-app.get('/set-lang/:lang', (req, res) => {
-    const lang = req.params.lang;
-    if (['ar', 'en'].includes(lang)) {
-        req.session.lang = lang;
-    }
-    res.redirect('back');
-});
-
-app.get('/dashboard', checkAuth, (req, res) => {
-    const lang = req.session.lang || 'ar';
-    const adminGuilds = req.user.guilds.filter(g => {
-        const p = BigInt(g.permissions);
-        return (p & 8n) === 8n || (p & 32n) === 32n;
-    });
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
-
-    const cards = adminGuilds.map(g => {
-        const hasBot = client.guilds.cache.has(g.id);
-        const iconURL = g.icon
-            ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
-            : 'https://placehold.co/80/0d0d1a/1e90ff?text=' + g.name[0];
-
-        return `
-        <a href="${hasBot ? '/manage/' + g.id + '/home' : inviteLink}" class="guild-card">
-            <img src="${iconURL}" class="guild-icon" alt="${g.name}">
-            <h3>${g.name}</h3>
-            ${hasBot
-                ? `<div style="color:var(--blue);">${lang === 'ar' ? 'الإعدادات' : 'Settings'}</div>`
-                : `<div style="color:#00c853;">${lang === 'ar' ? 'اضافة البوت' : 'Add Bot'}</div>`
-            }
-        </a>`;
-    }).join('');
-
-    const content = `
-    <div class="card">
-        <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            ${t('select_guild', lang)}
-        </h3>
-        <div class="guild-grid">
-            ${cards}
-        </div>
-    </div>`;
-
-    res.send(ui({}, 'home', content, lang));
-});
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
-
-    const cards = adminGuilds.map(g => {
-        const hasBot = client.guilds.cache.has(g.id);
-        const iconURL = g.icon
-            ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
-            : 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-        return `
-        <div class="guild-card">
-            <img src="${iconURL}" class="guild-icon" alt="${g.name}">
-            <h3>${g.name}</h3>
-            ${hasBot
-                ? `<a href="/manage/${g.id}/home" style="color:var(--blue);">الإعدادات</a>`
-                : `<a href="${inviteLink}" style="color:#00c853;">اضافة البوت</a>`
-            }
-        </div>`;
-    }).join('');
-
-    const content = `
-    <div style="text-align:center; margin-bottom:40px;">
-        <div style="font-size:48px; font-weight:800; letter-spacing:6px;
-            background: linear-gradient(135deg, var(--blue), #fff, var(--red));
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-            margin-bottom:10px;">VORTEX</div>
-        <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
-        <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
-            <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
-        </div>
-    </div>
-    <div class="guild-grid" id="guildGrid">${cards}</div>
-    <script>
-        function filterGuilds() {
-            const input = document.getElementById('guildSearch');
-            const filter = input.value.toLowerCase();
-            const grid = document.getElementById('guildGrid');
-            const cards = grid.getElementsByClassName('guild-card');
-            for (let i = 0; i < cards.length; i++) {
-                const h3 = cards[i].getElementsByTagName('h3')[0];
-                const txtValue = h3.textContent || h3.innerText;
-                if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                    cards[i].style.display = "";
-                } else {
-                    cards[i].style.display = "none";
-                }
-            }
-        }
-    </script>`;
-
-    res.send(ui({ id: null, name: 'قائمة السيرفرات' }, 'home', content));
-});
-
 // --- [ Home / Stats ] ---
 app.get('/manage/:guildId/home', checkGuildAdmin, async (req, res) => {
     const lang = req.session.lang || 'ar';
@@ -1562,10 +1101,10 @@ app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
 app.post('/save/:guildId/kick', checkGuildAdmin, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { kickUser, channelId, roleId, mentionCategories } = req.body;
+        const { kickUser, channelId, roleId, mentionCats } = req.body;
         const lang = req.session.lang || 'ar';
         const username = kickUser.replace('https://kick.com', '').replace('/', '').trim();
-        const cats = Array.isArray(mentionCategories) ? mentionCategories : (mentionCategories ? [mentionCategories] : []);
+        const cats = Array.isArray(mentionCats) ? mentionCats : (mentionCats ? [mentionCats] : []);
         
         await KickConfig.findOneAndUpdate(
             { guildId },
