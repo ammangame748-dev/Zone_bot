@@ -951,15 +951,15 @@ function ui(guild, active, content) {
             function changeLanguage(lang) {
                 const btns = document.querySelectorAll('.lang-btn');
                 btns.forEach(btn => btn.classList.remove('active'));
-                document.querySelector(`[data-lang="${lang}"]`).classList.add('active');
+                const selector = '[data-lang="' + lang + '"]';
+                document.querySelector(selector).classList.add('active');
                 localStorage.setItem('selectedLang', lang);
-                // Reload page to apply language changes
                 setTimeout(() => location.reload(), 300);
             }
-            // Load saved language preference
             const savedLang = localStorage.getItem('selectedLang') || 'ar';
             if (savedLang !== 'ar') {
-                const btn = document.querySelector(`[data-lang="${savedLang}"]`);
+                const selector = '[data-lang="' + savedLang + '"]';
+                const btn = document.querySelector(selector);
                 if (btn) {
                     document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
