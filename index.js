@@ -1,3 +1,6 @@
+// ==========================================
+// ABOUD SYSTEM BOT - Full Version
+// ==========================================
 
 require('dotenv').config();
 const express = require('express');
@@ -329,7 +332,7 @@ passport.use(new Strategy({
 }, (accessToken, refreshToken, profile, done) => done(null, profile)));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'VORTEX -secret-key-2026',
+    secret: process.env.SESSION_SECRET || 'aboud-system-secret-key-2026',
     resave: false,
     saveUninitialized: false
 }));
@@ -357,19 +360,17 @@ app.get('/login', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX  - تسجيل الدخول</title>
+    <title>ABOUD SYSTEM - تسجيل الدخول</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --blue: #1e90ff;
-            --blue-dark: #0a6ecc;
-            --red: #e63946;
-            --red-light: #ff6b6b;
-            --black: #050508;
-            --dark: #0d0d18;
-            --card: rgba(10, 10, 25, 0.85);
-            --border: rgba(30, 144, 255, 0.25);
+            --p1: #7b2ff7;
+            --p2: #00e0ff;
+            --p3: #ff2e92;
+            --black: #060613;
+            --card: rgba(14, 14, 30, 0.85);
+            --border: rgba(123, 47, 247, 0.3);
         }
         body {
             font-family: 'Changa', sans-serif;
@@ -383,74 +384,48 @@ app.get('/login', (req, res) => {
         }
         .bg-particles {
             position: fixed; inset: 0; z-index: 0;
-            background: radial-gradient(ellipse at 20% 50%, rgba(30,144,255,0.08) 0%, transparent 60%),
-                        radial-gradient(ellipse at 80% 20%, rgba(230,57,70,0.06) 0%, transparent 50%),
-                        radial-gradient(ellipse at 50% 80%, rgba(30,144,255,0.05) 0%, transparent 50%);
+            background: radial-gradient(ellipse at 20% 50%, rgba(123,47,247,0.12) 0%, transparent 60%),
+                        radial-gradient(ellipse at 80% 20%, rgba(0,224,255,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(255,46,146,0.06) 0%, transparent 50%);
         }
         .grid-bg {
             position: fixed; inset: 0; z-index: 0;
-            background-image: linear-gradient(rgba(30,144,255,0.04) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(30,144,255,0.04) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(123,47,247,0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(123,47,247,0.05) 1px, transparent 1px);
             background-size: 50px 50px;
         }
-        .login-wrapper {
-            position: relative; z-index: 10;
-            display: flex; flex-direction: column; align-items: center; gap: 30px;
-        }
-        .logo-area {
-            text-align: center;
-        }
+        .login-wrapper { position: relative; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 30px; }
+        .logo-area { text-align: center; }
         .logo-text {
-            font-size: 64px; font-weight: 800; letter-spacing: 8px;
-            background: linear-gradient(135deg, var(--blue), #ffffff, var(--red));
+            font-size: 58px; font-weight: 800; letter-spacing: 6px;
+            background: linear-gradient(120deg, var(--p2), var(--p1) 55%, var(--p3));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 30px rgba(30,144,255,0.4));
+            filter: drop-shadow(0 0 30px rgba(123,47,247,0.5));
             animation: logoGlow 3s ease-in-out infinite alternate;
         }
-        @keyframes logoGlow {
-            from { filter: drop-shadow(0 0 20px rgba(30,144,255,0.3)); }
-            to   { filter: drop-shadow(0 0 50px rgba(30,144,255,0.7)); }
-        }
-        .logo-sub {
-            color: rgba(255,255,255,0.4); font-size: 14px; letter-spacing: 4px; margin-top: 5px;
-        }
+        @keyframes logoGlow { from { filter: drop-shadow(0 0 20px rgba(123,47,247,0.35)); } to { filter: drop-shadow(0 0 50px rgba(0,224,255,0.7)); } }
+        .logo-sub { color: rgba(255,255,255,0.45); font-size: 14px; letter-spacing: 4px; margin-top: 5px; }
         .login-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 50px 60px;
-            text-align: center;
-            backdrop-filter: blur(30px);
-            box-shadow: 0 0 60px rgba(30,144,255,0.1), 0 0 120px rgba(0,0,0,0.5);
-            min-width: 380px;
-            position: relative;
-            overflow: hidden;
+            background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 50px 60px;
+            text-align: center; backdrop-filter: blur(30px);
+            box-shadow: 0 0 60px rgba(123,47,247,0.12), 0 0 120px rgba(0,0,0,0.5);
+            min-width: 380px; position: relative; overflow: hidden;
         }
         .login-card::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--blue), var(--red), transparent);
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--p2), var(--p3), transparent);
             animation: scanLine 3s linear infinite;
         }
-        @keyframes scanLine {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
+        @keyframes scanLine { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .login-card h2 { color: white; font-size: 22px; margin-bottom: 8px; }
         .login-card p { color: rgba(255,255,255,0.45); font-size: 14px; margin-bottom: 35px; }
         .btn-discord {
             display: inline-flex; align-items: center; gap: 12px;
-            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
-            color: white; padding: 16px 40px; border-radius: 14px;
-            text-decoration: none; font-weight: 700; font-size: 16px;
-            transition: all 0.3s; border: 1px solid rgba(30,144,255,0.3);
-            box-shadow: 0 8px 30px rgba(30,144,255,0.3);
+            background: linear-gradient(135deg, var(--p1), #4d0fce); color: white; padding: 16px 40px; border-radius: 14px;
+            text-decoration: none; font-weight: 700; font-size: 16px; transition: all 0.3s; border: 1px solid rgba(123,47,247,0.35);
+            box-shadow: 0 8px 30px rgba(123,47,247,0.35);
         }
-        .btn-discord:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(30,144,255,0.5);
-            filter: brightness(1.1);
-        }
+        .btn-discord:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(0,224,255,0.4); filter: brightness(1.1); }
     </style>
 </head>
 <body>
@@ -458,7 +433,7 @@ app.get('/login', (req, res) => {
     <div class="grid-bg"></div>
     <div class="login-wrapper">
         <div class="logo-area">
-            <div class="logo-text">VORTEX </div>
+            <div class="logo-text">ABOUD SYSTEM</div>
             <div class="logo-sub">DISCORD BOT SYSTEM</div>
         </div>
         <div class="login-card">
@@ -481,7 +456,6 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // 8. UI Helper Function
 // ==========================================
 function ui(guild, active, content) {
-    const showNav = guild.id ? 'flex' : 'none';
     const guildName = guild.name || 'قائمة السيرفرات';
 
     const navItems = guild.id ? `
@@ -494,12 +468,16 @@ function ui(guild, active, content) {
             الحماية
         </a>
         <a class="${active === 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--bg0)"/></svg>
             تنبيهات Kick
         </a>
         <a class="${active === 'suggestions' ? 'active' : ''}" href="/manage/${guild.id}/suggestions">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
             الاقتراحات
+        </a>
+        <a class="${active === 'admincmds' ? 'active' : ''}" href="/manage/${guild.id}/admin-commands">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            الأوامر الإدارية
         </a>
         <a class="${active === 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
@@ -540,388 +518,291 @@ function ui(guild, active, content) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> VORTEX  | Dashboard</title>
+    <title>ABOUD SYSTEM | Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --blue: #1e90ff;
-            --blue-dark: #0a6ecc;
-            --blue-glow: rgba(30,144,255,0.15);
-            --gold: #ffb703;
-            --gold-glow: rgba(255,183,3,0.15);
-            --red: #e63946;
-            --red-light: #ff6b6b;
-            --red-glow: rgba(230,57,70,0.12);
-            --black: #050508;
-            --dark: #0a0a14;
+            --p1: #7b2ff7;
+            --p2: #00e0ff;
+            --p3: #ff2e92;
+            --gold: #ffc857;
+            --ok: #12e6a0;
+            --danger: #ff4d6d;
+            --bg0: #060613;
+            --panel: rgba(16,16,36,0.72);
+            --panel-solid: #10101f;
+            --border: rgba(123,47,247,0.28);
+            --border-soft: rgba(255,255,255,0.07);
+            --text: #eef0ff;
+            --text-dim: rgba(238,240,255,0.5);
+            --sidebar-w: 272px;
+            --radius: 18px;
+            /* legacy aliases so older inline styles keep working */
+            --blue: var(--p2);
+            --blue-dark: #0090a8;
+            --blue-glow: rgba(0,224,255,0.12);
+            --gold-glow: rgba(255,200,87,0.12);
+            --red: var(--danger);
+            --red-light: #ff8fa3;
+            --red-glow: rgba(255,77,109,0.12);
+            --border-red: rgba(255,77,109,0.3);
+            --dark: var(--bg0);
             --darker: #07070f;
-            --card: rgba(12,12,24,0.75);
-            --card-hover: rgba(18,18,34,0.9);
-            --border: rgba(30,144,255,0.18);
-            --border-red: rgba(230,57,70,0.18);
-            --text: #e8eaf6;
-            --text-muted: rgba(255,255,255,0.45);
-            --sidebar-w: 280px;
+            --black: var(--bg0);
+            --card: var(--panel);
+            --text-muted: var(--text-dim);
         }
 
+        html, body { height: 100%; }
         body {
             font-family: 'Changa', sans-serif;
-            background: var(--black);
+            background: var(--bg0);
             color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: row-reverse;
             direction: rtl;
-            animation: pageFadeIn 0.5s ease both;
+            overflow-x: hidden;
         }
-        @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* ===== BACKGROUND ===== */
-        body::before {
-            content: '';
+        .bg-fixed {
             position: fixed; inset: 0; z-index: -3;
             background:
-                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.09) 0%, transparent 50%),
-                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 60% 10%, rgba(255,183,3,0.05) 0%, transparent 45%),
-                radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
+                radial-gradient(ellipse 700px 500px at 8% 10%, rgba(123,47,247,0.20) 0%, transparent 60%),
+                radial-gradient(ellipse 700px 500px at 95% 15%, rgba(0,224,255,0.14) 0%, transparent 55%),
+                radial-gradient(ellipse 600px 500px at 50% 100%, rgba(255,46,146,0.12) 0%, transparent 55%),
+                var(--bg0);
         }
-        body::after {
+        .bg-fixed::after {
             content: '';
-            position: fixed; inset: 0; z-index: -2;
+            position: absolute; inset: 0;
             background-image:
-                linear-gradient(rgba(30,144,255,0.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(30,144,255,0.025) 1px, transparent 1px);
-            background-size: 60px 60px;
+                linear-gradient(rgba(123,47,247,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(123,47,247,0.05) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: radial-gradient(ellipse 80% 80% at 50% 20%, black 30%, transparent 90%);
         }
-        .orb {
-            position: fixed; z-index: -1; border-radius: 50%;
-            filter: blur(60px); opacity: 0.35; pointer-events: none;
-            animation: floatOrb 14s ease-in-out infinite;
-        }
-        .orb-1 { width: 320px; height: 320px; background: var(--blue); top: -80px; right: -60px; animation-delay: 0s; }
-        .orb-2 { width: 260px; height: 260px; background: var(--red); bottom: -60px; left: -40px; animation-delay: 3s; }
-        .orb-3 { width: 200px; height: 200px; background: var(--gold); top: 40%; left: 30%; animation-delay: 6s; opacity: 0.15; }
-        @keyframes floatOrb {
-            0%, 100% { transform: translate(0,0) scale(1); }
-            50% { transform: translate(30px,-30px) scale(1.12); }
-        }
+        .orb { position: fixed; z-index: -2; border-radius: 50%; filter: blur(70px); opacity: 0.28; pointer-events: none; animation: floatOrb 16s ease-in-out infinite; }
+        .orb-1 { width: 340px; height: 340px; background: var(--p1); top: -100px; right: -80px; }
+        .orb-2 { width: 280px; height: 280px; background: var(--p2); bottom: -80px; left: -60px; animation-delay: 4s; }
+        .orb-3 { width: 220px; height: 220px; background: var(--p3); top: 45%; left: 35%; opacity: 0.16; animation-delay: 8s; }
+        @keyframes floatOrb { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(25px,-25px) scale(1.1); } }
 
-        /* ===== SIDEBAR ===== */
+        .app-shell { display: flex; flex-direction: row-reverse; height: 100vh; overflow: hidden; }
+
         .sidebar {
             width: var(--sidebar-w);
-            background: rgba(7,7,15,0.95);
-            border-left: 1px solid var(--border);
-            position: relative;
-            display: flex; flex-direction: column;
-            z-index: 100;
-            backdrop-filter: blur(20px);
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--blue) transparent;
             flex-shrink: 0;
             height: 100vh;
+            position: fixed;
+            top: 0; right: 0;
+            background: rgba(8,8,20,0.92);
+            border-left: 1px solid var(--border);
+            backdrop-filter: blur(22px);
+            display: flex; flex-direction: column;
+            z-index: 200;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--p1) transparent;
+            transition: transform 0.35s cubic-bezier(.2,.9,.3,1.1);
         }
         .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 10px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--p1); border-radius: 10px; }
 
-        .sidebar-header {
-            padding: 30px 20px 20px;
-            border-bottom: 1px solid var(--border);
-            text-align: center;
-            flex-shrink: 0;
-        }
+        .sidebar-header { padding: 28px 20px 18px; border-bottom: 1px solid var(--border-soft); text-align: center; flex-shrink: 0; }
         .sidebar-logo {
-            font-size: 27px; font-weight: 800; letter-spacing: 3px;
-            background: linear-gradient(135deg, var(--blue), #ffffff 50%, var(--red));
+            font-size: 25px; font-weight: 800; letter-spacing: 2px;
+            background: linear-gradient(120deg, var(--p2), var(--p1) 55%, var(--p3));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            display: block;
-            animation: logoShimmer 4s ease-in-out infinite alternate;
+            display: block; animation: logoShimmer 4s ease-in-out infinite alternate;
         }
-        @keyframes logoShimmer {
-            from { filter: drop-shadow(0 0 8px rgba(30,144,255,0.4)); }
-            to   { filter: drop-shadow(0 0 20px rgba(30,144,255,0.8)); }
-        }
-        .sidebar-tagline {
-            font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
-            margin-top: 4px; text-transform: uppercase;
-        }
+        .sidebar-logo .gold { -webkit-text-fill-color: var(--gold); background: none; }
+        @keyframes logoShimmer { from { filter: drop-shadow(0 0 8px rgba(123,47,247,0.45)); } to { filter: drop-shadow(0 0 22px rgba(0,224,255,0.55)); } }
+        .sidebar-tagline { font-size: 10px; letter-spacing: 3px; color: var(--text-dim); margin-top: 5px; text-transform: uppercase; }
 
-        .nav {
-            display: ${showNav};
-            flex-direction: column;
-            gap: 4px;
-            padding: 20px 12px 30px;
-            flex: 1;
-        }
+        .nav { display: flex; flex-direction: column; gap: 4px; padding: 18px 12px 30px; flex: 1; }
         .nav a {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 16px; border-radius: 12px;
-            color: var(--text-muted); text-decoration: none;
-            font-size: 14px; font-weight: 500;
-            transition: all 0.25s cubic-bezier(.2,.9,.3,1.2);
-            border: 1px solid transparent;
-            position: relative; overflow: hidden;
+            display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px;
+            color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 500;
+            transition: all 0.25s cubic-bezier(.2,.9,.3,1.2); border: 1px solid transparent; position: relative; overflow: hidden;
         }
         .nav a svg { flex-shrink: 0; opacity: 0.6; transition: opacity 0.25s; }
-        .nav a:hover {
-            background: var(--blue-glow);
-            color: white;
-            border-color: var(--border);
-            transform: translateX(-4px);
-        }
+        .nav a:hover { background: rgba(123,47,247,0.12); color: white; border-color: var(--border); transform: translateX(-4px); }
         .nav a:hover svg { opacity: 1; }
         .nav a.active {
-            background: linear-gradient(135deg, rgba(30,144,255,0.22), rgba(30,144,255,0.08));
-            color: var(--blue);
-            border-color: rgba(30,144,255,0.4);
-            font-weight: 700;
-            box-shadow: 0 0 18px rgba(30,144,255,0.18) inset;
+            background: linear-gradient(135deg, rgba(0,224,255,0.18), rgba(123,47,247,0.14));
+            color: var(--p2); border-color: rgba(0,224,255,0.35); font-weight: 700;
+            box-shadow: 0 0 18px rgba(0,224,255,0.14) inset;
         }
-        .nav a.active svg { opacity: 1; color: var(--blue); }
+        .nav a.active svg { opacity: 1; color: var(--p2); }
         .nav a.active::before {
-            content: '';
-            position: absolute; right: 0; top: 20%; bottom: 20%;
-            width: 3px; background: linear-gradient(var(--blue), var(--gold));
-            border-radius: 3px 0 0 3px;
-            animation: pulseBar 1.6s ease-in-out infinite;
+            content: ''; position: absolute; right: 0; top: 20%; bottom: 20%; width: 3px;
+            background: linear-gradient(var(--p2), var(--p3)); border-radius: 3px 0 0 3px; animation: pulseBar 1.6s ease-in-out infinite;
         }
         @keyframes pulseBar { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-        /* ===== MAIN CONTENT ===== */
-        .main {
-            margin-right: 0;
-            padding: 40px 50px;
-            flex: 1;
-            min-height: 100vh;
-            overflow-y: auto;
+        .menu-toggle {
+            display: none; position: fixed; top: 16px; right: 16px; z-index: 300;
+            width: 46px; height: 46px; border-radius: 12px; background: var(--panel-solid);
+            border: 1px solid var(--border); color: var(--p2); align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
         }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150; }
 
-        .page-header {
-            display: flex; align-items: center; gap: 15px;
-            margin-bottom: 35px; padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-        }
-        .page-header h1 {
-            font-size: 24px; font-weight: 700; color: white;
-        }
-        .page-header .badge {
-            background: var(--blue-glow); border: 1px solid var(--border);
-            color: var(--blue); padding: 4px 12px; border-radius: 20px; font-size: 12px;
-        }
+        .main { margin-right: var(--sidebar-w); flex: 1; height: 100vh; overflow-y: auto; padding: 40px 48px 60px; }
 
-        /* ===== CARDS ===== */
+        .page-header { display: flex; align-items: center; gap: 15px; margin-bottom: 32px; padding-bottom: 18px; border-bottom: 1px solid var(--border-soft); animation: fadeInUp 0.4s ease both; }
+        .page-header h1 { font-size: 23px; font-weight: 700; color: white; }
+        .page-header .badge { background: rgba(0,224,255,0.12); border: 1px solid var(--border); color: var(--p2); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+
         .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 28px;
-            margin-bottom: 24px;
-            backdrop-filter: blur(15px);
-            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
-            position: relative;
-            overflow: hidden;
+            background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius);
+            padding: 26px; margin-bottom: 22px; backdrop-filter: blur(16px);
+            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; position: relative; overflow: hidden;
+            animation: fadeInUp 0.45s ease both;
         }
         .card::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--blue), var(--gold), transparent);
-            opacity: 0.5;
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--p2), var(--p3), transparent); opacity: 0.5;
         }
-        .card:hover {
-            border-color: rgba(30,144,255,0.4);
-            transform: translateY(-3px);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.35), 0 0 30px rgba(30,144,255,0.08);
-        }
-        .card h3 {
-            color: white; font-size: 17px; font-weight: 700;
-            margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
-        }
-        .card h3 svg { color: var(--blue); }
+        .card:hover { border-color: rgba(0,224,255,0.35); transform: translateY(-3px); box-shadow: 0 20px 45px rgba(0,0,0,0.4), 0 0 30px rgba(123,47,247,0.08); }
+        .card h3 { color: white; font-size: 16px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+        .card h3 svg { color: var(--p2); }
 
-        /* ===== FORMS ===== */
-        label {
-            display: block; color: var(--text-muted); font-size: 13px;
-            margin-bottom: 6px; margin-top: 16px; font-weight: 500;
-        }
+        label { display: block; color: var(--text-dim); font-size: 13px; margin-bottom: 6px; margin-top: 16px; font-weight: 500; }
         input, select, textarea {
-            width: 100%; padding: 12px 16px;
-            background: rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px; color: white;
-            font-family: 'Changa', sans-serif; font-size: 14px;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            outline: none;
+            width: 100%; padding: 12px 16px; background: rgba(0,0,0,0.35); border: 1px solid var(--border-soft);
+            border-radius: 10px; color: white; font-family: 'Changa', sans-serif; font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s; outline: none;
         }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--blue);
-            box-shadow: 0 0 0 3px rgba(30,144,255,0.12);
-        }
+        input:focus, select:focus, textarea:focus { border-color: var(--p2); box-shadow: 0 0 0 3px rgba(0,224,255,0.12); }
         select option { background: #0d0d1a; color: white; }
         textarea { resize: vertical; min-height: 100px; }
 
-        /* ===== BUTTONS ===== */
         .btn-save {
-            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
-            color: white; border: none; padding: 13px 24px;
-            border-radius: 12px; cursor: pointer; font-weight: 700;
-            font-size: 14px; font-family: 'Changa', sans-serif;
-            transition: all 0.3s; display: inline-block; text-decoration: none;
-            text-align: center; width: 100%;
-            box-shadow: 0 4px 20px rgba(30,144,255,0.25);
-            position: relative; overflow: hidden;
+            background: linear-gradient(135deg, var(--p1), #4d0fce); color: white; border: none; padding: 13px 24px;
+            border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 14px; font-family: 'Changa', sans-serif;
+            transition: all 0.3s; display: inline-block; text-decoration: none; text-align: center; width: 100%;
+            box-shadow: 0 4px 20px rgba(123,47,247,0.3); position: relative; overflow: hidden;
         }
         .btn-save::after {
-            content: ''; position: absolute; top: 0; left: -60%;
-            width: 40%; height: 100%;
+            content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
             background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
-            transform: skewX(-20deg);
-            transition: left 0.6s ease;
+            transform: skewX(-20deg); transition: left 0.6s ease;
         }
         .btn-save:hover::after { left: 130%; }
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(30,144,255,0.4);
-            filter: brightness(1.1);
+        .btn-save:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(123,47,247,0.45); filter: brightness(1.1); }
+        .btn-danger { background: linear-gradient(135deg, var(--danger), #a10f2f); box-shadow: 0 4px 20px rgba(255,77,109,0.3); }
+        .btn-danger:hover { box-shadow: 0 8px 30px rgba(255,77,109,0.45); }
+        .btn-green, .cmd-unlock-btn, .cmd-untimeout-btn, .cmd-unban-btn {
+            background: linear-gradient(135deg, var(--ok), #039c72); box-shadow: 0 4px 20px rgba(18,230,160,0.25);
         }
-        .btn-danger {
-            background: linear-gradient(135deg, var(--red), #c0392b);
-            box-shadow: 0 4px 20px rgba(230,57,70,0.25);
-        }
-        .btn-danger:hover { box-shadow: 0 8px 30px rgba(230,57,70,0.4); }
-        .btn-sm { padding: 8px 16px; font-size: 13px; width: auto; border-radius: 8px; }
-        .btn-green {
-            background: linear-gradient(135deg, #00c853, #00a040);
-            box-shadow: 0 4px 20px rgba(0,200,83,0.25);
-        }
+        .btn-sm { padding: 9px 18px; font-size: 13px; width: auto; border-radius: 10px; }
+        .btn-cyan { background: linear-gradient(135deg, var(--p2), #0090a8); box-shadow: 0 4px 20px rgba(0,224,255,0.25); }
 
-        /* ===== STAT BOXES ===== */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px; margin-top: 16px;
-        }
-        .stat-box {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border);
-            border-radius: 14px; padding: 20px;
-            text-align: center; transition: all 0.3s;
-        }
-        .stat-box:hover { border-color: var(--blue); transform: translateY(-3px); }
-        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); }
-        .stat-box .stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+        .cmd-lock-btn { background: linear-gradient(135deg, var(--danger), #a10f2f); box-shadow: 0 4px 20px rgba(255,77,109,0.3); }
+        .cmd-timeout-btn { background: linear-gradient(135deg, var(--gold), #c98a10); color: #1a1200; box-shadow: 0 4px 20px rgba(255,200,87,0.25); }
+        .cmd-ban-btn { background: linear-gradient(135deg, var(--danger), #7a0a24); box-shadow: 0 4px 20px rgba(255,77,109,0.3); }
+        .cmd-kick-btn { background: linear-gradient(135deg, var(--p3), #a10f5e); box-shadow: 0 4px 20px rgba(255,46,146,0.3); }
+        .cmd-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+        @media (max-width: 560px) { .cmd-row { grid-template-columns: 1fr; } }
 
-        /* ===== GUILD GRID (Dashboard) ===== */
-        .guild-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 20px; max-width: 1000px; margin: 0 auto;
-        }
-        .guild-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 18px; padding: 28px 20px;
-            text-align: center; transition: all 0.35s;
-            cursor: pointer;
-        }
-        .guild-card:hover {
-            transform: translateY(-8px);
-            border-color: var(--blue);
-            box-shadow: 0 20px 50px rgba(30,144,255,0.15);
-        }
-        .guild-icon {
-            width: 75px; height: 75px; border-radius: 50%;
-            border: 2px solid var(--border); margin-bottom: 14px;
-            transition: border-color 0.3s;
-        }
-        .guild-card:hover .guild-icon { border-color: var(--blue); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 16px; }
+        .stat-box { background: rgba(0,0,0,0.28); border: 1px solid var(--border-soft); border-radius: 14px; padding: 20px; text-align: center; transition: all 0.3s; }
+        .stat-box:hover { border-color: var(--p2); transform: translateY(-3px); }
+        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--p2); }
+        .stat-box .stat-label { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+
+        .guild-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+        .guild-card { background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 28px 20px; text-align: center; transition: all 0.35s; cursor: pointer; }
+        .guild-card:hover { transform: translateY(-8px); border-color: var(--p2); box-shadow: 0 20px 50px rgba(0,224,255,0.15); }
+        .guild-icon { width: 75px; height: 75px; border-radius: 50%; border: 2px solid var(--border-soft); margin-bottom: 14px; transition: border-color 0.3s; }
+        .guild-card:hover .guild-icon { border-color: var(--p2); }
         .guild-card h3 { color: white; font-size: 15px; margin-bottom: 12px; }
         .guild-card a { font-size: 13px; font-weight: 600; text-decoration: none; }
 
-        /* ===== TABLE ===== */
         .data-table { width: 100%; border-collapse: collapse; }
-        .data-table th {
-            padding: 12px 16px; text-align: right;
-            color: var(--text-muted); font-size: 12px; font-weight: 600;
-            border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 1px;
-        }
-        .data-table td {
-            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-size: 14px; color: var(--text);
-        }
-        .data-table tr:hover td { background: rgba(30,144,255,0.04); }
+        .data-table th { padding: 12px 16px; text-align: right; color: var(--text-dim); font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border-soft); text-transform: uppercase; letter-spacing: 1px; }
+        .data-table td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 14px; color: var(--text); }
+        .data-table tr:hover td { background: rgba(0,224,255,0.04); }
 
-        /* ===== BADGE ===== */
-        .tag {
-            display: inline-block; padding: 3px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 600;
-        }
-        .tag-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid var(--border); }
-        .tag-red { background: var(--red-glow); color: var(--red-light); border: 1px solid var(--border-red); }
-        .tag-green { background: rgba(0,200,83,0.1); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .tag-blue { background: rgba(0,224,255,0.12); color: var(--p2); border: 1px solid var(--border); }
+        .tag-red { background: rgba(255,77,109,0.12); color: var(--danger); border: 1px solid rgba(255,77,109,0.3); }
+        .tag-green { background: rgba(18,230,160,0.1); color: var(--ok); border: 1px solid rgba(18,230,160,0.25); }
 
-        /* ===== DIVIDER ===== */
-        .section-divider {
-            height: 1px; background: var(--border);
-            margin: 24px 0;
-        }
+        .section-divider { height: 1px; background: var(--border-soft); margin: 24px 0; }
 
-        /* ===== TOGGLE SWITCH ===== */
-        .toggle-row {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
         .toggle-row label { margin: 0; color: var(--text); font-size: 14px; }
 
-        /* ===== ANIMATIONS ===== */
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: translateY(0); }
+        .status-banner {
+            padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 14px; font-weight: 600;
+            border: 1px solid; animation: fadeInUp 0.35s ease both;
         }
-        .card { animation: fadeInUp 0.4s ease both; }
+        .status-ok { background: rgba(18,230,160,0.1); border-color: rgba(18,230,160,0.35); color: var(--ok); }
+        .status-err { background: rgba(255,77,109,0.1); border-color: rgba(255,77,109,0.35); color: var(--danger); }
+
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
         .card:nth-child(2) { animation-delay: 0.05s; }
         .card:nth-child(3) { animation-delay: 0.1s; }
         .card:nth-child(4) { animation-delay: 0.15s; }
 
-        /* ===== SCROLLBAR ===== */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(30,144,255,0.3); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+        ::-webkit-scrollbar-thumb { background: rgba(123,47,247,0.35); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--p2); }
 
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            .sidebar { width: 240px; }
-            .main { margin-right: 240px; padding: 20px; }
+        @media (max-width: 900px) {
+            .menu-toggle { display: flex; }
+            .sidebar { transform: translateX(100%); box-shadow: -20px 0 60px rgba(0,0,0,0.6); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay.open { display: block; }
+            .main { margin-right: 0; padding: 80px 18px 40px; }
+            .stats-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+        }
+        @media (max-width: 480px) {
+            .card { padding: 18px; border-radius: 14px; }
+            .page-header h1 { font-size: 19px; }
         }
     </style>
 </head>
 <body>
+    <div class="bg-fixed"></div>
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     <div class="orb orb-3"></div>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <span class="sidebar-logo">VORTEX 
- <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
-            <div class="sidebar-tagline">Bot Dashboard</div>
-        </div>
-        <nav class="nav">
-            ${navItems}
-        </nav>
+
+    <div class="menu-toggle" id="menuToggle" onclick="toggleSidebar()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </div>
-    <div class="main">
-        <div class="page-header">
-            <h1>${guildName}</h1>
-            ${guild.id ? `<span class="badge">مدير</span>` : ''}
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <div class="app-shell">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo">ABOUD <span class="gold">SYSTEM</span></span>
+                <div class="sidebar-tagline">Bot Dashboard</div>
+            </div>
+            <nav class="nav">
+                ${navItems}
+            </nav>
         </div>
-        ${content}
+        <div class="main">
+            <div class="page-header">
+                <h1>${guildName}</h1>
+                ${guild.id ? `<span class="badge">مدير</span>` : ''}
+            </div>
+            ${content}
+        </div>
     </div>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('open');
+        }
+    </script>
 </body>
 </html>`;
 }
-
 
 // ==========================================
 // 9. Dashboard Routes
@@ -946,21 +827,21 @@ app.get('/dashboard', checkAuth, (req, res) => {
             <img src="${iconURL}" class="guild-icon" alt="${g.name}">
             <h3>${g.name}</h3>
             ${hasBot
-                ? `<a href="/manage/${g.id}/home" style="color:var(--blue);">الإعدادات</a>`
-                : `<a href="${inviteLink}" style="color:#00c853;">اضافة البوت</a>`
+                ? `<a href="/manage/${g.id}/home" style="color:var(--p2);">الإعدادات</a>`
+                : `<a href="${inviteLink}" style="color:var(--ok);">اضافة البوت</a>`
             }
         </div>`;
     }).join('');
 
     const content = `
     <div style="text-align:center; margin-bottom:40px;">
-        <div style="font-size:48px; font-weight:800; letter-spacing:6px;
-            background: linear-gradient(135deg, var(--blue), #fff, var(--red));
+        <div style="font-size:46px; font-weight:800; letter-spacing:4px;
+            background: linear-gradient(120deg, var(--p2), var(--p1) 55%, var(--p3));
             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-            margin-bottom:10px;">VORTEX </div>
-        <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
+            margin-bottom:10px;">ABOUD SYSTEM</div>
+        <p style="color:var(--text-dim); font-size:15px;">اختر السيرفر لإدارته</p>
         <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
-            <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
+            <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(123,47,247,0.06); border:1px solid var(--border);">
         </div>
     </div>
     <div class="guild-grid" id="guildGrid">${cards}</div>
@@ -1011,16 +892,16 @@ app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
                 <div class="stat-num">${statsData.messages?.total || 0}</div>
                 <div class="stat-label">اجمالي الرسائل</div>
             </div>
-            <div class="stat-box" style="--blue:#e63946;">
-                <div class="stat-num" style="color:var(--blue);">${g.memberCount}</div>
+            <div class="stat-box">
+                <div class="stat-num" style="color:var(--p3);">${g.memberCount}</div>
                 <div class="stat-label">عدد الاعضاء</div>
             </div>
-            <div class="stat-box" style="--blue:#00c853;">
-                <div class="stat-num" style="color:#00c853;">+${newMembersCount}</div>
+            <div class="stat-box">
+                <div class="stat-num" style="color:var(--ok);">+${newMembersCount}</div>
                 <div class="stat-label">اعضاء جدد (7 ايام)</div>
             </div>
-            <div class="stat-box" style="--blue:#ff6b6b;">
-                <div class="stat-num" style="color:#ff6b6b;">-${leftMembersCount}</div>
+            <div class="stat-box">
+                <div class="stat-num" style="color:var(--danger);">-${leftMembersCount}</div>
                 <div class="stat-label">اعضاء غادروا (7 ايام)</div>
             </div>
             <div class="stat-box">
@@ -1047,8 +928,8 @@ app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
     const streamerRows = s.streamers.map((st, i) => `
     <tr>
         <td><span class="tag tag-blue">${st.kickUsername}</span></td>
-        <td style="color:var(--text-muted);">#${g.channels.cache.get(st.channelId)?.name || 'قناة محذوفة'}</td>
-        <td>${st.roleId ? `<span class="tag tag-red">@${g.roles.cache.get(st.roleId)?.name || 'رتبة محذوفة'}</span>` : '<span class="tag" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">بدون منشن</span>'}</td>
+        <td style="color:var(--text-dim);">#${g.channels.cache.get(st.channelId)?.name || 'قناة محذوفة'}</td>
+        <td>${st.roleId ? `<span class="tag tag-red">@${g.roles.cache.get(st.roleId)?.name || 'رتبة محذوفة'}</span>` : '<span class="tag" style="background:rgba(255,255,255,0.05);color:var(--text-dim);">بدون منشن</span>'}</td>
         <td>
             <a href="/delete-kick/${g.id}/${i}" class="btn-save btn-danger btn-sm" style="text-decoration:none;" onclick="return confirm('حذف الستريمر؟')">حذف</a>
         </td>
@@ -1057,12 +938,12 @@ app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
     const content = `
     <div class="card">
         <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--bg0)"/></svg>
             نظام تنبيهات Kick
         </h3>
 
-        <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:24px;">
-            <h4 style="color:var(--blue); margin-bottom:18px; font-size:15px;">اضافة ستريمر جديد</h4>
+        <div style="background:rgba(0,0,0,0.25); border:1px solid var(--border-soft); border-radius:14px; padding:24px; margin-bottom:24px;">
+            <h4 style="color:var(--p2); margin-bottom:18px; font-size:15px;">اضافة ستريمر جديد</h4>
             <form method="POST" action="/save/${g.id}/kick">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                     <div>
@@ -1102,7 +983,7 @@ app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
                 </tr>
             </thead>
             <tbody>${streamerRows}</tbody>
-        </table>` : `<p style="color:var(--text-muted); text-align:center; padding:30px 0;">لا يوجد ستريمرات مضافة بعد.</p>`}
+        </table>` : `<p style="color:var(--text-dim); text-align:center; padding:30px 0;">لا يوجد ستريمرات مضافة بعد.</p>`}
     </div>`;
 
     res.send(ui(g, 'kick', content));
@@ -1144,8 +1025,8 @@ app.get('/manage/:guildId/suggestions', checkAuth, async (req, res) => {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
                 نظام الاقتراحات
             </h3>
-            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">
-                حدد روم الاقتراحات، ارفع صورة تظهر داخل كل اقتراح، وحدد إيموجيين (بالـ ID) يستخدمان للتصويت.
+            <p style="color:var(--text-dim); font-size:13px; margin-bottom:16px;">
+                حدد روم الاقتراحات، ارفع صورة تظهر داخل كل اقتراح، وحدد إيموجيين (بالـ ID) يستخدمان للتصويت. عداد التصويت يظهر الآن بسطر واحد ثابت تحت الاقتراح حتى لا يختلف شكله عند وجود صورة.
             </p>
             <label>روم الاقتراحات</label>
             <select name="channelId" required>
@@ -1164,7 +1045,7 @@ app.get('/manage/:guildId/suggestions', checkAuth, async (req, res) => {
             </div>
             <label>صورة الاقتراح (تظهر داخل كل ايمبد اقتراح)</label>
             <input type="file" name="suggestImage" accept="image/*">
-            ${s.imagePath ? `<div style="margin-top:12px;"><img src="/${s.imagePath.replace(/^\.\//,'')}" style="max-width:220px; border-radius:12px; border:1px solid var(--border);"></div>` : ''}
+            ${s.imagePath ? `<div style="margin-top:12px;"><img src="/${s.imagePath.replace(/^\.\//,'')}" style="max-width:220px; border-radius:12px; border:1px solid var(--border-soft);"></div>` : ''}
             <button class="btn-save" style="margin-top:20px;">حفظ إعدادات الاقتراحات</button>
         </div>
     </form>`;
@@ -1179,6 +1060,210 @@ app.post('/save/:guildId/suggestions', checkAuth, upload.single('suggestImage'),
     if (req.file) update.imagePath = req.file.path;
     await SuggestionConfig.findOneAndUpdate({ guildId }, { $set: update }, { upsert: true });
     res.redirect(`/manage/${guildId}/suggestions`);
+});
+
+// --- [ الأوامر الإدارية / Admin Commands Shortcuts ] ---
+app.get('/manage/:guildId/admin-commands', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+
+    const okMsg = req.query.ok;
+    const errMsg = req.query.err;
+    const banner = okMsg
+        ? `<div class="status-banner status-ok">${okMsg}</div>`
+        : (errMsg ? `<div class="status-banner status-err">${errMsg}</div>` : '');
+
+    const textChannels = g.channels.cache.filter(c => c.type === 0);
+
+    const content = `
+    ${banner}
+
+    <div class="card">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            قفل / فتح روم (Lock &amp; Unlock)
+        </h3>
+        <p style="color:var(--text-dim); font-size:13px;">اختر الروم ثم اضغط قفل لمنع الأعضاء من الكتابة، أو فتح لإرجاع الكتابة.</p>
+        <form method="POST" action="/manage/${g.id}/admin-commands/channel-lock">
+            <label>الروم</label>
+            <select name="channelId" required>
+                ${textChannels.map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+            </select>
+            <div class="cmd-row">
+                <button type="submit" name="action" value="lock" class="btn-save cmd-lock-btn">قفل الروم</button>
+                <button type="submit" name="action" value="unlock" class="btn-save cmd-unlock-btn">فتح الروم</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            تايم اوت (Timeout)
+        </h3>
+        <p style="color:var(--text-dim); font-size:13px;">أدخل ID العضو ومدة الكتم بالدقائق لإضافة تايم اوت، أو أدخل ID فقط لإزالته.</p>
+        <form method="POST" action="/manage/${g.id}/admin-commands/timeout-add">
+            <label>ID العضو</label>
+            <input type="text" name="userId" placeholder="مثلاً: 123456789012345678" required>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                    <label>المدة (دقائق)</label>
+                    <input type="number" name="minutes" min="1" value="10" required>
+                </div>
+                <div>
+                    <label>السبب (اختياري)</label>
+                    <input type="text" name="reason" placeholder="سبب التايم اوت">
+                </div>
+            </div>
+            <button type="submit" class="btn-save cmd-timeout-btn" style="margin-top:16px;">إضافة تايم اوت</button>
+        </form>
+        <div class="section-divider"></div>
+        <form method="POST" action="/manage/${g.id}/admin-commands/timeout-remove">
+            <label>ID العضو لإزالة التايم اوت عنه</label>
+            <input type="text" name="userId" placeholder="مثلاً: 123456789012345678" required>
+            <button type="submit" class="btn-save cmd-untimeout-btn" style="margin-top:16px;">إزالة التايم اوت</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            الباند (Ban)
+        </h3>
+        <p style="color:var(--text-dim); font-size:13px;">أدخل ID العضو لحظره، أو أدخل ID عضو محظور لإزالة الحظر عنه.</p>
+        <form method="POST" action="/manage/${g.id}/admin-commands/ban-add">
+            <label>ID العضو</label>
+            <input type="text" name="userId" placeholder="مثلاً: 123456789012345678" required>
+            <label>السبب (اختياري)</label>
+            <input type="text" name="reason" placeholder="سبب الحظر">
+            <button type="submit" class="btn-save cmd-ban-btn" style="margin-top:16px;">حظر العضو</button>
+        </form>
+        <div class="section-divider"></div>
+        <form method="POST" action="/manage/${g.id}/admin-commands/ban-remove">
+            <label>ID العضو لإزالة الحظر عنه</label>
+            <input type="text" name="userId" placeholder="مثلاً: 123456789012345678" required>
+            <button type="submit" class="btn-save cmd-unban-btn" style="margin-top:16px;">إزالة الحظر</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--bg0)"/></svg>
+            الطرد (Kick)
+        </h3>
+        <p style="color:var(--text-dim); font-size:13px;">أدخل ID العضو لطرده من السيرفر.</p>
+        <form method="POST" action="/manage/${g.id}/admin-commands/kick">
+            <label>ID العضو</label>
+            <input type="text" name="userId" placeholder="مثلاً: 123456789012345678" required>
+            <label>السبب (اختياري)</label>
+            <input type="text" name="reason" placeholder="سبب الطرد">
+            <button type="submit" class="btn-save cmd-kick-btn" style="margin-top:16px;">طرد العضو</button>
+        </form>
+    </div>`;
+
+    res.send(ui(g, 'admincmds', content));
+});
+
+function redirectAdminCmds(res, guildId, ok, err) {
+    const params = new URLSearchParams();
+    if (ok) params.set('ok', ok);
+    if (err) params.set('err', err);
+    res.redirect(`/manage/${guildId}/admin-commands?${params.toString()}`);
+}
+
+// قفل / فتح روم
+app.post('/manage/:guildId/admin-commands/channel-lock', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const { channelId, action } = req.body;
+    const channel = g.channels.cache.get(channelId);
+    if (!channel) return redirectAdminCmds(res, g.id, null, 'الروم غير موجود.');
+    try {
+        if (action === 'lock') {
+            await channel.permissionOverwrites.edit(g.roles.everyone, { SendMessages: false });
+            return redirectAdminCmds(res, g.id, `تم قفل روم #${channel.name} بنجاح.`);
+        } else {
+            await channel.permissionOverwrites.edit(g.roles.everyone, { SendMessages: null });
+            return redirectAdminCmds(res, g.id, `تم فتح روم #${channel.name} بنجاح.`);
+        }
+    } catch (err) {
+        return redirectAdminCmds(res, g.id, null, 'تعذر تنفيذ العملية، تأكد من صلاحيات البوت.');
+    }
+});
+
+// إضافة تايم اوت
+app.post('/manage/:guildId/admin-commands/timeout-add', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const { userId, minutes, reason } = req.body;
+    const member = await g.members.fetch(userId).catch(() => null);
+    if (!member) return redirectAdminCmds(res, g.id, null, 'العضو غير موجود بالسيرفر.');
+    if (!member.moderatable) return redirectAdminCmds(res, g.id, null, 'لا يمكن كتم هذا العضو (رتبته أعلى من البوت).');
+    try {
+        await member.timeout(Number(minutes) * 60 * 1000, reason || 'بدون سبب');
+        return redirectAdminCmds(res, g.id, `تم إعطاء ${member.user.tag} تايم اوت لمدة ${minutes} دقيقة.`);
+    } catch (err) {
+        return redirectAdminCmds(res, g.id, null, 'تعذر تنفيذ العملية.');
+    }
+});
+
+// إزالة تايم اوت
+app.post('/manage/:guildId/admin-commands/timeout-remove', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const { userId } = req.body;
+    const member = await g.members.fetch(userId).catch(() => null);
+    if (!member) return redirectAdminCmds(res, g.id, null, 'العضو غير موجود بالسيرفر.');
+    try {
+        await member.timeout(null);
+        return redirectAdminCmds(res, g.id, `تم إزالة التايم اوت عن ${member.user.tag}.`);
+    } catch (err) {
+        return redirectAdminCmds(res, g.id, null, 'تعذر تنفيذ العملية.');
+    }
+});
+
+// حظر عضو
+app.post('/manage/:guildId/admin-commands/ban-add', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const { userId, reason } = req.body;
+    try {
+        const member = await g.members.fetch(userId).catch(() => null);
+        if (member && !member.bannable) return redirectAdminCmds(res, g.id, null, 'لا يمكن حظر هذا العضو (رتبته أعلى من البوت).');
+        await g.members.ban(userId, { reason: reason || 'بدون سبب' });
+        return redirectAdminCmds(res, g.id, `تم حظر العضو ${userId} بنجاح.`);
+    } catch (err) {
+        return redirectAdminCmds(res, g.id, null, 'تعذر تنفيذ عملية الحظر، تأكد من صحة الـ ID.');
+    }
+});
+
+// فك حظر عضو
+app.post('/manage/:guildId/admin-commands/ban-remove', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const { userId } = req.body;
+    try {
+        await g.members.unban(userId);
+        return redirectAdminCmds(res, g.id, `تم فك الحظر عن العضو ${userId}.`);
+    } catch (err) {
+        return redirectAdminCmds(res, g.id, null, 'تعذر فك الحظر، تأكد من صحة الـ ID.');
+    }
+});
+
+// طرد عضو
+app.post('/manage/:guildId/admin-commands/kick', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const { userId, reason } = req.body;
+    const member = await g.members.fetch(userId).catch(() => null);
+    if (!member) return redirectAdminCmds(res, g.id, null, 'العضو غير موجود بالسيرفر.');
+    if (!member.kickable) return redirectAdminCmds(res, g.id, null, 'لا يمكن طرد هذا العضو (رتبته أعلى من البوت).');
+    try {
+        await member.kick(reason || 'بدون سبب');
+        return redirectAdminCmds(res, g.id, `تم طرد ${member.user.tag} بنجاح.`);
+    } catch (err) {
+        return redirectAdminCmds(res, g.id, null, 'تعذر تنفيذ عملية الطرد.');
+    }
 });
 
 // --- [ Logs ] ---
@@ -1206,7 +1291,7 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
             ${types.map(t => `
             <div class="toggle-row">
                 <div style="display:flex; align-items:center; gap:12px;">
-                    <input type="checkbox" name="${t}_st" id="chk_${t}" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer; accent-color:var(--blue);">
+                    <input type="checkbox" name="${t}_st" id="chk_${t}" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer; accent-color:var(--p2);">
                     <label for="chk_${t}" style="margin:0; color:white; cursor:pointer;">${typeLabels[t]}</label>
                 </div>
                 <select name="${t}_ch" style="width:250px; margin:0;">
@@ -1244,9 +1329,9 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
     const content = `
     <style>
-        .preview-container { position:relative; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#000; width:100%; aspect-ratio:2/1; user-select:none; }
+        .preview-container { position:relative; border:1px solid var(--border-soft); border-radius:14px; overflow:hidden; background:#000; width:100%; aspect-ratio:2/1; user-select:none; }
         #previewAvatar { position:absolute; border:3px solid #fff; border-radius:50%; background-size:100% 100%; cursor:move; box-shadow:0 0 15px rgba(0,0,0,0.5); }
-        .resizer { width:12px; height:12px; background:var(--blue); position:absolute; border-radius:50%; cursor:se-resize; }
+        .resizer { width:12px; height:12px; background:var(--p2); position:absolute; border-radius:50%; cursor:se-resize; }
         .resizer.br { bottom:-6px; right:-6px; }
     </style>
     <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
@@ -1258,7 +1343,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
             <div class="toggle-row">
                 <label style="color:white; margin:0;">تفعيل نظام الترحيب</label>
-                <input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
+                <input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--p2); cursor:pointer;">
             </div>
 
             <label>قناة الترحيب</label>
@@ -1353,7 +1438,7 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
             </h3>
             <div class="toggle-row">
                 <label style="color:white; margin:0;">حظر الروابط</label>
-                <input type="checkbox" name="antiLinks" ${s.security?.antiLinks ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
+                <input type="checkbox" name="antiLinks" ${s.security?.antiLinks ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--p2); cursor:pointer;">
             </div>
             <label>الكلمات المحظورة (افصل بفاصلة)</label>
             <input type="text" name="badWords" value="${s.security?.badWords || ''}" placeholder="كلمة1, كلمة2, ...">
@@ -1362,7 +1447,7 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
             <label>رتب الاستثناء (لن تطبق عليهم الحماية)</label>
             ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `
             <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
-                <input type="checkbox" name="bypassRoles" value="${r.id}" id="bypass_${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--blue);">
+                <input type="checkbox" name="bypassRoles" value="${r.id}" id="bypass_${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--p2);">
                 <label for="bypass_${r.id}" style="margin:0; color:var(--text); cursor:pointer;">${r.name}</label>
             </div>`).join('')}
             <button class="btn-save" style="margin-top:20px;">حفظ الإعدادات</button>
@@ -1403,8 +1488,8 @@ app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
                 الرد الآلي (حتى 15 رد)
             </h3>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 12px; margin-bottom:8px; padding:0 14px;">
-                <span style="color:var(--text-muted); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px;">الكلمة المحفزة</span>
-                <span style="color:var(--text-muted); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px;">الرد</span>
+                <span style="color:var(--text-dim); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px;">الكلمة المحفزة</span>
+                <span style="color:var(--text-dim); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1px;">الرد</span>
             </div>
             ${rows}
             <button class="btn-save" style="margin-top:8px;">حفظ الردود</button>
@@ -1473,12 +1558,12 @@ app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
     <div class="card">
         <h3>القيف اوايات النشطة</h3>
         ${activeGiveaways.map(gw => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px; background:rgba(0,0,0,0.2); border-radius:10px; margin-bottom:10px; border:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px; background:rgba(0,0,0,0.2); border-radius:10px; margin-bottom:10px; border:1px solid var(--border-soft);">
             <div>
                 <span style="color:white; font-weight:700;">${gw.prize}</span>
                 <span class="tag tag-blue" style="margin-right:10px;">${gw.winnersCount} فائز</span>
             </div>
-            <span style="color:var(--text-muted); font-size:13px;">ينتهي <t:${Math.floor(gw.endAt / 1000)}:R></span>
+            <span style="color:var(--text-dim); font-size:13px;">ينتهي <t:${Math.floor(gw.endAt / 1000)}:R></span>
         </div>`).join('')}
     </div>` : ''}`;
 
@@ -1498,7 +1583,7 @@ app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
     const embed = new EmbedBuilder()
         .setTitle(`قيف اواي: ${prize}`)
         .setDescription(`${description || 'لا يوجد وصف'}\n\nينتهي: <t:${Math.floor(endAt / 1000)}:R>\nعدد الفائزين: ${winners}`)
-        .setColor(0x1e90ff)
+        .setColor(0x7b2ff7)
         .setFooter({ text: 'اضغط على رد فعل للاشتراك' });
 
     const giveawayMsg = await targetCh.send({ embeds: [embed] });
@@ -1525,16 +1610,16 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
 
             <div style="display:flex; gap:30px; justify-content:center; margin-bottom:24px;">
                 <div style="text-align:center;">
-                    <div style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">الصورة العلوية</div>
-                    <img src="${topImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--border);">
-                    <label style="display:block; margin-top:8px; background:var(--blue-glow); border:1px solid var(--border); color:var(--blue); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
+                    <div style="color:var(--text-dim); font-size:12px; margin-bottom:8px;">الصورة العلوية</div>
+                    <img src="${topImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--border-soft);">
+                    <label style="display:block; margin-top:8px; background:rgba(0,224,255,0.12); border:1px solid var(--border); color:var(--p2); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
                         تغيير <input type="file" name="topImage" style="display:none;" accept="image/*">
                     </label>
                 </div>
                 <div style="text-align:center;">
-                    <div style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">الصورة السفلية</div>
-                    <img src="${bottomImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--border);">
-                    <label style="display:block; margin-top:8px; background:var(--blue-glow); border:1px solid var(--border); color:var(--blue); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
+                    <div style="color:var(--text-dim); font-size:12px; margin-bottom:8px;">الصورة السفلية</div>
+                    <img src="${bottomImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--border-soft);">
+                    <label style="display:block; margin-top:8px; background:rgba(0,224,255,0.12); border:1px solid var(--border); color:var(--p2); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
                         تغيير <input type="file" name="bottomImage" style="display:none;" accept="image/*">
                     </label>
                 </div>
@@ -1558,7 +1643,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;">
                 <div>
-                    <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:10px;">الازرار (حتى 4)</div>
+                    <div style="color:var(--p2); font-size:13px; font-weight:700; margin-bottom:10px;">الازرار (حتى 4)</div>
                     ${[0,1,2,3].map(i => `
                     <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="btn_label_${i}" value="${s.buttons?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
@@ -1566,7 +1651,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     </div>`).join('')}
                 </div>
                 <div>
-                    <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:10px;">خيارات المنيو (حتى 4)</div>
+                    <div style="color:var(--p2); font-size:13px; font-weight:700; margin-bottom:10px;">خيارات المنيو (حتى 4)</div>
                     ${[0,1,2,3].map(i => `
                     <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="menu_label_${i}" value="${s.menuOptions?.[i]?.label || ''}" placeholder="خيار ${i+1}">
@@ -1687,7 +1772,7 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
             </h3>
             <div class="toggle-row">
                 <label style="color:white; margin:0;">تفعيل نظام المستويات</label>
-                <input type="checkbox" name="enabled" ${s.levels?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
+                <input type="checkbox" name="enabled" ${s.levels?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--p2); cursor:pointer;">
             </div>
             <label>XP لكل رسالة</label>
             <input type="number" name="xpPerMessage" value="${s.levels?.xpPerMessage || 10}" min="1">
@@ -1738,7 +1823,7 @@ app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
                 ).join('')}
             </select>
             <div style="margin-top:20px;">
-                <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:12px;">الرتب (حتى 10)</div>
+                <div style="color:var(--p2); font-size:13px; font-weight:700; margin-bottom:12px;">الرتب (حتى 10)</div>
                 ${Array.from({ length: 10 }, (_, i) => `
                 <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
                     <select name="role_id_${i}">
@@ -1785,7 +1870,7 @@ app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
             if (row.components.length > 0) rows.push(row);
             
             await channel.send({ 
-                embeds: [new EmbedBuilder().setTitle('لوحة الرتب الذاتية').setDescription('اضغط على الزر للحصول على الرتبة أو إزالتها').setColor(0x1e90ff)],
+                embeds: [new EmbedBuilder().setTitle('لوحة الرتب الذاتية').setDescription('اضغط على الزر للحصول على الرتبة أو إزالتها').setColor(0x7b2ff7)],
                 components: rows 
             }).catch(() => {});
         }
@@ -1808,7 +1893,7 @@ app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 إعدادات نظام السجن
             </h3>
-            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">
+            <p style="color:var(--text-dim); font-size:13px; margin-bottom:16px;">
                 عند سجن شخص، يتم سحب جميع رتبه تلقائياً ويُعطى رتبة السجن فقط، ولن يستطيع رؤية أي روم سوى روم السجن.
             </p>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
@@ -1856,8 +1941,6 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
     res.redirect(`/manage/${req.params.guildId}/mod`);
 });
 
-
-
 // ==========================================
 // 10. Discord Event Handlers
 // ==========================================
@@ -1875,16 +1958,18 @@ client.on('messageCreate', async (msg) => {
                 const authorAvatar = msg.author.displayAvatarURL({ dynamic: true });
                 await msg.delete().catch(() => {});
 
+                // ملاحظة: عداد التصويت أصبح حقل واحد غير inline بسطر ثابت
+                // بدل حقلين inline، حتى لا يختلف شكله (واحد جوا وواحد برا)
+                // عند وجود صورة داخل الايمبد.
+                const voteLine = `${getEmojiDisplay(msg.guild, sugCfg.emoji1)} \`0\`      ${getEmojiDisplay(msg.guild, sugCfg.emoji2)} \`0\``;
+
                 const embed = new EmbedBuilder()
                     .setAuthor({ name: `اقتراح من ${msg.author.username}`, iconURL: authorAvatar })
                     .setDescription(content || '*بدون نص*')
-                    .setColor(0x1e90ff)
-                    .setFooter({ text: 'VORTEX  - Suggestions' })
+                    .setColor(0x7b2ff7)
+                    .setFooter({ text: 'ABOUD SYSTEM - Suggestions' })
                     .setTimestamp()
-                    .addFields(
-                        { name: getEmojiDisplay(msg.guild, sugCfg.emoji1), value: '0', inline: true },
-                        { name: getEmojiDisplay(msg.guild, sugCfg.emoji2), value: '0', inline: true }
-                    );
+                    .addFields({ name: 'التصويت', value: voteLine, inline: false });
 
                 const files = [];
                 if (attachmentImg) {
@@ -1940,7 +2025,7 @@ client.on('messageCreate', async (msg) => {
 
             const embed = new EmbedBuilder()
                 .setTitle(`اعلى 15 ليفل في السيرفر`)
-                .setColor(0x1e90ff)
+                .setColor(0x7b2ff7)
                 .setThumbnail(msg.guild.iconURL({ dynamic: true }))
                 .setTimestamp();
 
@@ -2125,14 +2210,14 @@ client.on('messageCreate', async (msg) => {
         ctx.fillStyle = bgGradient;
         ctx.fillRect(0, 0, 850, 500);
 
-        ctx.strokeStyle = '#1e90ff';
+        ctx.strokeStyle = '#7b2ff7';
         ctx.lineWidth = 3;
         ctx.strokeRect(8, 8, 834, 484);
 
         ctx.save();
         ctx.beginPath();
         ctx.arc(150, 150, 90, 0, Math.PI * 2);
-        ctx.strokeStyle = '#1e90ff';
+        ctx.strokeStyle = '#00e0ff';
         ctx.lineWidth = 5;
         ctx.stroke();
         ctx.clip();
@@ -2146,19 +2231,19 @@ client.on('messageCreate', async (msg) => {
         ctx.fillText(target.username, 270, 130);
 
         ctx.font = '28px Arial';
-        ctx.fillStyle = '#1e90ff';
+        ctx.fillStyle = '#00e0ff';
         ctx.fillText(`XP: ${uData.xp || 0}`, 270, 175);
 
         function drawStatBox(x, y, label, value) {
-            ctx.fillStyle = 'rgba(30, 144, 255, 0.08)';
+            ctx.fillStyle = 'rgba(123, 47, 247, 0.08)';
             ctx.beginPath();
             ctx.roundRect(x, y, 240, 160, 16);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(30, 144, 255, 0.3)';
+            ctx.strokeStyle = 'rgba(0, 224, 255, 0.3)';
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#1e90ff';
+            ctx.fillStyle = '#00e0ff';
             ctx.font = 'bold 20px Arial';
             ctx.fillText(label, x + 120, y + 48);
             ctx.fillStyle = '#ffffff';
@@ -2220,10 +2305,8 @@ client.on('messageCreate', async (msg) => {
                 });
 
                 // إخفاء كل الرومات عن المسجون (تلقائي عبر رتبة السجن)
-                // يجب أن تكون رتبة السجن تمنع ViewChannel في كل الرومات
                 const jailChannel = msg.guild.channels.cache.get(modConfig.jail.channelId);
                 if (jailChannel) {
-                    // السماح للمسجون برؤية روم السجن فقط
                     await jailChannel.permissionOverwrites.edit(target.id, {
                         ViewChannel: true,
                         SendMessages: true
@@ -2233,7 +2316,7 @@ client.on('messageCreate', async (msg) => {
                 const embed = new EmbedBuilder()
                     .setTitle('تم السجن')
                     .setDescription(`تم سجن ${target} لمدة **${timeInput}**`)
-                    .setColor(0xe63946)
+                    .setColor(0xff4d6d)
                     .addFields(
                         { name: 'العضو', value: `${target}`, inline: true },
                         { name: 'بواسطة', value: `${msg.author}`, inline: true },
@@ -2262,7 +2345,7 @@ client.on('messageCreate', async (msg) => {
             const embed = new EmbedBuilder()
                 .setTitle('فك السجن')
                 .setDescription(`تم فك سجن ${target} واسترجاع رتبه كاملة.`)
-                .setColor(0x00c853)
+                .setColor(0x12e6a0)
                 .setTimestamp();
             msg.channel.send({ embeds: [embed] });
         }
@@ -2298,11 +2381,11 @@ async function updateSuggestionVotes(reaction, user, isAdd) {
         }
         await suggestion.save();
 
+        // نفس منطق العرض بحقل واحد ثابت غير inline حتى لا يختلف الشكل
+        const voteLine = `${getEmojiDisplay(message.guild, sugCfg.emoji1)} \`${suggestion.votes1.length}\`      ${getEmojiDisplay(message.guild, sugCfg.emoji2)} \`${suggestion.votes2.length}\``;
+
         const embed = EmbedBuilder.from(message.embeds[0]);
-        embed.setFields(
-            { name: getEmojiDisplay(message.guild, sugCfg.emoji1), value: `${suggestion.votes1.length}`, inline: true },
-            { name: getEmojiDisplay(message.guild, sugCfg.emoji2), value: `${suggestion.votes2.length}`, inline: true }
-        );
+        embed.setFields({ name: 'التصويت', value: voteLine, inline: false });
         await message.edit({ embeds: [embed] }).catch(() => {});
     } catch (err) {
         console.error('[Suggestion Vote Error]', err);
@@ -2323,7 +2406,7 @@ client.on('messageDelete', async (message) => {
 
     const embed = new EmbedBuilder()
         .setTitle('رسالة محذوفة')
-        .setColor(0xe63946)
+        .setColor(0xff4d6d)
         .addFields(
             { name: 'صاحب الرسالة', value: `<@${message.author.id}>`, inline: true },
             { name: 'حذفها', value: executor ? `<@${executor.id}>` : 'غير معروف', inline: true },
@@ -2341,7 +2424,7 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
 
     const embed = new EmbedBuilder()
         .setTitle('رسالة معدلة')
-        .setColor(0xf39c12)
+        .setColor(0xffc857)
         .addFields(
             { name: 'العضو', value: `<@${oldMsg.author.id}>`, inline: true },
             { name: 'القناة', value: `<#${oldMsg.channel.id}>`, inline: true },
@@ -2365,7 +2448,7 @@ client.on('guildMemberAdd', async (member) => {
         // لوق الأعضاء
         const logEmbed = new EmbedBuilder()
             .setTitle('عضو جديد انضم')
-            .setColor(0x00c853)
+            .setColor(0x12e6a0)
             .setThumbnail(member.user.displayAvatarURL())
             .addFields({ name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true })
             .setTimestamp();
@@ -2386,18 +2469,18 @@ client.on('guildMemberAdd', async (member) => {
         const welcomeEmbed = new EmbedBuilder()
             .setTitle('عضو جديد انضم إلينا')
             .setDescription(welcomeMsg)
-            .setColor(0x1e90ff)
+            .setColor(0x7b2ff7)
             .setTimestamp()
-            .setFooter({ text: `VORTEX  - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+            .setFooter({ text: `ABOUD SYSTEM - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
         try {
             const canvas = createCanvas(800, 400);
             const ctx = canvas.getContext('2d');
 
             let bgUrl = config.welcome.imagePath;
-if (!bgUrl) bgUrl = 'https://placehold.co/800x400/050510/1e90ff?text=Welcome';
+if (!bgUrl) bgUrl = 'https://placehold.co/800x400/060613/7b2ff7?text=Welcome';
 if (!bgUrl.startsWith('http' )) bgUrl = `${process.env.BASE_URL || 'http://localhost:3000'}${bgUrl}`;
-const background = await loadImage(bgUrl ).catch(() => loadImage('https://placehold.co/800x400/050510/1e90ff?text=Welcome' ));
+const background = await loadImage(bgUrl ).catch(() => loadImage('https://placehold.co/800x400/060613/7b2ff7?text=Welcome' ));
 
             ctx.drawImage(background, 0, 0, 800, 400);
 
@@ -2415,7 +2498,7 @@ const background = await loadImage(bgUrl ).catch(() => loadImage('https://placeh
             if (avatar) ctx.drawImage(avatar, x - (avW / 2), y - (avH / 2), avW, avH);
             ctx.restore();
 
-            ctx.strokeStyle = '#1e90ff';
+            ctx.strokeStyle = '#7b2ff7';
             ctx.lineWidth = 5;
             ctx.beginPath();
             ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
@@ -2436,7 +2519,7 @@ const background = await loadImage(bgUrl ).catch(() => loadImage('https://placeh
 client.on('guildMemberRemove', async (member) => {
     const embed = new EmbedBuilder()
         .setTitle('عضو غادر')
-        .setColor(0xe63946)
+        .setColor(0xff4d6d)
         .setThumbnail(member.user.displayAvatarURL())
         .addFields({ name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true })
         .setTimestamp();
@@ -2462,7 +2545,7 @@ client.on('guildBanRemove', async (ban) => {
     const executor = await getExecutor(ban.guild, AuditLogEvent.MemberUnban);
     const embed = new EmbedBuilder()
         .setTitle('رُفع الحظر عن عضو')
-        .setColor(0x00c853)
+        .setColor(0x12e6a0)
         .addFields(
             { name: 'العضو', value: `${ban.user.tag}`, inline: true },
             { name: 'بواسطة', value: executor, inline: true }
@@ -2475,7 +2558,7 @@ client.on('channelCreate', async (channel) => {
     if (!channel.guild) return;
     const embed = new EmbedBuilder()
         .setTitle('قناة جديدة')
-        .setColor(0x1e90ff)
+        .setColor(0x00e0ff)
         .addFields({ name: 'القناة', value: `${channel.name} (<#${channel.id}>)` })
         .setTimestamp();
     await sendLog(channel.guild, 'channels', embed);
@@ -2485,7 +2568,7 @@ client.on('channelDelete', async (channel) => {
     if (!channel.guild) return;
     const embed = new EmbedBuilder()
         .setTitle('قناة محذوفة')
-        .setColor(0xe63946)
+        .setColor(0xff4d6d)
         .addFields({ name: 'القناة', value: channel.name })
         .setTimestamp();
     await sendLog(channel.guild, 'channels', embed);
@@ -2494,7 +2577,7 @@ client.on('channelDelete', async (channel) => {
 client.on('roleCreate', async (role) => {
     const embed = new EmbedBuilder()
         .setTitle('رتبة جديدة')
-        .setColor(0x00c853)
+        .setColor(0x12e6a0)
         .addFields({ name: 'الرتبة', value: role.name })
         .setTimestamp();
     await sendLog(role.guild, 'roles', embed);
@@ -2503,7 +2586,7 @@ client.on('roleCreate', async (role) => {
 client.on('roleDelete', async (role) => {
     const embed = new EmbedBuilder()
         .setTitle('رتبة محذوفة')
-        .setColor(0xe63946)
+        .setColor(0xff4d6d)
         .addFields({ name: 'الرتبة', value: role.name })
         .setTimestamp();
     await sendLog(role.guild, 'roles', embed);
@@ -2517,7 +2600,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (!oldState.channel && newState.channel) {
         embed = new EmbedBuilder()
             .setTitle('دخل روم صوتي')
-            .setColor(0x00c853)
+            .setColor(0x12e6a0)
             .addFields(
                 { name: 'العضو', value: `<@${newState.member.id}>`, inline: true },
                 { name: 'الروم', value: newState.channel.name, inline: true }
@@ -2526,7 +2609,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     } else if (oldState.channel && !newState.channel) {
         embed = new EmbedBuilder()
             .setTitle('غادر روم صوتي')
-            .setColor(0xe63946)
+            .setColor(0xff4d6d)
             .addFields(
                 { name: 'العضو', value: `<@${oldState.member.id}>`, inline: true },
                 { name: 'الروم', value: oldState.channel.name, inline: true }
@@ -2559,7 +2642,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle('لوحة تغيير الاسم')
                     .setDescription(`اضغط على الزر لتغيير اسمك إلى: **${name}**`)
-                    .setColor(0x1e90ff);
+                    .setColor(0x7b2ff7);
                 if (image) embed.setImage(image.url);
 
                 const row = new ActionRowBuilder().addComponents(
@@ -2577,7 +2660,7 @@ client.on('interactionCreate', async (interaction) => {
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (member && !member.bannable) return interaction.reply({ content: 'لا يمكنني حظر هذا العضو (رتبته أعلى مني).', ephemeral: true });
                 await interaction.guild.members.ban(target.id, { reason }).catch(() => {});
-                const embed = new EmbedBuilder().setTitle('تم الحظر').setColor(0xe63946)
+                const embed = new EmbedBuilder().setTitle('تم الحظر').setColor(0xff4d6d)
                     .addFields({ name: 'العضو', value: `${target.tag}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
@@ -2589,7 +2672,7 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.guild.members.unban(id, reason).catch(() => {
                     return interaction.reply({ content: 'تعذر فك الحظر، تأكد من صحة الـ ID.', ephemeral: true });
                 });
-                const embed = new EmbedBuilder().setTitle('تم فك الحظر').setColor(0x00c853)
+                const embed = new EmbedBuilder().setTitle('تم فك الحظر').setColor(0x12e6a0)
                     .addFields({ name: 'العضو', value: `<@${id}>`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
@@ -2602,7 +2685,7 @@ client.on('interactionCreate', async (interaction) => {
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 if (!member.kickable) return interaction.reply({ content: 'لا يمكنني طرد هذا العضو (رتبته أعلى مني).', ephemeral: true });
                 await member.kick(reason).catch(() => {});
-                const embed = new EmbedBuilder().setTitle('تم الطرد').setColor(0xe63946)
+                const embed = new EmbedBuilder().setTitle('تم الطرد').setColor(0xff4d6d)
                     .addFields({ name: 'العضو', value: `${target.tag}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
@@ -2616,7 +2699,7 @@ client.on('interactionCreate', async (interaction) => {
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 if (!member.moderatable) return interaction.reply({ content: 'لا يمكنني كتم هذا العضو (رتبته أعلى مني).', ephemeral: true });
                 await member.timeout(minutes * 60 * 1000, reason).catch(() => {});
-                const embed = new EmbedBuilder().setTitle('تم الكتم (Timeout)').setColor(0xffac33)
+                const embed = new EmbedBuilder().setTitle('تم الكتم (Timeout)').setColor(0xffc857)
                     .addFields({ name: 'العضو', value: `${target}`, inline: true }, { name: 'المدة', value: `${minutes} دقيقة`, inline: true }, { name: 'السبب', value: reason })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
@@ -2634,7 +2717,7 @@ client.on('interactionCreate', async (interaction) => {
                 const target = interaction.options.getUser('عضو');
                 const reason = interaction.options.getString('سبب');
                 await Warn.create({ guildId: interaction.guild.id, userId: target.id, reason, moderatorId: interaction.user.id });
-                const embed = new EmbedBuilder().setTitle('تم توجيه تحذير').setColor(0xffac33)
+                const embed = new EmbedBuilder().setTitle('تم توجيه تحذير').setColor(0xffc857)
                     .addFields({ name: 'العضو', value: `${target}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
                     .setTimestamp();
                 await interaction.reply({ embeds: [embed] });
@@ -2646,7 +2729,7 @@ client.on('interactionCreate', async (interaction) => {
                 const target = interaction.options.getUser('عضو');
                 const warns = await Warn.find({ guildId: interaction.guild.id, userId: target.id }).sort({ createdAt: -1 }).limit(15);
                 if (warns.length === 0) return interaction.reply({ content: `${target} لا يملك أي تحذيرات.`, ephemeral: true });
-                const embed = new EmbedBuilder().setTitle(`تحذيرات ${target.username}`).setColor(0xffac33)
+                const embed = new EmbedBuilder().setTitle(`تحذيرات ${target.username}`).setColor(0xffc857)
                     .setDescription(warns.map((w, i) => `**${i + 1}.** ${w.reason} — بواسطة <@${w.moderatorId}> <t:${Math.floor(w.createdAt.getTime() / 1000)}:R>`).join('\n'))
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -2718,8 +2801,8 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle(title)
                     .setDescription(text)
-                    .setColor(0x1e90ff)
-                    .setFooter({ text: `VORTEX  - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                    .setColor(0x7b2ff7)
+                    .setFooter({ text: `ABOUD SYSTEM - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                     .setTimestamp();
                 if (image) embed.setImage(image.url);
 
@@ -2742,7 +2825,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle(`معلومات ${target.username}`)
                     .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-                    .setColor(0x1e90ff)
+                    .setColor(0x7b2ff7)
                     .addFields(
                         { name: 'الاسم الكامل', value: target.tag, inline: true },
                         { name: 'ID', value: target.id, inline: true },
@@ -2762,7 +2845,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle(g.name)
                     .setThumbnail(g.iconURL({ dynamic: true }))
-                    .setColor(0x1e90ff)
+                    .setColor(0x7b2ff7)
                     .addFields(
                         { name: 'المالك', value: `<@${g.ownerId}>`, inline: true },
                         { name: 'عدد الأعضاء', value: `${g.memberCount}`, inline: true },
@@ -2770,7 +2853,7 @@ client.on('interactionCreate', async (interaction) => {
                         { name: 'عدد الرتب', value: `${g.roles.cache.size}`, inline: true },
                         { name: 'تاريخ الإنشاء', value: `<t:${Math.floor(g.createdTimestamp / 1000)}:D>`, inline: true },
                     )
-                    .setFooter({ text: 'VORTEX ' })
+                    .setFooter({ text: 'ABOUD SYSTEM' })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
             }
@@ -2780,7 +2863,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle(`صورة ${target.username}`)
                     .setImage(target.displayAvatarURL({ dynamic: true, size: 1024 }))
-                    .setColor(0x1e90ff);
+                    .setColor(0x7b2ff7);
                 return interaction.reply({ embeds: [embed] });
             }
         }
@@ -2904,7 +2987,6 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
     const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
     if (!tConfig) return interaction.reply({ content: 'لم يتم العثور على إعدادات التذاكر.', ephemeral: true });
 
-    // استخراج رقم الخيار من الـ value (مثلاً ticket_opt_0 → 0)
     const optIndex = parseInt(selected.replace('ticket_opt_', ''));
     let ticketType = 'تذكرة دعم';
     if (tConfig.menuOptions?.[optIndex]) {
@@ -3006,7 +3088,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
             const replyEmbed = new EmbedBuilder()
                 .setAuthor({ name: `رد الإدارة - ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                 .setDescription(replyText)
-                .setColor(0x1e90ff)
+                .setColor(0x7b2ff7)
                 .setTimestamp();
             await thread.send({ embeds: [replyEmbed] });
 
@@ -3073,14 +3155,14 @@ async function openTicket(interaction, tConfig, ticketType) {
         const embed = new EmbedBuilder()
             .setTitle(`تكت ${ticketType} | #${ticketCount}`)
             .setDescription(`مرحباً ${interaction.user}!\n\nالإدارة ستتواصل معك قريباً. يرجى شرح مشكلتك بالتفصيل.`)
-            .setColor(0x1e90ff)
+            .setColor(0x7b2ff7)
             .addFields(
                 { name: 'صاحب التكت', value: `${interaction.user}`, inline: true },
                 { name: 'النوع', value: ticketType, inline: true }
             )
             .setThumbnail(interaction.user.displayAvatarURL())
             .setTimestamp()
-            .setFooter({ text: 'VORTEX  - Tickets' });
+            .setFooter({ text: 'ABOUD SYSTEM - Tickets' });
 
         if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
             const topName = path.basename(tConfig.topImagePath);
@@ -3170,7 +3252,7 @@ async function checkKickLive() {
                                 { name: 'المشاهدون', value: `${viewers}`, inline: true }
                             )
                             .setTimestamp()
-                            .setFooter({ text: 'VORTEX  - Kick Notifications' });
+                            .setFooter({ text: 'ABOUD SYSTEM - Kick Notifications' });
 
                         if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
 
@@ -3305,7 +3387,7 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
-        console.log('[VORTEX ] Slash commands registered.');
+        console.log('[ABOUD SYSTEM] Slash commands registered.');
     } catch (err) {
         console.error('[Slash Register Error]', err);
     }
@@ -3316,9 +3398,9 @@ async function registerSlashCommands() {
 // ==========================================
 
 client.once('ready', async () => {
-    console.log(`[VORTEX ] Bot is online as ${client.user.tag}`);
+    console.log(`[ABOUD SYSTEM] Bot is online as ${client.user.tag}`);
     client.user.setPresence({
-        activities: [{ name: 'VORTEX ', type: ActivityType.Watching }],
+        activities: [{ name: 'ABOUD SYSTEM', type: ActivityType.Watching }],
         status: 'online'
     });
 
@@ -3346,10 +3428,10 @@ client.once('ready', async () => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`[VORTEX ] Dashboard running on port ${PORT}`);
+    console.log(`[ABOUD SYSTEM] Dashboard running on port ${PORT}`);
 });
 
 client.login(process.env.TOKEN).catch(err => {
-    console.error('[VORTEX ] Login failed:', err);
+    console.error('[ABOUD SYSTEM] Login failed:', err);
     process.exit(1);
 });
