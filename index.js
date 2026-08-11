@@ -24,19 +24,21 @@ const {
 // ==========================================
 
 
+
 const AdminCmdConfig = mongoose.model('AdminCmdConfig', new mongoose.Schema({
     guildId: String,
     adminRoles: { type: [String], default: [] },
-    shortcuts: {
-        lock: { type: String, default: '-ق' },
-        unlock: { type: String, default: '-ف' },
-        timeout: { type: String, default: '-ت' },
-        untimeout: { type: String, default: '-فت' },
-        ban: { type: String, default: '-ب' },
-        unban: { type: String, default: '-فب' },
-        kick: { type: String, default: '-ك' }
+    settings: {
+        lock: { shortcut: { type: String, default: '-ق' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } },
+        unlock: { shortcut: { type: String, default: '-ف' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } },
+        timeout: { shortcut: { type: String, default: '-ت' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } },
+        untimeout: { shortcut: { type: String, default: '-فت' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } },
+        ban: { shortcut: { type: String, default: '-ب' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } },
+        unban: { shortcut: { type: String, default: '-فب' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } },
+        kick: { shortcut: { type: String, default: '-ك' }, delUser: { type: Boolean, default: false }, delBot: { type: Boolean, default: false } }
     }
 }));
+
 const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
     guildId: String,
     streamers: [{
@@ -947,44 +949,52 @@ function ui(guild, active, content) {
 // ==========================================
 
 
+
 // --- [ Dashboard - Admin Commands ] ---
 app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    const config = await AdminCmdConfig.findOne({ guildId: g.id }) || { adminRoles: [], shortcuts: { lock: '-ق', unlock: '-ف', timeout: '-ت', untimeout: '-فت', ban: '-ب', unban: '-فب', kick: '-ك' } };
-    
-    const content = `
-        <div class="card">
-            <h3>الاختصارات الإدارية</h3>
-            <p style="color:#888; font-size:13px; margin-bottom:20px;">حدد الاختصارات التي تريد استخدامها والرتب المسموح لها.</p>
-            
-            <form method="POST" action="/save/${g.id}/admincmds">
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="card" style="margin-bottom:0;">
-                        <h4>الرتب المسموح لها</h4>
-                        <p style="font-size:11px; color:#666;">ضع معرفات الرتب (IDs) مفصولة بفاصلة</p>
-                        <input type="text" name="adminRoles" value="${config.adminRoles.join(',')}" placeholder="مثلاً: 123456789,987654321">
-                    </div>
-                    
-                    <div class="card" style="margin-bottom:0;">
-                        <h4>اختصارات الأوامر</h4>
-                        <label>قفل الشات</label>
-                        <input type="text" name="lock" value="${config.shortcuts.lock}">
-                        <label>فتح الشات</label>
-                        <input type="text" name="unlock" value="${config.shortcuts.unlock}">
-                        <label>كتم (Timeout)</label>
-                        <input type="text" name="timeout" value="${config.shortcuts.timeout}">
-                        <label>فك الكتم</label>
-                        <input type="text" name="untimeout" value="${config.shortcuts.untimeout}">
-                        <label>حظر (Ban)</label>
-                        <input type="text" name="ban" value="${config.shortcuts.ban}">
-                        <label>فك الحظر</label>
-                        <input type="text" name="unban" value="${config.shortcuts.unban}">
-                        <label>طرد (Kick)</label>
-                        <input type="text" name="kick" value="${config.shortcuts.kick}">
+    let config = await AdminCmdConfig.findOne({ guildId: g.id });
+    if (!config) {
+        config = new AdminCmdConfig({ guildId: g.id });
+        await config.save();
+    }
+
+    const renderClass = (title, keys) => {
+        let html = `<div class="card"><h4>${title}</h4><div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">`;
+        keys.forEach(k => {
+            const s = config.settings[k];
+            const label = k === 'lock' ? 'قفل الشات' : k === 'unlock' ? 'فتح الشات' : k === 'timeout' ? 'كتم' : k === 'untimeout' ? 'فك الكتم' : k === 'ban' ? 'باند' : k === 'unban' ? 'فك باند' : 'كيك';
+            html += `
+                <div style="background:rgba(255,255,255,0.02); padding:15px; border-radius:10px; border:1px solid rgba(255,255,255,0.05);">
+                    <label style="color:var(--blue); font-weight:800;">${label}</label>
+                    <input type="text" name="${k}_shortcut" value="${s.shortcut}" placeholder="الاختصار">
+                    <div style="margin-top:10px; font-size:12px;">
+                        <label style="display:inline; margin:0;"><input type="checkbox" name="${k}_delUser" ${s.delUser ? 'checked' : ''} style="width:auto; margin-left:5px;"> حذف رسالة العضو</label><br>
+                        <label style="display:inline; margin:0;"><input type="checkbox" name="${k}_delBot" ${s.delBot ? 'checked' : ''} style="width:auto; margin-left:5px;"> حذف رد البوت</label>
                     </div>
                 </div>
-                <button type="submit" class="btn-save">حفظ الإعدادات</button>
+            `;
+        });
+        html += `</div></div>`;
+        return html;
+    };
+
+    const content = `
+        <div class="card">
+            <h3>الأوامر الإدارية (الاختصارات)</h3>
+            <form method="POST" action="/save/${g.id}/admincmds">
+                <div class="card" style="background:rgba(30,144,255,0.05);">
+                    <label>الرتب المسموح لها باستخدام الاختصارات (IDs مفصولة بفاصلة)</label>
+                    <input type="text" name="adminRoles" value="${config.adminRoles.join(',')}" placeholder="مثلاً: 123456789,987654321">
+                </div>
+                
+                ${renderClass('إدارة الشات', ['lock', 'unlock'])}
+                ${renderClass('نظام الكتم', ['timeout', 'untimeout'])}
+                ${renderClass('نظام الحظر', ['ban', 'unban'])}
+                ${renderClass('نظام الطرد', ['kick'])}
+                
+                <button type="submit" class="btn-save">حفظ كافة الإعدادات</button>
             </form>
         </div>
     `;
@@ -992,17 +1002,25 @@ app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
 });
 
 app.post('/save/:guildId/admincmds', checkAuth, async (req, res) => {
-    const { adminRoles, lock, unlock, timeout, untimeout, ban, unban, kick } = req.body;
-    const rolesArray = adminRoles.split(',').map(r => r.trim()).filter(Boolean);
-    await AdminCmdConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { 
-            adminRoles: rolesArray,
-            shortcuts: { lock, unlock, timeout, untimeout, ban, unban, kick }
-        },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/admincmds`);
+    const guildId = req.params.guildId;
+    const b = req.body;
+    const roles = b.adminRoles.split(',').map(r => r.trim()).filter(Boolean);
+    
+    const update = {
+        adminRoles: roles,
+        settings: {
+            lock: { shortcut: b.lock_shortcut, delUser: !!b.lock_delUser, delBot: !!b.lock_delBot },
+            unlock: { shortcut: b.unlock_shortcut, delUser: !!b.unlock_delUser, delBot: !!b.unlock_delBot },
+            timeout: { shortcut: b.timeout_shortcut, delUser: !!b.timeout_delUser, delBot: !!b.timeout_delBot },
+            untimeout: { shortcut: b.untimeout_shortcut, delUser: !!b.untimeout_delUser, delBot: !!b.untimeout_delBot },
+            ban: { shortcut: b.ban_shortcut, delUser: !!b.ban_delUser, delBot: !!b.ban_delBot },
+            unban: { shortcut: b.unban_shortcut, delUser: !!b.unban_delUser, delBot: !!b.unban_delBot },
+            kick: { shortcut: b.kick_shortcut, delUser: !!b.kick_delUser, delBot: !!b.kick_delBot }
+        }
+    };
+    
+    await AdminCmdConfig.findOneAndUpdate({ guildId }, { $set: update }, { upsert: true });
+    res.redirect(`/manage/${guildId}/admincmds`);
 });
 
 // --- [ Dashboard - Server List ] ---
@@ -1690,339 +1708,18 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
         if (b.targetChannel) {
             const channel = g.channels.cache.get(b.targetChannel);
             if (channel) {
-                const files = [];
-                const embed = new EmbedBuilder()
-                    .setTitle(config.title || 'نظام التذاكر')
-                    .setDescription(config.description || 'اضغط للفتح')
-                    .setColor(parseInt((config.color || '#1e90ff').replace('#', ''), 16));
-
-                if (config.topImagePath && fs.existsSync(config.topImagePath)) {
-                    const topName = path.basename(config.topImagePath);
-                    files.push(new AttachmentBuilder(config.topImagePath, { name: topName }));
-                    embed.setThumbnail(`attachment://${topName}`);
-                }
-                if (config.bottomImagePath && fs.existsSync(config.bottomImagePath)) {
-                    const bottomName = path.basename(config.bottomImagePath);
-                    files.push(new AttachmentBuilder(config.bottomImagePath, { name: bottomName }));
-                    embed.setImage(`attachment://${bottomName}`);
-                }
-
-                const components = [];
-                if (config.buttons?.length > 0) {
-                    const btnRow = new ActionRowBuilder();
-                    config.buttons.forEach((btn, i) => {
-                        const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
-                        if (btn.emoji && btn.emoji.trim() !== '') {
-                            const em = btn.emoji.trim();
-                            try {
-                                if (/^\d+$/.test(em)) button.setEmoji({ id: em });
-                                else if (/^<a?:\w+:\d+>$/.test(em)) button.setEmoji(em);
-                            } catch (e) {}
-                        }
-                        btnRow.addComponents(button);
-                    });
-                    if (btnRow.components.length > 0) components.push(btnRow);
-                }
-                if (config.menuOptions?.length > 0) {
-                    const select = new StringSelectMenuBuilder().setCustomId('ticket_menu').setPlaceholder('اختر من القائمة...');
-                    config.menuOptions.forEach((opt, i) => {
-                        const option = { label: opt.label, value: `ticket_opt_${i}` };
-                        if (opt.emoji && opt.emoji.trim() !== '') {
-                            const em = opt.emoji.trim();
-                            try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) {}
-                        }
-                        select.addOptions(option);
-                    });
-                    components.push(new ActionRowBuilder().addComponents(select));
-                }
-                if (components.length === 0) {
-                    components.push(new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة').setStyle(ButtonStyle.Primary)
-                    ));
-                }
-                await channel.send({ embeds: [embed], components, files }).catch(e => console.error('[Ticket Send Error]', e));
-            }
-        }
-        res.redirect(`/manage/${req.params.guildId}/tickets`);
-    } catch (error) {
-        console.error('[Ticket Save Error]', error);
-        res.status(500).send('Internal Error');
-    }
-});
-
-// --- [ Levels ] ---
-app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
-
-    const content = `
-    <form method="POST" action="/save/${g.id}/levels">
-        <div class="card">
-            <h3>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/></svg>
-                إعدادات المستويات
-            </h3>
-            <div class="toggle-row">
-                <label style="color:white; margin:0;">تفعيل نظام المستويات</label>
-                <input type="checkbox" name="enabled" ${s.levels?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
-            </div>
-            <label>XP لكل رسالة</label>
-            <input type="number" name="xpPerMessage" value="${s.levels?.xpPerMessage || 10}" min="1">
-            <label>قناة رسائل الترقية</label>
-            <select name="levelUpChannel">
-                <option value="">-- نفس القناة --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}" ${s.levels?.levelUpChannel === c.id ? 'selected' : ''}># ${c.name}</option>`
-                ).join('')}
-            </select>
-            <label>أمر قائمة المتصدرين</label>
-            <input name="leaderboardCommand" value="${s.levels?.leaderboardCommand || '!levels'}" placeholder="!levels">
-            <button class="btn-save" style="margin-top:20px;">حفظ الإعدادات</button>
-        </div>
-    </form>`;
-
-    res.send(ui(g, 'levels', content));
-});
-
-app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
-    const b = req.body;
-    await GuildConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { $set: { levels: { enabled: b.enabled === 'on', xpPerMessage: Number(b.xpPerMessage) || 10, levelUpChannel: b.levelUpChannel, leaderboardCommand: b.leaderboardCommand || '!levels' } } },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/levels`);
-});
-
-// --- [ Roles Panel ] ---
-app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await GuildConfig.findOne({ guildId: g.id }) || { rolesPanel: [] };
-
-    const content = `
-    <div class="card">
-        <h3>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-            لوحة الرتب الذاتية
-        </h3>
-        <form method="POST" action="/save/${g.id}/roles">
-            <label>قناة إرسال اللوحة</label>
-            <select name="rolesChannel">
-                <option value="">-- اختر القناة --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}" ${s.rolesChannel === c.id ? 'selected' : ''}># ${c.name}</option>`
-                ).join('')}
-            </select>
-            <div style="margin-top:20px;">
-                <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:12px;">الرتب (حتى 10)</div>
-                ${Array.from({ length: 10 }, (_, i) => `
-                <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
-                    <select name="role_id_${i}">
-                        <option value="">-- اختر رتبة --</option>
-                        ${g.roles.cache.filter(r => r.name !== '@everyone').map(r =>
-                            `<option value="${r.id}" ${s.rolesPanel?.[i]?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
-                        ).join('')}
-                    </select>
-                    <input name="role_label_${i}" value="${s.rolesPanel?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
-                </div>`).join('')}
-            </div>
-            <button class="btn-save" style="margin-top:12px;">حفظ اللوحة</button>
-        </form>
-    </div>`;
-
-    res.send(ui(g, 'roles', content));
-});
-app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
-    const b = req.body;
-    const rolesPanel = [];
-    for (let i = 0; i < 10; i++) {
-        const roleId = b[`role_id_${i}`];
-        const label = b[`role_label_${i}`]?.trim();
-        if (roleId && label) rolesPanel.push({ roleId, label, type: 'button' });
-    }
-    
-    const config = await GuildConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { $set: { rolesPanel, rolesChannel: b.rolesChannel } },
-        { upsert: true, new: true }
-    );
-
-    // إرسال اللوحة تلقائياً للروم
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (g && b.rolesChannel && rolesPanel.length > 0) {
-        const channel = g.channels.cache.get(b.rolesChannel);
-        if (channel) {
-            const rows = [];
-            let row = new ActionRowBuilder();
-            for (const r of rolesPanel) {
-                row.addComponents(new ButtonBuilder().setCustomId(`role_${r.roleId}`).setLabel(r.label).setStyle(ButtonStyle.Secondary));
-                if (row.components.length === 5) { rows.push(row); row = new ActionRowBuilder(); }
-            }
-            if (row.components.length > 0) rows.push(row);
-            
-            await channel.send({ 
-                embeds: [new EmbedBuilder().setTitle('لوحة الرتب الذاتية').setDescription('اضغط على الزر للحصول على الرتبة أو إزالتها').setColor(0x1e90ff)],
-                components: rows 
-            }).catch(() => {});
-        }
-    }
-
-    res.redirect(`/manage/${req.params.guildId}/roles`);
-});
-
-
-// --- [ Mod / Jail Config ] ---
-app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    let s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
-
-    const content = `
-    <form method="POST" action="/save/${g.id}/mod">
-        <div class="card">
-            <h3>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                إعدادات نظام السجن
-            </h3>
-            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">
-                عند سجن شخص، يتم سحب جميع رتبه تلقائياً ويُعطى رتبة السجن فقط، ولن يستطيع رؤية أي روم سوى روم السجن.
-            </p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                <div>
-                    <label>أمر السجن</label>
-                    <input name="jailCmd" value="${s.jail?.commandName || 'jail'}" placeholder="jail">
-                </div>
-                <div>
-                    <label>أمر فك السجن</label>
-                    <input name="unjailCmd" value="${s.jail?.unjailCommand || 'unjail'}" placeholder="unjail">
-                </div>
-            </div>
-            <label>رتبة السجن</label>
-            <select name="jailRole">
-                <option value="">-- اختر رتبة السجن --</option>
-                ${g.roles.cache.filter(r => r.name !== '@everyone').map(r =>
-                    `<option value="${r.id}" ${s.jail?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
-                ).join('')}
-            </select>
-            <label>روم السجن (الروم الوحيد الذي يراه المسجون)</label>
-            <select name="jailChannel">
-                <option value="">-- اختر روم السجن --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}" ${s.jail?.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
-                ).join('')}
-            </select>
-            <button class="btn-save" style="margin-top:20px;">حفظ الإعدادات</button>
-        </div>
-    </form>`;
-
-    res.send(ui(g, 'mod', content));
-});
-
-app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
-    await ModConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { $set: {
-            'jail.commandName': req.body.jailCmd || 'jail',
-            'jail.unjailCommand': req.body.unjailCmd || 'unjail',
-            'jail.roleId': req.body.jailRole,
-            'jail.channelId': req.body.jailChannel
-        }},
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/mod`);
-});
-
-
-
-// ==========================================
-// 10. Discord Event Handlers
-// ==========================================
-
-client.on('messageCreate', async (msg) => {
-    if (!msg.guild || msg.author.bot) return;
-
-    
-    // --- [ نظام اختصارات الأوامر الإدارية ] ---
-    try {
-        const adminCfg = await AdminCmdConfig.findOne({ guildId: msg.guild.id });
-        if (adminCfg) {
-            const sc = adminCfg.shortcuts;
-            const args = msg.content.split(' ');
-            const cmd = args[0];
-            
-            const isShortcut = Object.values(sc).includes(cmd);
-            if (isShortcut) {
-                const hasPermission = msg.member.permissions.has(PermissionFlagsBits.Administrator) || 
-                                      msg.member.roles.cache.some(r => adminCfg.adminRoles.includes(r.id));
                 
-                if (hasPermission) {
-                    const target = msg.mentions.members.first() || msg.guild.members.cache.get(args[1]);
-
-                    if (cmd === sc.lock) {
-                        await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
-                        return msg.reply('🔒 تم قفل الشات بنجاح.');
-                    }
-                    if (cmd === sc.unlock) {
-                        await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: null });
-                        return msg.reply('🔓 تم فتح الشات بنجاح.');
-                    }
-                    if (cmd === sc.timeout && target) {
-                        const mins = parseInt(args[2]) || 60;
-                        await target.timeout(mins * 60 * 1000).catch(() => {});
-                        return msg.reply(`⏳ تم إعطاء تايم أوت لـ ${target.user.username} لمدة ${mins} دقيقة.`);
-                    }
-                    if (cmd === sc.untimeout && target) {
-                        await target.timeout(null).catch(() => {});
-                        return msg.reply(`✅ تم فك التايم أوت عن ${target.user.username}.`);
-                    }
-                    if (cmd === sc.ban && target) {
-                        await target.ban().catch(() => {});
-                        return msg.reply(`🔨 تم حظر ${target.user.username} بنجاح.`);
-                    }
-                    if (cmd === sc.unban && args[1]) {
-                        await msg.guild.members.unban(args[1]).catch(() => {});
-                        return msg.reply(`✅ تم فك الحظر عن العضو بنجاح.`);
-                    }
-                    if (cmd === sc.kick && target) {
-                        await target.kick().catch(() => {});
-                        return msg.reply(`👢 تم طرد ${target.user.username} بنجاح.`);
-                    }
-                }
-            }
-        }
-    } catch (e) { console.error('Shortcut Error:', e); }
-
-    // --- [ نظام الاقتراحات ] ---
-    try {
-        const sugCfg = await SuggestionConfig.findOne({ guildId: msg.guild.id, channelId: msg.channel.id });
-        if (sugCfg) {
-            const content = msg.content?.trim();
-            const attachmentImg = msg.attachments.find(a => a.contentType?.startsWith('image/'));
-            if (content || attachmentImg) {
-                const authorAvatar = msg.author.displayAvatarURL({ dynamic: true });
-                await msg.delete().catch(() => {});
-
-                const embed = new EmbedBuilder()
-                    .setAuthor({ name: `اقتراح من ${msg.author.username}`, iconURL: authorAvatar })
-                    .setDescription(content || '*بدون نص*')
-                    .setColor(0x1e90ff)
-                    .setFooter({ text: 'VORTEX  - Suggestions' })
-                    .setTimestamp()
-                    .addFields(
-                        { name: getEmojiDisplay(msg.guild, sugCfg.emoji1), value: '0', inline: true },
-                        { name: getEmojiDisplay(msg.guild, sugCfg.emoji2), value: '0', inline: true }
-                    );
-
                 const files = [];
                 if (attachmentImg) {
+                    // إذا العضو رفع صورة، نحطها بالإيمباد بس ما نرفقها كملف عشان ما تطلع مرتين
                     embed.setImage(attachmentImg.url);
                 } else if (sugCfg.imagePath && fs.existsSync(sugCfg.imagePath)) {
+                    // إذا صورة من الإعدادات (ملف محلي)، لازم نرفقها ونستخدم رابط الأتشمنت
                     const imgName = path.basename(sugCfg.imagePath);
                     files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
                     embed.setImage(`attachment://${imgName}`);
                 }
+
 
                 const menu = new StringSelectMenuBuilder()
                     .setCustomId('suggestion_menu')
