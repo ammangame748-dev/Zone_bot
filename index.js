@@ -948,7 +948,6 @@ function ui(guild, active, content) {
 // ==========================================
 
 
-
 // --- [ Dashboard - Admin Commands ] ---
 app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
@@ -991,20 +990,37 @@ app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
         <div class="card">
             <h2 style="margin-bottom:10px;">الأوامر الإدارية المتقدمة</h2>
             <p style="color:#666; font-size:13px; margin-bottom:30px;">تحكم في اختصارات الأوامر وطريقة تفاعل البوت معها في السيرفر.</p>
-            
             <form method="POST" action="/save/${g.id}/admincmds">
                 <div class="card" style="background:rgba(30,144,255,0.05); border:1px dashed var(--blue);">
                     <label style="font-weight:800;">الرتب المسموح لها (IDs مفصولة بفاصلة)</label>
                     <input type="text" name="adminRoles" value="${config.adminRoles.join(',')}" placeholder="مثلاً: 123456789,987654321">
                 </div>
-                
                 ${classesHtml}
-                
                 <button type="submit" class="btn-save" style="font-size:16px; padding:15px;">حفظ كافة التغييرات</button>
             </form>
         </div>
     `;
     res.send(ui(g, 'admincmds', content));
+});
+
+app.post('/save/:guildId/admincmds', checkAuth, async (req, res) => {
+    const guildId = req.params.guildId;
+    const b = req.body;
+    const roles = b.adminRoles.split(',').map(r => r.trim()).filter(Boolean);
+    const update = {
+        adminRoles: roles,
+        settings: {
+            lock: { shortcut: b.lock_shortcut, delUser: !!b.lock_delUser, delBot: !!b.lock_delBot },
+            unlock: { shortcut: b.unlock_shortcut, delUser: !!b.unlock_delUser, delBot: !!b.unlock_delBot },
+            timeout: { shortcut: b.timeout_shortcut, delUser: !!b.timeout_delUser, delBot: !!b.timeout_delBot },
+            untimeout: { shortcut: b.untimeout_shortcut, delUser: !!b.untimeout_delUser, delBot: !!b.untimeout_delBot },
+            ban: { shortcut: b.ban_shortcut, delUser: !!b.ban_delUser, delBot: !!b.ban_delBot },
+            unban: { shortcut: b.unban_shortcut, delUser: !!b.unban_delUser, delBot: !!b.unban_delBot },
+            kick: { shortcut: b.kick_shortcut, delUser: !!b.kick_delUser, delBot: !!b.kick_delBot }
+        }
+    };
+    await AdminCmdConfig.findOneAndUpdate({ guildId }, { $set: update }, { upsert: true });
+    res.redirect(`/manage/${guildId}/admincmds`);
 });
 
 // --- [ Dashboard - Server List ] ---
@@ -1695,17 +1711,13 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
                 
                 const files = [];
                 const dashboardUrl = process.env.RENDER_EXTERNAL_URL || '';
-                
                 if (attachmentImg) {
-                    // إذا العضو رفع صورة، نستخدم الرابط مباشرة
                     embed.setImage(attachmentImg.url);
                 } else if (sugCfg.imagePath && fs.existsSync(sugCfg.imagePath)) {
                     const imgName = path.basename(sugCfg.imagePath);
                     if (dashboardUrl) {
-                        // الحل الجذري: نستخدم رابط مباشر من الداشبورد لمنع التكرار
-                        embed.setImage(`${dashboardUrl}/uploads/${imgName}`);
+                        embed.setImage(`${dashboardUrl.replace(/\/$/, '')}/uploads/${imgName}`);
                     } else {
-                        // حل احتياطي إذا لم يوجد رابط (قد يظهر مرتين لكنه ضروري لعمل الصورة)
                         files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
                         embed.setImage(`attachment://${imgName}`);
                     }
@@ -2992,6 +3004,7 @@ async function checkKickLive() {
     } catch (err) {}
 }
 setInterval(checkKickLive, 25000);
+
 
 // ==========================================
 // 15. Slash Commands Registration
