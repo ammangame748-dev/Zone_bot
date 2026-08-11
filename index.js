@@ -357,16 +357,19 @@ app.get('/login', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX - تسجيل الدخول</title>
-    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700;800&display=swap" rel="stylesheet">
+    <title>VORTEX  - تسجيل الدخول</title>
+    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --blue: #1e90ff;
+            --blue-dark: #0a6ecc;
             --red: #e63946;
+            --red-light: #ff6b6b;
             --black: #050508;
             --dark: #0d0d18;
-            --border: rgba(30, 144, 255, 0.3);
+            --card: rgba(10, 10, 25, 0.85);
+            --border: rgba(30, 144, 255, 0.25);
         }
         body {
             font-family: 'Changa', sans-serif;
@@ -378,50 +381,94 @@ app.get('/login', (req, res) => {
             overflow: hidden;
             position: relative;
         }
+        .bg-particles {
+            position: fixed; inset: 0; z-index: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(30,144,255,0.08) 0%, transparent 60%),
+                        radial-gradient(ellipse at 80% 20%, rgba(230,57,70,0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(30,144,255,0.05) 0%, transparent 50%);
+        }
         .grid-bg {
             position: fixed; inset: 0; z-index: 0;
-            background-image: linear-gradient(rgba(30,144,255,0.05) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(30,144,255,0.05) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(30,144,255,0.04) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(30,144,255,0.04) 1px, transparent 1px);
             background-size: 50px 50px;
         }
-        .login-card {
+        .login-wrapper {
             position: relative; z-index: 10;
-            background: rgba(10, 10, 20, 0.9);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 60px;
+            display: flex; flex-direction: column; align-items: center; gap: 30px;
+        }
+        .logo-area {
             text-align: center;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 0 50px rgba(0,0,0,1), 0 0 20px rgba(30,144,255,0.2);
-            min-width: 400px;
         }
         .logo-text {
-            font-size: 70px; font-weight: 800; letter-spacing: 5px;
+            font-size: 64px; font-weight: 800; letter-spacing: 8px;
             background: linear-gradient(135deg, var(--blue), #ffffff, var(--red));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 20px rgba(30,144,255,0.5));
-            margin-bottom: 40px;
+            filter: drop-shadow(0 0 30px rgba(30,144,255,0.4));
+            animation: logoGlow 3s ease-in-out infinite alternate;
         }
+        @keyframes logoGlow {
+            from { filter: drop-shadow(0 0 20px rgba(30,144,255,0.3)); }
+            to   { filter: drop-shadow(0 0 50px rgba(30,144,255,0.7)); }
+        }
+        .logo-sub {
+            color: rgba(255,255,255,0.4); font-size: 14px; letter-spacing: 4px; margin-top: 5px;
+        }
+        .login-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 50px 60px;
+            text-align: center;
+            backdrop-filter: blur(30px);
+            box-shadow: 0 0 60px rgba(30,144,255,0.1), 0 0 120px rgba(0,0,0,0.5);
+            min-width: 380px;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--blue), var(--red), transparent);
+            animation: scanLine 3s linear infinite;
+        }
+        @keyframes scanLine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .login-card h2 { color: white; font-size: 22px; margin-bottom: 8px; }
+        .login-card p { color: rgba(255,255,255,0.45); font-size: 14px; margin-bottom: 35px; }
         .btn-discord {
-            display: inline-block;
-            background: linear-gradient(135deg, var(--blue), #0a6ecc);
-            color: white; padding: 18px 50px; border-radius: 12px;
-            text-decoration: none; font-weight: 800; font-size: 18px;
-            transition: 0.3s;
-            box-shadow: 0 10px 20px rgba(30,144,255,0.3);
+            display: inline-flex; align-items: center; gap: 12px;
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            color: white; padding: 16px 40px; border-radius: 14px;
+            text-decoration: none; font-weight: 700; font-size: 16px;
+            transition: all 0.3s; border: 1px solid rgba(30,144,255,0.3);
+            box-shadow: 0 8px 30px rgba(30,144,255,0.3);
         }
         .btn-discord:hover {
             transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(30,144,255,0.5);
+            box-shadow: 0 15px 40px rgba(30,144,255,0.5);
             filter: brightness(1.1);
         }
     </style>
 </head>
 <body>
+    <div class="bg-particles"></div>
     <div class="grid-bg"></div>
-    <div class="login-card">
-        <div class="logo-text">VORTEX</div>
-        <a href="/auth/discord" class="btn-discord">تسجيل الدخول بالديسكورد</a>
+    <div class="login-wrapper">
+        <div class="logo-area">
+            <div class="logo-text">VORTEX </div>
+            <div class="logo-sub">DISCORD BOT SYSTEM</div>
+        </div>
+        <div class="login-card">
+            <h2>مرحباً بك</h2>
+            <p>سجل دخولك عبر حساب ديسكورد للوصول للداشبورد</p>
+            <a href="/auth/discord" class="btn-discord">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+                تسجيل الدخول بديسكورد
+            </a>
+        </div>
     </div>
 </body>
 </html>`);
@@ -434,117 +481,89 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // 8. UI Helper Function
 // ==========================================
 function ui(guild, active, content) {
-    const guildName = guild.name || 'نظام فورتكس';
-    const navItems = guild.id ? [
-        { id: 'home', label: 'الإحصائيات', url: `/manage/${guild.id}/home` },
-        { id: 'security', label: 'الحماية', url: `/manage/${guild.id}/security` },
-        { id: 'kick', label: 'تنبيهات كيك', url: `/manage/${guild.id}/kick` },
-        { id: 'suggestions', label: 'الاقتراحات', url: `/manage/${guild.id}/suggestions` },
-        { id: 'logs', label: 'السجلات', url: `/manage/${guild.id}/logs` },
-        { id: 'tickets', label: 'التذاكر', url: `/manage/${guild.id}/tickets` },
-        { id: 'autoreply', label: 'الرد الآلي', url: `/manage/${guild.id}/autoreply` },
-        { id: 'levels', label: 'المستويات', url: `/manage/${guild.id}/levels` },
-        { id: 'welcome', label: 'الترحيب', url: `/manage/${guild.id}/welcome` },
-        { id: 'giveaway', label: 'القيف اواي', url: `/manage/${guild.id}/giveaway` },
-        { id: 'roles', label: 'الرتب', url: `/manage/${guild.id}/roles` },
-        { id: 'mod', label: 'الإشراف', url: `/manage/${guild.id}/mod` }
-    ] : [];
+    const showNav = guild.id ? 'flex' : 'none';
+    const guildName = guild.name || 'قائمة السيرفرات';
 
-    const renderedNav = navItems.map(item => `
-        <a href="${item.url}" class="nav-link ${active === item.id ? 'active' : ''}">${item.label}</a>
-    `).join('');
+    const navItems = guild.id ? `
+        <a class="${active === 'home' ? 'active' : ''}" href="/manage/${guild.id}/home">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            الإحصائيات
+        </a>
+        <a class="${active === 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            الحماية
+        </a>
+        <a class="${active === 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
+            تنبيهات Kick
+        </a>
+        <a class="${active === 'suggestions' ? 'active' : ''}" href="/manage/${guild.id}/suggestions">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+            الاقتراحات
+        </a>
+        <a class="${active === 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            اللوق
+        </a>
+        <a class="${active === 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/></svg>
+            التذاكر
+        </a>
+        <a class="${active === 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            الرد الآلي
+        </a>
+        <a class="${active === 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
+            المستويات
+        </a>
+        <a class="${active === 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            الترحيب
+        </a>
+        <a class="${active === 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="20,12 20,22 4,22 4,12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+            القيف اواي
+        </a>
+        <a class="${active === 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            الرتب
+        </a>
+        <a class="${active === 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            أوامر الإشراف
+        </a>
+    ` : '';
 
     return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX | ${guildName}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700;800&display=swap" rel="stylesheet">
+    <title> VORTEX  | Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --blue: #1e90ff;
+            --blue-dark: #0a6ecc;
+            --blue-glow: rgba(30,144,255,0.15);
+            --gold: #ffb703;
+            --gold-glow: rgba(255,183,3,0.15);
             --red: #e63946;
+            --red-light: #ff6b6b;
+            --red-glow: rgba(230,57,70,0.12);
             --black: #050508;
             --dark: #0a0a14;
-            --border: rgba(30, 144, 255, 0.2);
-            --text: #ffffff;
+            --darker: #07070f;
+            --card: rgba(12,12,24,0.75);
+            --card-hover: rgba(18,18,34,0.9);
+            --border: rgba(30,144,255,0.18);
+            --border-red: rgba(230,57,70,0.18);
+            --text: #e8eaf6;
+            --text-muted: rgba(255,255,255,0.45);
+            --sidebar-w: 280px;
         }
-        body {
-            font-family: 'Changa', sans-serif;
-            background: var(--black);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: row-reverse;
-        }
-        .sidebar {
-            width: 260px; background: var(--dark);
-            border-left: 1px solid var(--border);
-            height: 100vh; position: fixed; right: 0; top: 0;
-            padding: 40px 20px;
-        }
-        .logo {
-            font-size: 32px; font-weight: 800; text-align: center;
-            background: linear-gradient(135deg, var(--blue), var(--red));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            margin-bottom: 40px;
-        }
-        .nav-link {
-            display: block; padding: 12px 20px; color: #888;
-            text-decoration: none; font-weight: 700; font-size: 14px;
-            border-radius: 8px; margin-bottom: 5px; transition: 0.3s;
-        }
-        .nav-link:hover, .nav-link.active {
-            background: rgba(30, 144, 255, 0.1); color: var(--blue);
-            box-shadow: inset 0 0 10px rgba(30, 144, 255, 0.1);
-        }
-        .nav-link.active { border-right: 3px solid var(--blue); }
-        .main {
-            margin-right: 260px; flex: 1; padding: 40px;
-        }
-        .header {
-            font-size: 28px; font-weight: 800; margin-bottom: 30px;
-            border-bottom: 1px solid var(--border); padding-bottom: 20px;
-        }
-        .card {
-            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
-            border-radius: 15px; padding: 25px; margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        input, select, textarea {
-            width: 100%; padding: 12px; background: #000;
-            border: 1px solid var(--border); border-radius: 8px;
-            color: #fff; font-family: 'Changa'; margin-top: 10px;
-        }
-        .btn-save {
-            background: var(--blue); color: #fff; border: none;
-            padding: 12px 30px; border-radius: 8px; cursor: pointer;
-            font-weight: 800; transition: 0.3s; margin-top: 20px;
-        }
-        .btn-save:hover { filter: brightness(1.2); transform: scale(1.02); }
-        .btn-danger { background: var(--red); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th { text-align: right; color: #555; padding: 10px; font-size: 12px; }
-        td { padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .tag { padding: 4px 10px; border-radius: 5px; font-size: 12px; }
-        .tag-blue { background: rgba(30,144,255,0.2); color: var(--blue); }
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <div class="logo">VORTEX</div>
-        <nav>${renderedNav}</nav>
-        <a href="/logout" class="nav-link" style="color:var(--red); margin-top: 20px;">تسجيل الخروج</a>
-    </div>
-    <div class="main">
-        <div class="header">${guildName}</div>
-        ${content}
-    </div>
-</body>
-</html>`;
-}
 
 // ==========================================
 // 9. Dashboard Routes
