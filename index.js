@@ -1,5 +1,5 @@
 // ==========================================
-// VORTEX SYSTEM BOT - Full Version
+// ABOUD SYSTEM BOT - Full Version
 // ==========================================
 
 require('dotenv').config();
@@ -33,16 +33,7 @@ const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
         channelId: String,
         roleId: String,
         customMessage: String,
-        isLive: { type: Boolean, default: false },
-        // New Fields
-        mentionCategories: [String], // Categories that trigger a special mention
-        lastCategory: String,
-        lastLiveData: {
-            title: String,
-            viewers: Number,
-            startedAt: Date,
-            thumbnail: String
-        }
+        isLive: { type: Boolean, default: false }
     }]
 }));
 
@@ -63,19 +54,7 @@ const UserLevel = mongoose.model('UserLevel', new mongoose.Schema({
     userId: String,
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
-    msgCount: { type: Number, default: 0 },
-    streakCount: { type: Number, default: 0 },
-    dailyMsgs: { type: Number, default: 0 },
-    lastMessageDate: { type: Date, default: Date.now },
-    warned: { type: Boolean, default: false }
-}));
-
-const StreakConfig = mongoose.model('StreakConfig', new mongoose.Schema({
-    guildId: String,
-    requiredMessages: { type: Number, default: 60 },
-    streakRole: String,
-    rewardRole: String,
-    streakChannel: String
+    msgCount: { type: Number, default: 0 }
 }));
 
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
@@ -87,6 +66,14 @@ const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
         channelId: String,
         adminRoles: [String]
     }
+}));
+
+const Warn = mongoose.model('Warn', new mongoose.Schema({
+    guildId: String,
+    userId: String,
+    reason: String,
+    moderatorId: String,
+    createdAt: { type: Date, default: Date.now }
 }));
 
 const JailData = mongoose.model('JailData', new mongoose.Schema({
@@ -175,30 +162,25 @@ const Giveaway = mongoose.model('Giveaway', new mongoose.Schema({
     ended: { type: Boolean, default: false }
 }));
 
-const Clan = mongoose.model('Clan', new mongoose.Schema({
-    assistantIds: [String],
+const SuggestionConfig = mongoose.model('SuggestionConfig', new mongoose.Schema({
     guildId: String,
-    clanIndex: Number,
-    clanName: String,
-    roleId: String,
-    leaderId: String,
-    points: { type: Number, default: 0 },
-    applyChannel: String,
-    applyMessage: String,
-    textChannelId: String,
-    voiceChannelId: String,
-    resultsChannelId: String,
-    members: [String],
-    questions: { type: [String], default: [] }
+    channelId: String,
+    imagePath: String,
+    emoji1: String,
+    emoji2: String
 }));
 
-const ClanMember = mongoose.model('ClanMember', new mongoose.Schema({
+const Suggestion = mongoose.model('Suggestion', new mongoose.Schema({
     guildId: String,
-    userId: String,
-    clanIndex: Number,
-    points: { type: Number, default: 0 },
-    msgCountForPoints: { type: Number, default: 0 },
-    voiceMinutes: { type: Number, default: 0 }
+    messageId: String,
+    channelId: String,
+    authorId: String,
+    content: String,
+    status: { type: String, default: 'pending' },
+    votes1: { type: [String], default: [] },
+    votes2: { type: [String], default: [] },
+    replyThreadId: String,
+    createdAt: { type: Date, default: Date.now }
 }));
 
 const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
@@ -239,9 +221,10 @@ const client = new Client({
         GatewayIntentBits.GuildModeration,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildEmojisAndStickers,
-        GatewayIntentBits.GuildInvites
+        GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember]
+    partials: [Partials.Message, Partials.Channel, Partials.User, Partials.GuildMember, Partials.Reaction]
 });
 
 const commands = [
@@ -279,6 +262,12 @@ async function getExecutor(guild, actionType) {
     } catch {
         return 'غير معروف';
     }
+}
+
+function getEmojiDisplay(guild, emojiId) {
+    if (!emojiId) return '❓';
+    const em = guild.emojis.cache.get(emojiId);
+    return em ? em.toString() : `<:v:${emojiId}>`;
 }
 
 async function handleUnjail(member, guildId) {
@@ -343,7 +332,7 @@ passport.use(new Strategy({
 }, (accessToken, refreshToken, profile, done) => done(null, profile)));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'vortex-ultra-secret-2024',
+    secret: process.env.SESSION_SECRET || 'aboud-system-secret-key-2026',
     resave: false,
     saveUninitialized: false
 }));
@@ -354,19 +343,6 @@ app.use(passport.session());
 const checkAuth = (req, res, next) => {
     if (req.isAuthenticated()) return next();
     res.redirect('/login');
-};
-
-const checkGuildAdmin = (req, res, next) => {
-    if (!req.isAuthenticated()) return res.redirect('/login');
-    const guildId = req.params.guildId;
-    if (!guildId) return next();
-    const userGuild = req.user.guilds.find(g => g.id === guildId);
-    if (!userGuild) return res.status(403).send('Forbidden: You are not in this guild.');
-    const p = BigInt(userGuild.permissions);
-    if ((p & 8n) === 8n || (p & 32n) === 32n) {
-        return next();
-    }
-    return res.status(403).send('Forbidden: You do not have admin permissions in this guild.');
 };
 
 app.get('/auth/discord', passport.authenticate('discord'));
@@ -384,7 +360,7 @@ app.get('/login', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX - تسجيل الدخول</title>
+    <title>ABOUD SYSTEM - تسجيل الدخول</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -485,7 +461,7 @@ app.get('/login', (req, res) => {
     <div class="grid-bg"></div>
     <div class="login-wrapper">
         <div class="logo-area">
-            <div class="logo-text">VORTEX</div>
+            <div class="logo-text">ABOUD SYSTEM</div>
             <div class="logo-sub">DISCORD BOT SYSTEM</div>
         </div>
         <div class="login-card">
@@ -507,31 +483,7 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // ==========================================
 // 8. UI Helper Function
 // ==========================================
-
-// ==========================================
-// [ Vortex Translation System ]
-// ==========================================
-const strings = {
-    ar: {
-        stats: 'الإحصائيات', security: 'الحماية', kick: 'تنبيهات Kick', streaks: 'الستريك', 
-        logs: 'اللوق', tickets: 'التذاكر', autoreply: 'الرد الآلي', levels: 'المستويات', 
-        welcome: 'الترحيب', giveaway: 'القيف اواي', roles: 'الرتب', mod: 'الإشراف', clans: 'الكلانات',
-        add_streamer: 'إضافة ستريمر', kick_user: 'اسم المستخدم', channel: 'القناة', 
-        mention_role: 'رتبة المنشن', custom_msg: 'رسالة مخصصة', cats: 'كاتيقوريات المنشن',
-        save: 'حفظ الإعدادات', delete: 'حذف', viewers: 'المشاهدين', duration: 'مدة البث'
-    },
-    en: {
-        stats: 'Statistics', security: 'Security', kick: 'Kick Alerts', streaks: 'Streaks', 
-        logs: 'Logs', tickets: 'Tickets', autoreply: 'Auto Reply', levels: 'Levels', 
-        welcome: 'Welcome', giveaway: 'Giveaway', roles: 'Roles', mod: 'Moderation', clans: 'Clans',
-        add_streamer: 'Add Streamer', kick_user: 'Kick Username', channel: 'Channel', 
-        mention_role: 'Mention Role', custom_msg: 'Custom Message', cats: 'Mention Categories',
-        save: 'Save Settings', delete: 'Delete', viewers: 'Viewers', duration: 'Duration'
-    }
-};
-function t(key, lang = 'ar') { return strings[lang]?.[key] || strings['ar'][key] || key; }
-
-function ui(guild, active, content, lang = 'ar') {
+function ui(guild, active, content) {
     const showNav = guild.id ? 'flex' : 'none';
     const guildName = guild.name || 'قائمة السيرفرات';
 
@@ -548,9 +500,9 @@ function ui(guild, active, content, lang = 'ar') {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
             تنبيهات Kick
         </a>
-        <a class="${active === 'streaks' ? 'active' : ''}" href="/manage/${guild.id}/streaks">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            الستريك
+        <a class="${active === 'suggestions' ? 'active' : ''}" href="/manage/${guild.id}/suggestions">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+            الاقتراحات
         </a>
         <a class="${active === 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
@@ -584,10 +536,6 @@ function ui(guild, active, content, lang = 'ar') {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             أوامر الإشراف
         </a>
-        <a class="${active === 'clans' ? 'active' : ''}" href="/manage/${guild.id}/clans">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-            نظام الكلانات
-        </a>
     ` : '';
 
     return `<!DOCTYPE html>
@@ -595,7 +543,7 @@ function ui(guild, active, content, lang = 'ar') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX Dashboard</title>
+    <title>ABOUD SYSTEM | Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -603,14 +551,16 @@ function ui(guild, active, content, lang = 'ar') {
             --blue: #1e90ff;
             --blue-dark: #0a6ecc;
             --blue-glow: rgba(30,144,255,0.15);
+            --gold: #ffb703;
+            --gold-glow: rgba(255,183,3,0.15);
             --red: #e63946;
             --red-light: #ff6b6b;
             --red-glow: rgba(230,57,70,0.12);
             --black: #050508;
             --dark: #0a0a14;
             --darker: #07070f;
-            --card: rgba(10,10,22,0.8);
-            --card-hover: rgba(15,15,30,0.9);
+            --card: rgba(12,12,24,0.75);
+            --card-hover: rgba(18,18,34,0.9);
             --border: rgba(30,144,255,0.18);
             --border-red: rgba(230,57,70,0.18);
             --text: #e8eaf6;
@@ -626,24 +576,39 @@ function ui(guild, active, content, lang = 'ar') {
             display: flex;
             flex-direction: row-reverse;
             direction: rtl;
+            animation: pageFadeIn 0.5s ease both;
         }
+        @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         /* ===== BACKGROUND ===== */
         body::before {
             content: '';
-            position: fixed; inset: 0; z-index: -2;
+            position: fixed; inset: 0; z-index: -3;
             background:
-                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.07) 0%, transparent 50%),
-                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.09) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 60% 10%, rgba(255,183,3,0.05) 0%, transparent 45%),
                 radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
         }
         body::after {
             content: '';
-            position: fixed; inset: 0; z-index: -1;
+            position: fixed; inset: 0; z-index: -2;
             background-image:
                 linear-gradient(rgba(30,144,255,0.025) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(30,144,255,0.025) 1px, transparent 1px);
             background-size: 60px 60px;
+        }
+        .orb {
+            position: fixed; z-index: -1; border-radius: 50%;
+            filter: blur(60px); opacity: 0.35; pointer-events: none;
+            animation: floatOrb 14s ease-in-out infinite;
+        }
+        .orb-1 { width: 320px; height: 320px; background: var(--blue); top: -80px; right: -60px; animation-delay: 0s; }
+        .orb-2 { width: 260px; height: 260px; background: var(--red); bottom: -60px; left: -40px; animation-delay: 3s; }
+        .orb-3 { width: 200px; height: 200px; background: var(--gold); top: 40%; left: 30%; animation-delay: 6s; opacity: 0.15; }
+        @keyframes floatOrb {
+            0%, 100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(30px,-30px) scale(1.12); }
         }
 
         /* ===== SIDEBAR ===== */
@@ -671,7 +636,7 @@ function ui(guild, active, content, lang = 'ar') {
             flex-shrink: 0;
         }
         .sidebar-logo {
-            font-size: 32px; font-weight: 800; letter-spacing: 5px;
+            font-size: 27px; font-weight: 800; letter-spacing: 3px;
             background: linear-gradient(135deg, var(--blue), #ffffff 50%, var(--red));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             display: block;
@@ -698,7 +663,7 @@ function ui(guild, active, content, lang = 'ar') {
             padding: 12px 16px; border-radius: 12px;
             color: var(--text-muted); text-decoration: none;
             font-size: 14px; font-weight: 500;
-            transition: all 0.25s ease;
+            transition: all 0.25s cubic-bezier(.2,.9,.3,1.2);
             border: 1px solid transparent;
             position: relative; overflow: hidden;
         }
@@ -707,21 +672,25 @@ function ui(guild, active, content, lang = 'ar') {
             background: var(--blue-glow);
             color: white;
             border-color: var(--border);
+            transform: translateX(-4px);
         }
         .nav a:hover svg { opacity: 1; }
         .nav a.active {
-            background: linear-gradient(135deg, rgba(30,144,255,0.2), rgba(30,144,255,0.08));
+            background: linear-gradient(135deg, rgba(30,144,255,0.22), rgba(30,144,255,0.08));
             color: var(--blue);
-            border-color: rgba(30,144,255,0.35);
+            border-color: rgba(30,144,255,0.4);
             font-weight: 700;
+            box-shadow: 0 0 18px rgba(30,144,255,0.18) inset;
         }
         .nav a.active svg { opacity: 1; color: var(--blue); }
         .nav a.active::before {
             content: '';
             position: absolute; right: 0; top: 20%; bottom: 20%;
-            width: 3px; background: var(--blue);
+            width: 3px; background: linear-gradient(var(--blue), var(--gold));
             border-radius: 3px 0 0 3px;
+            animation: pulseBar 1.6s ease-in-out infinite;
         }
+        @keyframes pulseBar { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
         /* ===== MAIN CONTENT ===== */
         .main {
@@ -753,17 +722,21 @@ function ui(guild, active, content, lang = 'ar') {
             padding: 28px;
             margin-bottom: 24px;
             backdrop-filter: blur(15px);
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
             position: relative;
             overflow: hidden;
         }
         .card::before {
             content: '';
             position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--blue), transparent);
+            background: linear-gradient(90deg, transparent, var(--blue), var(--gold), transparent);
             opacity: 0.5;
         }
-        .card:hover { border-color: rgba(30,144,255,0.35); }
+        .card:hover {
+            border-color: rgba(30,144,255,0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.35), 0 0 30px rgba(30,144,255,0.08);
+        }
         .card h3 {
             color: white; font-size: 17px; font-weight: 700;
             margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
@@ -800,7 +773,16 @@ function ui(guild, active, content, lang = 'ar') {
             transition: all 0.3s; display: inline-block; text-decoration: none;
             text-align: center; width: 100%;
             box-shadow: 0 4px 20px rgba(30,144,255,0.25);
+            position: relative; overflow: hidden;
         }
+        .btn-save::after {
+            content: ''; position: absolute; top: 0; left: -60%;
+            width: 40%; height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.6s ease;
+        }
+        .btn-save:hover::after { left: 130%; }
         .btn-save:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 30px rgba(30,144,255,0.4);
@@ -919,9 +901,12 @@ function ui(guild, active, content, lang = 'ar') {
     </style>
 </head>
 <body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
     <div class="sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-logo">VORTEX</span>
+            <span class="sidebar-logo">ABOUD <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
             <div class="sidebar-tagline">Bot Dashboard</div>
         </div>
         <nav class="nav">
@@ -974,7 +959,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
         <div style="font-size:48px; font-weight:800; letter-spacing:6px;
             background: linear-gradient(135deg, var(--blue), #fff, var(--red));
             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-            margin-bottom:10px;">VORTEX</div>
+            margin-bottom:10px;">ABOUD SYSTEM</div>
         <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
         <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
             <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
@@ -1003,178 +988,203 @@ app.get('/dashboard', checkAuth, (req, res) => {
 });
 
 // --- [ Home / Stats ] ---
-app.get('/manage/:guildId/home', checkGuildAdmin, async (req, res) => {
-    const lang = req.query.lang || 'ar';
+app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    
-    const statsData = await Stats.findOne({ guildId: g.id }) || {};
+
+    const statsData = await Stats.findOne({ guildId: g.id }) || {
+        messages: { total: 0, daily: 0, weekly: 0, monthly: 0 },
+        activeChannels: new Map(),
+        membersLog: { joined: [], left: [] }
+    };
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const newMembersCount = (statsData.membersLog?.joined || []).filter(d => d > sevenDaysAgo).length;
+    const leftMembersCount = (statsData.membersLog?.left || []).filter(d => d > sevenDaysAgo).length;
+
     const content = `
     <div class="card">
-        <h1>${g.name}</h1>
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/></svg>
+            إحصائيات السيرفر
+        </h3>
         <div class="stats-grid">
-            <div class="stat-box"><div class="stat-num">${g.memberCount}</div><div class="stat-label">الأعضاء</div></div>
-            <div class="stat-box"><div class="stat-num">${statsData.messages?.total || 0}</div><div class="stat-label">إجمالي الرسائل</div></div>
-            <div class="stat-box"><div class="stat-num">${statsData.messages?.daily || 0}</div><div class="stat-label">رسائل اليوم</div></div>
+            <div class="stat-box">
+                <div class="stat-num">${statsData.messages?.total || 0}</div>
+                <div class="stat-label">اجمالي الرسائل</div>
+            </div>
+            <div class="stat-box" style="--blue:#e63946;">
+                <div class="stat-num" style="color:var(--blue);">${g.memberCount}</div>
+                <div class="stat-label">عدد الاعضاء</div>
+            </div>
+            <div class="stat-box" style="--blue:#00c853;">
+                <div class="stat-num" style="color:#00c853;">+${newMembersCount}</div>
+                <div class="stat-label">اعضاء جدد (7 ايام)</div>
+            </div>
+            <div class="stat-box" style="--blue:#ff6b6b;">
+                <div class="stat-num" style="color:#ff6b6b;">-${leftMembersCount}</div>
+                <div class="stat-label">اعضاء غادروا (7 ايام)</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-num">${statsData.messages?.daily || 0}</div>
+                <div class="stat-label">رسائل اليوم</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-num">${statsData.messages?.weekly || 0}</div>
+                <div class="stat-label">رسائل الاسبوع</div>
+            </div>
         </div>
     </div>`;
-    res.send(ui(g, 'home', content, lang));
+
+    res.send(ui(g, 'home', content));
 });
 
 // --- [ Kick Notifications ] ---
-app.get('/manage/:guildId/kick', checkGuildAdmin, async (req, res) => {
-    const lang = req.query.lang || 'ar';
+app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
 
     let s = await KickConfig.findOne({ guildId: g.id }) || { streamers: [] };
-    
-    // Kick Categories including GTA
-    const categories = [
-        'Grand Theft Auto V', 'GTA RP', 'Just Chatting', 'Gaming', 'Music', 
-        'Creative', 'Sports', 'ASMR', 'Talk Shows', 'IRL', 'Crypto', 'Slots'
-    ];
-    const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
 
     const streamerRows = s.streamers.map((st, i) => `
     <tr>
-        <td><span style="color:var(--blue); font-weight:bold;">${st.kickUsername}</span></td>
-        <td>#${g.channels.cache.get(st.channelId)?.name || 'Deleted'}</td>
-        <td>${st.mentionCategories?.length > 0 ? st.mentionCategories.join(', ') : 'بدون منشن كاتيقوري'}</td>
+        <td><span class="tag tag-blue">${st.kickUsername}</span></td>
+        <td style="color:var(--text-muted);">#${g.channels.cache.get(st.channelId)?.name || 'قناة محذوفة'}</td>
+        <td>${st.roleId ? `<span class="tag tag-red">@${g.roles.cache.get(st.roleId)?.name || 'رتبة محذوفة'}</span>` : '<span class="tag" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">بدون منشن</span>'}</td>
         <td>
-            <a href="/delete-kick/${g.id}/${i}?lang=${lang}" style="color:#e63946; text-decoration:none; font-weight:bold;">${t('delete', lang)}</a>
+            <a href="/delete-kick/${g.id}/${i}" class="btn-save btn-danger btn-sm" style="text-decoration:none;" onclick="return confirm('حذف الستريمر؟')">حذف</a>
         </td>
     </tr>`).join('');
 
     const content = `
     <div class="card">
-        <h3>${t('kick_notifications', lang)}</h3>
-        <p style="color:#aaa; font-size:13px; margin-bottom:20px;">سيتم إرسال تنبيه "بدء البث" تلقائياً، ويمكنك اختيار كاتيقوريات محددة لعمل "منشن" عند دخولها.</p>
-        
-        <form method="POST" action="/save/${g.id}/kick?lang=${lang}">
-            <div class="stats-grid">
-                <div>
-                    <label>${t('kick_user', lang)}</label>
-                    <input name="kickUser" placeholder="مثلاً: vortex_bot" required>
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
+            نظام تنبيهات Kick
+        </h3>
+
+        <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:24px;">
+            <h4 style="color:var(--blue); margin-bottom:18px; font-size:15px;">اضافة ستريمر جديد</h4>
+            <form method="POST" action="/save/${g.id}/kick">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                    <div>
+                        <label>اسم المستخدم في Kick</label>
+                        <input type="text" name="kickUser" placeholder="مثلاً: username" required>
+                    </div>
+                    <div>
+                        <label>قناة التنبيه</label>
+                        <select name="channelId">
+                            ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label>الرتبة للمنشن (اختياري)</label>
+                        <select name="roleId">
+                            <option value="">-- بدون منشن --</option>
+                            ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label>رسالة مخصصة (استخدم %name% للاسم)</label>
+                        <input type="text" name="msg" placeholder="%name% بدأ البث الآن!">
+                    </div>
                 </div>
-                <div>
-                    <label>${t('channel', lang)}</label>
-                    <select name="channelId">
-                        ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>${t('mention_role', lang)}</label>
-                    <select name="roleId">
-                        <option value="">-- بدون منشن --</option>
-                        ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-            
-            <label>${t('cats', lang)} (اختر الكاتيقوريات اللي بدك منشن فيها - اضغط Ctrl للاختيار المتعدد)</label>
-            <select name="mentionCats" multiple style="height:120px;">
-                ${catOptions}
-            </select>
-            
-            <button class="btn-save">${t('add_streamer', lang)}</button>
-        </form>
-        
-        <table>
+                <button class="btn-save btn-green" style="margin-top:16px; width:auto; padding:12px 30px;">اضافة الستريمر</button>
+            </form>
+        </div>
+
+        ${s.streamers.length > 0 ? `
+        <table class="data-table">
             <thead>
                 <tr>
-                    <th>${t('kick_user', lang)}</th>
-                    <th>${t('channel', lang)}</th>
-                    <th>${t('cats', lang)}</th>
+                    <th>الستريمر</th>
+                    <th>القناة</th>
+                    <th>المنشن</th>
                     <th>الإجراء</th>
                 </tr>
             </thead>
             <tbody>${streamerRows}</tbody>
-        </table>
+        </table>` : `<p style="color:var(--text-muted); text-align:center; padding:30px 0;">لا يوجد ستريمرات مضافة بعد.</p>`}
     </div>`;
-    res.send(ui(g, 'kick', content, lang));
+
+    res.send(ui(g, 'kick', content));
 });
 
-app.post('/save/:guildId/kick', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/kick', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
-        const { kickUser, channelId, roleId, mentionCats } = req.body;
+        const { kickUser, channelId, roleId, msg } = req.body;
         const username = kickUser.replace('https://kick.com', '').replace('/', '').trim();
-        const cats = Array.isArray(mentionCats) ? mentionCats : (mentionCats ? [mentionCats] : []);
-        
         await KickConfig.findOneAndUpdate(
             { guildId },
-            { $push: { streamers: { 
-                kickUsername: username, 
-                channelId, 
-                roleId, 
-                mentionCategories: cats, 
-                isLive: false 
-            } } },
+            { $push: { streamers: { kickUsername: username, channelId, roleId, customMessage: msg, isLive: false } } },
             { upsert: true }
         );
-        res.redirect(`/manage/${guildId}/kick?lang=${req.query.lang || 'ar'}`);
-    } catch (err) { res.status(500).send('Error'); }
+        res.redirect(`/manage/${guildId}/kick`);
+    } catch (err) {
+        res.status(500).send('خطأ في إضافة الستريمر');
+    }
 });
 
-app.get('/delete-kick/:guildId/:index', checkGuildAdmin, async (req, res) => {
+app.get('/delete-kick/:guildId/:index', checkAuth, async (req, res) => {
     const { guildId, index } = req.params;
     const config = await KickConfig.findOne({ guildId });
     if (config) { config.streamers.splice(index, 1); await config.save(); }
     res.redirect(`/manage/${guildId}/kick`);
 });
 
-// --- [ Streaks ] ---
-app.get('/manage/:guildId/streaks', checkGuildAdmin, async (req, res) => {
+// --- [ Suggestions ] ---
+app.get('/manage/:guildId/suggestions', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
-    const s = await StreakConfig.findOne({ guildId: g.id }) || {};
+    const s = await SuggestionConfig.findOne({ guildId: g.id }) || {};
 
     const content = `
-    <form method="POST" action="/save/${g.id}/streaks">
+    <form method="POST" action="/save/${g.id}/suggestions" enctype="multipart/form-data">
         <div class="card">
             <h3>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                إعدادات الستريك
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
+                نظام الاقتراحات
             </h3>
-            <label>عدد الرسائل المطلوبة يومياً</label>
-            <input type="number" name="reqMsgs" value="${s.requiredMessages || 60}" min="1">
-            <label>رتبة الستريك (الرتبة اللي يجب أن يملكها العضو)</label>
-            <select name="streakRole">
-                <option value="">-- لا يوجد --</option>
-                ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.streakRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">
+                حدد روم الاقتراحات، ارفع صورة تظهر داخل كل اقتراح، وحدد إيموجيين (بالـ ID) يستخدمان للتصويت.
+            </p>
+            <label>روم الاقتراحات</label>
+            <select name="channelId" required>
+                <option value="">-- اختر الروم --</option>
+                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
             </select>
-            <label>قناة إعلانات الستريك</label>
-            <select name="streakChannel">
-                <option value="">-- لا يوجد --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.streakChannel === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
-            </select>
-            <button class="btn-save" style="margin-top:20px;">حفظ الإعدادات</button>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                    <label>ID الإيموجي الأول</label>
+                    <input type="text" name="emoji1" value="${s.emoji1 || ''}" placeholder="مثلاً: 123456789012345678">
+                </div>
+                <div>
+                    <label>ID الإيموجي الثاني</label>
+                    <input type="text" name="emoji2" value="${s.emoji2 || ''}" placeholder="مثلاً: 123456789012345678">
+                </div>
+            </div>
+            <label>صورة الاقتراح (تظهر داخل كل ايمبد اقتراح)</label>
+            <input type="file" name="suggestImage" accept="image/*">
+            ${s.imagePath ? `<div style="margin-top:12px;"><img src="/${s.imagePath.replace(/^\.\//,'')}" style="max-width:220px; border-radius:12px; border:1px solid var(--border);"></div>` : ''}
+            <button class="btn-save" style="margin-top:20px;">حفظ إعدادات الاقتراحات</button>
         </div>
-    </form>
-    <form method="POST" action="/reset-streaks/${g.id}" onsubmit="return confirm('هل أنت متأكد من تصفير كل الستريكات؟')">
-        <button class="btn-save btn-danger">تصفير كل الستريكات</button>
     </form>`;
 
-    res.send(ui(g, 'streaks', content));
+    res.send(ui(g, 'suggestions', content));
 });
 
-app.post('/save/:guildId/streaks', checkGuildAdmin, async (req, res) => {
-    await StreakConfig.findOneAndUpdate(
-        { guildId: req.params.guildId },
-        { $set: { requiredMessages: Number(req.body.reqMsgs), streakRole: req.body.streakRole, streakChannel: req.body.streakChannel } },
-        { upsert: true }
-    );
-    res.redirect(`/manage/${req.params.guildId}/streaks`);
-});
-
-app.post('/reset-streaks/:guildId', checkAuth, async (req, res) => {
-    await UserLevel.updateMany({ guildId: req.params.guildId }, { $set: { streakCount: 0, dailyMsgs: 0 } });
-    res.redirect(`/manage/${req.params.guildId}/streaks`);
+app.post('/save/:guildId/suggestions', checkAuth, upload.single('suggestImage'), async (req, res) => {
+    const { guildId } = req.params;
+    const { channelId, emoji1, emoji2 } = req.body;
+    const update = { channelId, emoji1: (emoji1 || '').trim(), emoji2: (emoji2 || '').trim() };
+    if (req.file) update.imagePath = req.file.path;
+    await SuggestionConfig.findOneAndUpdate({ guildId }, { $set: update }, { upsert: true });
+    res.redirect(`/manage/${guildId}/suggestions`);
 });
 
 // --- [ Logs ] ---
-app.get('/manage/:guildId/logs', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { logs: {} };
@@ -1215,7 +1225,7 @@ app.get('/manage/:guildId/logs', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'logs', content));
 });
 
-app.post('/save/:guildId/logs', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/logs', checkAuth, async (req, res) => {
     const b = req.body;
     const types = ['messages', 'moderation', 'members', 'channels', 'roles', 'voice'];
     let logData = {};
@@ -1228,7 +1238,7 @@ app.post('/save/:guildId/logs', checkGuildAdmin, async (req, res) => {
 
 
 // --- [ Welcome ] ---
-app.get('/manage/:guildId/welcome', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { welcome: {} };
@@ -1314,7 +1324,7 @@ app.get('/manage/:guildId/welcome', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'welcome', content));
 });
 
-app.post('/save/:guildId/welcome', checkGuildAdmin, upload.single('bgImage'), async (req, res) => {
+app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (req, res) => {
     const b = req.body;
     let updateData = {
         'welcome.enabled': b.enabled === 'on',
@@ -1331,7 +1341,7 @@ app.post('/save/:guildId/welcome', checkGuildAdmin, upload.single('bgImage'), as
 });
 
 // --- [ Security ] ---
-app.get('/manage/:guildId/security', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { security: {} };
@@ -1364,7 +1374,7 @@ app.get('/manage/:guildId/security', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'security', content));
 });
 
-app.post('/save/:guildId/security', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/security', checkAuth, async (req, res) => {
     const b = req.body;
     const bypassRoles = Array.isArray(b.bypassRoles) ? b.bypassRoles : (b.bypassRoles ? [b.bypassRoles] : []);
     await GuildConfig.findOneAndUpdate(
@@ -1376,7 +1386,7 @@ app.post('/save/:guildId/security', checkGuildAdmin, async (req, res) => {
 });
 
 // --- [ Auto Reply ] ---
-app.get('/manage/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/autoreply', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { autoReply: [] };
@@ -1406,7 +1416,7 @@ app.get('/manage/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'autoreply', content));
 });
 
-app.post('/save/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/autoreply', checkAuth, async (req, res) => {
     try {
         const { guildId } = req.params;
         const finalData = [];
@@ -1424,7 +1434,7 @@ app.post('/save/:guildId/autoreply', checkGuildAdmin, async (req, res) => {
 });
 
 // --- [ Giveaway ] ---
-app.get('/manage/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     const activeGiveaways = await Giveaway.find({ guildId: g.id, ended: false });
@@ -1477,7 +1487,7 @@ app.get('/manage/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'giveaway', content));
 });
 
-app.post('/save/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
     const { prize, duration, winners, channel, description } = req.body;
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.status(404).send('السيرفر غير موجود');
@@ -1500,7 +1510,7 @@ app.post('/save/:guildId/giveaway', checkGuildAdmin, async (req, res) => {
 });
 
 // --- [ Tickets ] ---
-app.get('/manage/:guildId/tickets', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await TicketConfig.findOne({ guildId: g.id }) || { buttons: [], menuOptions: [] };
@@ -1579,7 +1589,7 @@ app.get('/manage/:guildId/tickets', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'tickets', content));
 });
 
-app.post('/save/:guildId/tickets', checkGuildAdmin, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
+app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
     try {
         const b = req.body;
         const g = client.guilds.cache.get(req.params.guildId);
@@ -1665,7 +1675,7 @@ app.post('/save/:guildId/tickets', checkGuildAdmin, upload.fields([{ name: 'topI
 });
 
 // --- [ Levels ] ---
-app.get('/manage/:guildId/levels', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { levels: {} };
@@ -1699,7 +1709,7 @@ app.get('/manage/:guildId/levels', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'levels', content));
 });
 
-app.post('/save/:guildId/levels', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/levels', checkAuth, async (req, res) => {
     const b = req.body;
     await GuildConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
@@ -1710,7 +1720,7 @@ app.post('/save/:guildId/levels', checkGuildAdmin, async (req, res) => {
 });
 
 // --- [ Roles Panel ] ---
-app.get('/manage/:guildId/roles', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await GuildConfig.findOne({ guildId: g.id }) || { rolesPanel: [] };
@@ -1748,7 +1758,7 @@ app.get('/manage/:guildId/roles', checkGuildAdmin, async (req, res) => {
 
     res.send(ui(g, 'roles', content));
 });
-app.post('/save/:guildId/roles', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
     const b = req.body;
     const rolesPanel = [];
     for (let i = 0; i < 10; i++) {
@@ -1788,7 +1798,7 @@ app.post('/save/:guildId/roles', checkGuildAdmin, async (req, res) => {
 
 
 // --- [ Mod / Jail Config ] ---
-app.get('/manage/:guildId/mod', checkGuildAdmin, async (req, res) => {
+app.get('/manage/:guildId/mod', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
     let s = await ModConfig.findOne({ guildId: g.id }) || { jail: {} };
@@ -1834,7 +1844,7 @@ app.get('/manage/:guildId/mod', checkGuildAdmin, async (req, res) => {
     res.send(ui(g, 'mod', content));
 });
 
-app.post('/save/:guildId/mod', checkGuildAdmin, async (req, res) => {
+app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
     await ModConfig.findOneAndUpdate(
         { guildId: req.params.guildId },
         { $set: {
@@ -1849,207 +1859,6 @@ app.post('/save/:guildId/mod', checkGuildAdmin, async (req, res) => {
 });
 
 
-// --- [ Clans ] ---
-app.get('/manage/:guildId/clans', checkGuildAdmin, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const clans = await Clan.find({ guildId: g.id }).sort({ clanIndex: 1 });
-
-    const clanCards = clans.map(clan => `
-    <div style="padding:20px; background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-            <div style="font-weight:700; color:white; font-size:15px; margin-bottom:4px;">${clan.clanName || 'كلان بدون اسم'}</div>
-            <div style="color:var(--text-muted); font-size:13px;">
-                القائد: <@${clan.leaderId}> &nbsp;|&nbsp; الأعضاء: ${clan.members?.length || 0}/10 &nbsp;|&nbsp; النقاط: ${clan.points || 0}
-            </div>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <a href="/manage/${g.id}/clans/edit/${clan.clanIndex}" class="btn-save btn-sm" style="text-decoration:none; background:var(--blue-glow); color:var(--blue); border:1px solid var(--border);">تعديل</a>
-            <a href="/manage/${g.id}/clans/delete/${clan.clanIndex}" class="btn-save btn-danger btn-sm" style="text-decoration:none;" onclick="return confirm('حذف الكلان؟')">حذف</a>
-        </div>
-    </div>`).join('');
-
-    const content = `
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="margin:0;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-                نظام الكلانات
-            </h3>
-            <a href="/manage/${g.id}/clans/add" class="btn-save btn-sm btn-green" style="text-decoration:none; width:auto;">اضافة كلان</a>
-        </div>
-        ${clans.length === 0 ? '<p style="color:var(--text-muted); text-align:center; padding:30px 0;">لا يوجد كلانات بعد.</p>' : clanCards}
-    </div>`;
-
-    res.send(ui(g, 'clans', content));
-});
-
-app.get('/manage/:guildId/clans/add', checkGuildAdmin, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const lastClan = await Clan.findOne({ guildId: g.id }).sort({ clanIndex: -1 });
-    const nextIndex = lastClan ? lastClan.clanIndex + 1 : 0;
-
-    const content = `
-    <form method="POST" action="/save/${g.id}/clans">
-        <div class="card">
-            <h3>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-                اضافة كلان جديد
-            </h3>
-            <input type="hidden" name="clanIndex" value="${nextIndex}">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                <div>
-                    <label>اسم الكلان</label>
-                    <input name="clanName" required placeholder="مثلاً: VORTEX TEAM">
-                </div>
-                <div>
-                    <label>ID القائد</label>
-                    <input name="leaderId" required placeholder="ID صاحب الكلان">
-                </div>
-                <div>
-                    <label>رتبة الكلان</label>
-                    <select name="roleId">
-                        <option value="">-- بدون رتبة --</option>
-                        ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>قناة إرسال لوحة التقديم</label>
-                    <select name="applyChannelId" required>
-                        <option value="">-- اختر القناة --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>قناة وصول نتائج التقديم</label>
-                    <select name="resultsChannelId" required>
-                        <option value="">-- اختر القناة --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-            <label style="margin-top:16px;">أسئلة التقديم (سؤال في كل سطر)</label>
-            <textarea name="questions" rows="5" placeholder="ما هو اسمك؟&#10;كم عمرك؟&#10;لماذا تريد الانضمام؟"></textarea>
-            <button type="submit" class="btn-save btn-green" style="margin-top:20px;">حفظ وإرسال لوحة التقديم</button>
-        </div>
-    </form>`;
-
-    res.send(ui(g, 'clans', content));
-});
-
-app.post('/save/:guildId/clans', checkGuildAdmin, async (req, res) => {
-    try {
-        const { guildId } = req.params;
-        const { clanName, leaderId, roleId, resultsChannelId, applyChannelId, clanIndex, questions } = req.body;
-        const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== '') : [];
-
-        const newClan = await Clan.create({
-            guildId, clanName, leaderId, roleId, resultsChannelId,
-            clanIndex: parseInt(clanIndex),
-            questions: questionsArray,
-            members: [], assistantIds: []
-        });
-
-        const applyChannel = client.channels.cache.get(applyChannelId);
-        if (applyChannel) {
-            const embed = new EmbedBuilder()
-                .setTitle(`نظام التقديم | ${clanName}`)
-                .setDescription('اضغط على الزر أدناه لفتح تذكرة تقديم والإجابة على الأسئلة.\n\nسيتم مراجعة طلبك من قبل الإدارة.')
-                .setColor(0x1e90ff)
-                .setThumbnail(applyChannel.guild.iconURL())
-                .setFooter({ text: 'VORTEX System - Clans' });
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`apply_clan_${newClan._id}`)
-                    .setLabel('تقديم الآن')
-                    .setStyle(ButtonStyle.Success)
-            );
-            await applyChannel.send({ embeds: [embed], components: [row] });
-        }
-
-        res.redirect(`/manage/${guildId}/clans`);
-    } catch (err) {
-        console.error('[Clan Save Error]', err);
-        res.status(500).send('خطأ في إضافة الكلان');
-    }
-});
-
-app.get('/manage/:guildId/clans/delete/:index', checkGuildAdmin, async (req, res) => {
-    const clanIdx = parseInt(req.params.index);
-    
-    // التأكد من أن الـ Index رقم صحيح قبل محاولة الحذف
-    if (isNaN(clanIdx)) {
-        return res.redirect(`/manage/${req.params.guildId}/clans`);
-    }
-
-    await Clan.deleteOne({ 
-        guildId: req.params.guildId, 
-        clanIndex: clanIdx 
-    });
-    
-    res.redirect(`/manage/${req.params.guildId}/clans`);
-});
-
-
-app.get('/manage/:guildId/clans/edit/:index', checkGuildAdmin, async (req, res) => {
-    const g = client.guilds.cache.get(req.params.guildId);
-    if (!g) return res.redirect('/dashboard');
-    const clan = await Clan.findOne({ guildId: g.id, clanIndex: parseInt(req.params.index) });
-    if (!clan) return res.redirect(`/manage/${g.id}/clans`);
-
-    const content = `
-    <form method="POST" action="/update/${g.id}/clans/${clan.clanIndex}">
-        <div class="card">
-            <h3>تعديل كلان: ${clan.clanName}</h3>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                <div>
-                    <label>اسم الكلان</label>
-                    <input name="clanName" value="${clan.clanName}" required>
-                </div>
-                <div>
-                    <label>ID القائد</label>
-                    <input name="leaderId" value="${clan.leaderId}" required>
-                </div>
-                <div>
-                    <label>رتبة الكلان</label>
-                    <select name="roleId">
-                        <option value="">-- بدون رتبة --</option>
-                        ${g.roles.cache.filter(r => r.name !== '@everyone').map(r =>
-                            `<option value="${r.id}" ${clan.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>قناة نتائج التقديم</label>
-                    <select name="resultsChannelId">
-                        <option value="">-- اختر القناة --</option>
-                        ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                            `<option value="${c.id}" ${clan.resultsChannelId === c.id ? 'selected' : ''}># ${c.name}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-            </div>
-            <label>أسئلة التقديم</label>
-            <textarea name="questions" rows="5">${(clan.questions || []).join('\n')}</textarea>
-            <button type="submit" class="btn-save" style="margin-top:20px;">حفظ التعديلات</button>
-        </div>
-    </form>`;
-
-    res.send(ui(g, 'clans', content));
-});
-
-app.post('/update/:guildId/clans/:index', checkGuildAdmin, async (req, res) => {
-    const { clanName, leaderId, roleId, resultsChannelId, questions } = req.body;
-    const questionsArray = questions ? questions.split('\n').filter(q => q.trim() !== '') : [];
-    await Clan.findOneAndUpdate(
-        { guildId: req.params.guildId, clanIndex: parseInt(req.params.index) },
-        { $set: { clanName, leaderId, roleId, resultsChannelId, questions: questionsArray } }
-    );
-    res.redirect(`/manage/${req.params.guildId}/clans`);
-});
-
 
 // ==========================================
 // 10. Discord Event Handlers
@@ -2058,12 +1867,72 @@ app.post('/update/:guildId/clans/:index', checkGuildAdmin, async (req, res) => {
 client.on('messageCreate', async (msg) => {
     if (!msg.guild || msg.author.bot) return;
 
-    const s = await GuildConfig.findOne({ guildId: msg.guild.id });
-    if (!s) {
-        // Create default config if it doesn't exist
-        await GuildConfig.create({ guildId: msg.guild.id });
-        return;
+    // --- [ نظام الاقتراحات ] ---
+    try {
+        const sugCfg = await SuggestionConfig.findOne({ guildId: msg.guild.id, channelId: msg.channel.id });
+        if (sugCfg) {
+            const content = msg.content?.trim();
+            const attachmentImg = msg.attachments.find(a => a.contentType?.startsWith('image/'));
+            if (content || attachmentImg) {
+                const authorAvatar = msg.author.displayAvatarURL({ dynamic: true });
+                await msg.delete().catch(() => {});
+
+                const embed = new EmbedBuilder()
+                    .setAuthor({ name: `اقتراح من ${msg.author.username}`, iconURL: authorAvatar })
+                    .setDescription(content || '*بدون نص*')
+                    .setColor(0x1e90ff)
+                    .setFooter({ text: 'ABOUD SYSTEM - Suggestions' })
+                    .setTimestamp()
+                    .addFields(
+                        { name: getEmojiDisplay(msg.guild, sugCfg.emoji1), value: '0', inline: true },
+                        { name: getEmojiDisplay(msg.guild, sugCfg.emoji2), value: '0', inline: true }
+                    );
+
+                const files = [];
+                if (attachmentImg) {
+                    embed.setImage(attachmentImg.url);
+                } else if (sugCfg.imagePath && fs.existsSync(sugCfg.imagePath)) {
+                    const imgName = path.basename(sugCfg.imagePath);
+                    files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
+                    embed.setImage(`attachment://${imgName}`);
+                }
+
+                const menu = new StringSelectMenuBuilder()
+                    .setCustomId('suggestion_menu')
+                    .setPlaceholder('إجراءات الإدارة على الاقتراح')
+                    .addOptions(
+                        { label: 'الرد على الاقتراح', value: 'reply', emoji: '💬' },
+                        { label: 'قبول الاقتراح', value: 'accept', emoji: '✅' },
+                        { label: 'حذف الاقتراح', value: 'delete', emoji: '🗑️' }
+                    );
+
+                const sentMsg = await msg.channel.send({
+                    embeds: [embed],
+                    components: [new ActionRowBuilder().addComponents(menu)],
+                    files
+                });
+
+                await Suggestion.create({
+                    guildId: msg.guild.id,
+                    messageId: sentMsg.id,
+                    channelId: msg.channel.id,
+                    authorId: msg.author.id,
+                    content: content || ''
+                });
+
+                const emojiObj1 = msg.guild.emojis.cache.get(sugCfg.emoji1);
+                const emojiObj2 = msg.guild.emojis.cache.get(sugCfg.emoji2);
+                if (sugCfg.emoji1) await sentMsg.react(emojiObj1 || sugCfg.emoji1).catch(() => {});
+                if (sugCfg.emoji2) await sentMsg.react(emojiObj2 || sugCfg.emoji2).catch(() => {});
+            }
+            return;
+        }
+    } catch (err) {
+        console.error('[Suggestion Error]', err);
     }
+
+    const s = await GuildConfig.findOne({ guildId: msg.guild.id });
+    if (!s) return;
 
     // --- [ أمر قائمة المتصدرين ] ---
     if (s.levels?.enabled && s.levels.leaderboardCommand) {
@@ -2095,20 +1964,6 @@ client.on('messageCreate', async (msg) => {
         return msg.channel.send({ files: [savedBanner] });
     }
 
-    // --- [ نظام نقاط الكلان التلقائي (الرسائل) ] ---
-    const memberClan = await Clan.findOne({ guildId: msg.guild.id, members: msg.author.id });
-    if (memberClan) {
-        let mData = await ClanMember.findOne({ guildId: msg.guild.id, userId: msg.author.id, clanIndex: memberClan.clanIndex });
-        if (!mData) mData = new ClanMember({ guildId: msg.guild.id, userId: msg.author.id, clanIndex: memberClan.clanIndex });
-        mData.msgCountForPoints = (mData.msgCountForPoints || 0) + 1;
-        if (mData.msgCountForPoints >= 30) {
-            mData.msgCountForPoints = 0;
-            mData.points = (mData.points || 0) + 20;
-            memberClan.points = (memberClan.points || 0) + 20;
-            await memberClan.save();
-        }
-        await mData.save();
-    }
 
     // --- [ جلب بيانات العضو ] ---
     let u = await UserLevel.findOne({ guildId: msg.guild.id, userId: msg.author.id });
@@ -2134,9 +1989,7 @@ client.on('messageCreate', async (msg) => {
             const forbiddenWords = s.security.badWords.split(',').map(w => w.trim()).filter(Boolean);
             const hasBadWord = forbiddenWords.some(word => {
                 try {
-                    // Escape special characters in the word to prevent RegExp crash
-                    const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(`(?<=^|[^أ-يa-zA-Z0-9])${escapedWord}(?=[^أ-يa-zA-Z0-9]|$)`, 'iu');
+                    const regex = new RegExp(`(?<=^|[^أ-يa-zA-Z0-9])${word}(?=[^أ-يa-zA-Z0-9]|$)`, 'iu');
                     return regex.test(msg.content);
                 } catch { return msg.content.includes(word); }
             });
@@ -2182,78 +2035,6 @@ client.on('messageCreate', async (msg) => {
         if (row.components.length > 0) rows.push(row);
         channel.send({ content: 'نظام الرتب', components: rows });
         msg.reply('تم إرسال لوحة الرتب');
-    }
-
-    // --- [ نظام الستريك ] ---
-    const sConf = await StreakConfig.findOne({ guildId: msg.guild.id });
-    if (sConf && msg.member.roles.cache.has(sConf.streakRole)) {
-        const now = new Date();
-        const isSameDay = u.lastMessageDate && u.lastMessageDate.toDateString() === now.toDateString();
-
-        if (!isSameDay) {
-            if (u.dailyMsgs < sConf.requiredMessages) u.streakCount = 0;
-            u.dailyMsgs = 0;
-            u.warned = false;
-        }
-
-        if (u.dailyMsgs < sConf.requiredMessages) {
-            u.dailyMsgs++;
-            u.lastMessageDate = now;
-
-            if (u.dailyMsgs === sConf.requiredMessages) {
-                u.streakCount++;
-                const logCh = msg.guild.channels.cache.get(sConf.streakChannel);
-                if (logCh) {
-                    const embed = new EmbedBuilder()
-                        .setAuthor({ name: `إحصائيات الستريك لـ ${msg.author.username}`, iconURL: msg.author.displayAvatarURL() })
-                        .setDescription(`عدد الأيام: ${u.streakCount} يوم\n\nرسائل اليوم: ${u.dailyMsgs} رسالة\n\nينتهي خلال: <t:${Math.floor((new Date(u.lastMessageDate).getTime() + 86400000) / 1000)}:R>`)
-                        .setThumbnail(msg.author.displayAvatarURL({ dynamic: true }))
-                        .setColor(0xffac33)
-                        .setFooter({ text: 'VORTEX System - استمر ولا تقطع!' })
-                        .setTimestamp();
-                    logCh.send({ content: `${msg.author}`, embeds: [embed] });
-                }
-            }
-        }
-        await u.save();
-    }
-
-    // --- [ أمر !ستريك ] ---
-    if (msg.content.startsWith('!ستريك')) {
-        const target = msg.mentions.members.first() || msg.member;
-        const userData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id });
-        if (!userData) return msg.reply('هذا العضو ليس لديه سجلات تفاعل بعد.');
-
-        const expiresAt = Math.floor((new Date(userData.lastMessageDate || Date.now()).getTime() + 86400000) / 1000);
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: `إحصائيات الستريك لـ ${target.user.username}`, iconURL: target.user.displayAvatarURL() })
-            .setDescription(`عدد الأيام: ${userData.streakCount || 0} يوم\n\nرسائل اليوم: ${userData.dailyMsgs || 0} رسالة\n\nينتهي خلال: <t:${expiresAt}:R>`)
-            .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
-            .setColor(0xffac33)
-            .setFooter({ text: 'VORTEX System - استمر ولا تقطع!' })
-            .setTimestamp();
-        msg.reply({ embeds: [embed] });
-    }
-
-    // --- [ أمر !توب-ستريك ] ---
-    if (msg.content.startsWith('!توب') || msg.content.startsWith('!top-streak')) {
-        const topUsers = await UserLevel.find({ guildId: msg.guild.id, streakCount: { $gt: 0 } }).sort({ streakCount: -1 }).limit(10);
-        if (topUsers.length === 0) return msg.reply('لا يوجد متصدرين في نظام الستريك بعد.');
-
-        const embed = new EmbedBuilder()
-            .setTitle(`قائمة متصدري الستريك في ${msg.guild.name}`)
-            .setColor(0xffac33)
-            .setThumbnail(msg.guild.iconURL())
-            .setTimestamp();
-
-        let description = '';
-        for (let i = 0; i < topUsers.length; i++) {
-            const uData = topUsers[i];
-            const medal = i === 0 ? '(1)' : i === 1 ? '(2)' : i === 2 ? '(3)' : `#${i + 1}`;
-            description += `${medal} | <@${uData.userId}> — \`${uData.streakCount} يوم\`\n`;
-        }
-        embed.setDescription(description).setFooter({ text: 'VORTEX System - المنافسة مشتعلة!' });
-        msg.reply({ embeds: [embed] });
     }
 
     // --- [ الرد الآلي ] ---
@@ -2334,8 +2115,7 @@ client.on('messageCreate', async (msg) => {
         const target = msg.mentions.users.first() || msg.author;
         await msg.channel.sendTyping();
 
-        const uData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id }) || { level: 1, xp: 0, streakCount: 0 };
-        const clanData = await Clan.findOne({ guildId: msg.guild.id, members: target.id });
+        const uData = await UserLevel.findOne({ guildId: msg.guild.id, userId: target.id }) || { level: 1, xp: 0, msgCount: 0 };
 
         const canvas = createCanvas(850, 500);
         const ctx = canvas.getContext('2d');
@@ -2368,13 +2148,8 @@ client.on('messageCreate', async (msg) => {
         ctx.fillText(target.username, 270, 130);
 
         ctx.font = '28px Arial';
-        if (clanData) {
-            ctx.fillStyle = '#1e90ff';
-            ctx.fillText(`Clan: ${clanData.clanName}`, 270, 175);
-        } else {
-            ctx.fillStyle = '#e63946';
-            ctx.fillText('No Clan Joined', 270, 175);
-        }
+        ctx.fillStyle = '#1e90ff';
+        ctx.fillText(`XP: ${uData.xp || 0}`, 270, 175);
 
         function drawStatBox(x, y, label, value) {
             ctx.fillStyle = 'rgba(30, 144, 255, 0.08)';
@@ -2394,46 +2169,11 @@ client.on('messageCreate', async (msg) => {
         }
 
         drawStatBox(50, 300, 'LEVEL', uData.level);
-        drawStatBox(305, 300, 'STREAK', uData.streakCount);
+        drawStatBox(305, 300, 'XP', uData.xp || 0);
         drawStatBox(560, 300, 'MESSAGES', uData.msgCount || 0);
 
-        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'vortex-profile.png' });
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'aboud-profile.png' });
         msg.reply({ files: [attachment] });
-    }
-
-    // --- [ أمر تحكم (الكلانات) - يجب أن يكون قبل فحص السجن ] ---
-    if (msg.content === 'تحكم') {
-        const myClan = await Clan.findOne({
-            guildId: msg.guild.id,
-            $or: [{ leaderId: msg.author.id }, { assistantIds: msg.author.id }]
-        });
-        if (!myClan) return msg.reply('هذا الأمر مخصص لقادة الكلان ومساعديهم فقط.');
-
-        const isLeader = myClan.leaderId === msg.author.id;
-
-        const options = [
-            { label: 'اضافة عضو', value: 'add_mem', description: 'اضافة عضو جديد للكلان' },
-            { label: 'طرد عضو', value: 'kick_mem', description: 'طرد عضو من الكلان' },
-            { label: 'إحصائيات الكلان', value: 'show_stats', description: 'عرض معلومات وإحصائيات الكلان' },
-        ];
-
-        if (isLeader) {
-            options.push({ label: 'اضافة مساعد', value: 'add_assist', description: 'ترقية عضو لمساعد' });
-            options.push({ label: 'سحب رتبة مساعد', value: 'remove_assist', description: 'سحب رتبة المساعد (لا يطرده من الكلان)' });
-        }
-
-        const menu = new StringSelectMenuBuilder()
-            .setCustomId(`clan_control_${myClan.clanIndex}`)
-            .setPlaceholder('لوحة إدارة الكلان')
-            .addOptions(options);
-
-        const embed = new EmbedBuilder()
-            .setTitle(`لوحة تحكم كلان ${myClan.clanName}`)
-            .setDescription(`مرحباً ${msg.author}، اختر الإجراء المطلوب من القائمة أدناه.`)
-            .setColor(0x1e90ff)
-            .setFooter({ text: 'VORTEX System - Clans Control' });
-
-        return msg.reply({ embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] });
     }
 
     // --- [ نظام السجن ] ---
@@ -2452,7 +2192,7 @@ client.on('messageCreate', async (msg) => {
             const target = msg.mentions.members.first();
             const timeInput = args.find(arg => /\d+[smhdw]/.test(arg));
 
-            if (!target || !timeInput) return msg.reply(`الاستخدام الصحيح: \`${prefix}${command} @user 1h\``);
+            if (!target || !timeInput) return msg.reply(`الاستخدام الصحيح: \`!${command} @user 1h\``);
             if (target.id === msg.author.id) return msg.reply('لا يمكنك سجن نفسك!');
             if (target.user.bot) return msg.reply('لا يمكنك سجن البوتات!');
 
@@ -2531,7 +2271,48 @@ client.on('messageCreate', async (msg) => {
     }
 
 });
-// (clan control block moved above jail block)
+
+// --- [ تصويت الاقتراحات ] ---
+async function updateSuggestionVotes(reaction, user, isAdd) {
+    try {
+        if (user.bot) return;
+        if (reaction.partial) await reaction.fetch().catch(() => {});
+        const message = reaction.message;
+        if (!message.guild) return;
+
+        const suggestion = await Suggestion.findOne({ guildId: message.guild.id, messageId: message.id });
+        if (!suggestion || suggestion.status !== 'pending') return;
+
+        const sugCfg = await SuggestionConfig.findOne({ guildId: message.guild.id });
+        if (!sugCfg) return;
+
+        const emojiId = reaction.emoji.id || reaction.emoji.name;
+        let field, otherField;
+        if (emojiId === sugCfg.emoji1) { field = 'votes1'; otherField = 'votes2'; }
+        else if (emojiId === sugCfg.emoji2) { field = 'votes2'; otherField = 'votes1'; }
+        else return;
+
+        if (isAdd) {
+            if (!suggestion[field].includes(user.id)) suggestion[field].push(user.id);
+            suggestion[otherField] = suggestion[otherField].filter(id => id !== user.id);
+        } else {
+            suggestion[field] = suggestion[field].filter(id => id !== user.id);
+        }
+        await suggestion.save();
+
+        const embed = EmbedBuilder.from(message.embeds[0]);
+        embed.setFields(
+            { name: getEmojiDisplay(message.guild, sugCfg.emoji1), value: `${suggestion.votes1.length}`, inline: true },
+            { name: getEmojiDisplay(message.guild, sugCfg.emoji2), value: `${suggestion.votes2.length}`, inline: true }
+        );
+        await message.edit({ embeds: [embed] }).catch(() => {});
+    } catch (err) {
+        console.error('[Suggestion Vote Error]', err);
+    }
+}
+
+client.on('messageReactionAdd', (reaction, user) => updateSuggestionVotes(reaction, user, true));
+client.on('messageReactionRemove', (reaction, user) => updateSuggestionVotes(reaction, user, false));
 
 // ==========================================
 // 11. Audit Log Events (بدون إيموجي في اللوق)
@@ -2609,7 +2390,7 @@ client.on('guildMemberAdd', async (member) => {
             .setDescription(welcomeMsg)
             .setColor(0x1e90ff)
             .setTimestamp()
-            .setFooter({ text: `VORTEX System - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+            .setFooter({ text: `ABOUD SYSTEM - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
         try {
             const canvas = createCanvas(800, 400);
@@ -2790,205 +2571,219 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.channel.send({ embeds: [embed], components: [row] });
                 return interaction.reply({ content: 'تم إرسال اللوحة!', ephemeral: true });
             }
-        }
 
-        // --- [ Clan Apply Button ] ---
-        if (interaction.isButton() && interaction.customId.startsWith('apply_clan_')) {
-            const clanId = interaction.customId.replace('apply_clan_', '');
-            const clan = await Clan.findById(clanId).catch(() => null);
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-            const thread = await interaction.channel.threads.create({
-                name: `تقديم-${clan.clanName}-${interaction.user.username}`,
-                autoArchiveDuration: 60,
-                type: ChannelType.PrivateThread,
-            }).catch(async () => {
-                return await interaction.channel.threads.create({
-                    name: `تقديم-${clan.clanName}-${interaction.user.username}`,
-                    autoArchiveDuration: 60,
-                    type: ChannelType.PublicThread,
-                }).catch(() => null);
-            });
-
-            if (!thread) return interaction.reply({ content: 'فشل إنشاء قناة التقديم.', ephemeral: true });
-
-            await thread.members.add(interaction.user.id);
-            await interaction.reply({ content: `تم فتح قناة التقديم: ${thread}`, ephemeral: true });
-            await askNextQuestion(thread, interaction.user, clan, 0, interaction.guild);
-            return;
-        }
-
-        // --- [ Clan Application Confirmation Buttons ] ---
-        if (interaction.isButton() && interaction.customId.startsWith('conf_')) {
-            const parts = interaction.customId.split('_');
-            const status = parts[1];
-            const clanId = parts[2];
-            const qIndex = parseInt(parts[3]);
-            const clan = await Clan.findById(clanId).catch(() => null);
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-            await interaction.message.delete().catch(() => {});
-            if (status === 'yes') {
-                await askNextQuestion(interaction.channel, interaction.user, clan, qIndex + 1, interaction.guild);
-            } else {
-                await askNextQuestion(interaction.channel, interaction.user, clan, qIndex, interaction.guild);
-            }
-            return;
-        }
-
-        // --- [ Accept / Reject Clan Member ] ---
-        if (interaction.isButton() && (interaction.customId.startsWith('accept_member:') || interaction.customId.startsWith('reject_member:'))) {
-            const parts = interaction.customId.split(':');
-            const action = parts[0];
-            const targetId = parts[1];
-            
-            // تحقق صارم من وجود القيمة وتحويلها
-            if (!parts[2] || isNaN(parseInt(parts[2]))) {
-                return interaction.reply({ content: '❌ خطأ: لم يتم العثور على رقم الكلان في هذا الزر.', ephemeral: true });
-            }
-            const clanIdx = parseInt(parts[2]);
-
-            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-            if (interaction.user.id !== clan.leaderId) {
-                return interaction.reply({ content: 'أنت لست قائد هذا الكلان!', ephemeral: true });
+            // ===== أوامر الإشراف =====
+            if (interaction.commandName === 'ban') {
+                const target = interaction.options.getUser('عضو');
+                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (member && !member.bannable) return interaction.reply({ content: 'لا يمكنني حظر هذا العضو (رتبته أعلى مني).', ephemeral: true });
+                await interaction.guild.members.ban(target.id, { reason }).catch(() => {});
+                const embed = new EmbedBuilder().setTitle('تم الحظر').setColor(0xe63946)
+                    .addFields({ name: 'العضو', value: `${target.tag}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed] });
             }
 
-            await interaction.deferUpdate();
-            const targetUser = await client.users.fetch(targetId).catch(() => null);
-
-            if (action === 'accept_member') {
-                if (clan.members.length >= 10) return interaction.followUp({ content: 'الكلان ممتلئ (10 أعضاء كحد أقصى)!', ephemeral: true });
-                if (!clan.members.includes(targetId)) {
-                    clan.members.push(targetId);
-                    await clan.save();
-                }
-                const member = await interaction.guild.members.fetch(targetId).catch(() => null);
-                if (member && clan.roleId) await member.roles.add(clan.roleId).catch(() => {});
-                if (targetUser) targetUser.send(`مبروك! تم قبولك في كلان **${clan.clanName}**`).catch(() => {});
-                await interaction.editReply({ content: `تم قبول <@${targetId}> بنجاح.`, components: [], embeds: interaction.message.embeds });
-            } else if (action === 'reject_member') {
-                if (targetUser) targetUser.send(`للأسف، تم رفض طلب انضمامك لكلان **${clan.clanName}**`).catch(() => {});
-                await interaction.editReply({ content: `تم رفض <@${targetId}>.`, components: [], embeds: interaction.message.embeds });
-            }
-            return;
-        }
-
-          // --- [ Clan Control Select Menu ] ---
-        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_control_')) {
-            // استخراج الأرقام فقط من الـ customId لمنع خطأ NaN نهائياً
-            const parts = interaction.customId.split('_');
-            const clanIdxStr = parts[parts.length - 1];
-            const clanIdx = parseInt(clanIdxStr);
-
-            if (isNaN(clanIdx)) {
-                return interaction.reply({ content: '❌ خطأ: لم يتم التعرف على رقم الكلان بشكل صحيح.', ephemeral: true });
+            if (interaction.commandName === 'unban') {
+                const id = interaction.options.getString('id');
+                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                await interaction.guild.members.unban(id, reason).catch(() => {
+                    return interaction.reply({ content: 'تعذر فك الحظر، تأكد من صحة الـ ID.', ephemeral: true });
+                });
+                const embed = new EmbedBuilder().setTitle('تم فك الحظر').setColor(0x00c853)
+                    .addFields({ name: 'العضو', value: `<@${id}>`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed] });
             }
 
-            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
+            if (interaction.commandName === 'kick') {
+                const target = interaction.options.getUser('عضو');
+                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
+                if (!member.kickable) return interaction.reply({ content: 'لا يمكنني طرد هذا العضو (رتبته أعلى مني).', ephemeral: true });
+                await member.kick(reason).catch(() => {});
+                const embed = new EmbedBuilder().setTitle('تم الطرد').setColor(0xe63946)
+                    .addFields({ name: 'العضو', value: `${target.tag}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed] });
+            }
 
-            const isLeader = clan.leaderId === interaction.user.id;
-            const isAssistant = clan.assistantIds?.includes(interaction.user.id);
-            if (!isLeader && !isAssistant) return interaction.reply({ content: 'ليس لديك صلاحية.', ephemeral: true });
+            if (interaction.commandName === 'timeout') {
+                const target = interaction.options.getUser('عضو');
+                const minutes = interaction.options.getInteger('دقائق');
+                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
+                if (!member.moderatable) return interaction.reply({ content: 'لا يمكنني كتم هذا العضو (رتبته أعلى مني).', ephemeral: true });
+                await member.timeout(minutes * 60 * 1000, reason).catch(() => {});
+                const embed = new EmbedBuilder().setTitle('تم الكتم (Timeout)').setColor(0xffac33)
+                    .addFields({ name: 'العضو', value: `${target}`, inline: true }, { name: 'المدة', value: `${minutes} دقيقة`, inline: true }, { name: 'السبب', value: reason })
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed] });
+            }
 
-            const selected = interaction.values[0];
+            if (interaction.commandName === 'untimeout') {
+                const target = interaction.options.getUser('عضو');
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
+                await member.timeout(null).catch(() => {});
+                return interaction.reply({ content: `تم فك الكتم عن ${target}.` });
+            }
 
-            if (selected === 'show_stats') {
-                const membersList = clan.members.length > 0 ? clan.members.map(id => `<@${id}>`).join(', ') : 'لا يوجد أعضاء';
-                const assistantsList = clan.assistantIds?.length > 0 ? clan.assistantIds.map(id => `<@${id}>`).join(', ') : 'لا يوجد مساعدين';
+            if (interaction.commandName === 'warn') {
+                const target = interaction.options.getUser('عضو');
+                const reason = interaction.options.getString('سبب');
+                await Warn.create({ guildId: interaction.guild.id, userId: target.id, reason, moderatorId: interaction.user.id });
+                const embed = new EmbedBuilder().setTitle('تم توجيه تحذير').setColor(0xffac33)
+                    .addFields({ name: 'العضو', value: `${target}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
+                    .setTimestamp();
+                await interaction.reply({ embeds: [embed] });
+                target.send(`تم توجيه تحذير لك في سيرفر **${interaction.guild.name}**\nالسبب: ${reason}`).catch(() => {});
+                return;
+            }
 
-                const embed = new EmbedBuilder()
-                    .setTitle(`إحصائيات كلان ${clan.clanName}`)
-                    .setColor(0x1e90ff)
-                    .addFields(
-                        { name: 'القائد', value: `<@${clan.leaderId}>`, inline: true },
-                        { name: 'عدد الأعضاء', value: `${clan.members.length}/10`, inline: true },
-                        { name: 'النقاط', value: `${clan.points || 0}`, inline: true },
-                        { name: 'الأعضاء', value: membersList },
-                        { name: 'المساعدون', value: assistantsList }
-                    )
-                    .setTimestamp()
-                    .setFooter({ text: 'VORTEX System - Clans' });
-
+            if (interaction.commandName === 'warnings') {
+                const target = interaction.options.getUser('عضو');
+                const warns = await Warn.find({ guildId: interaction.guild.id, userId: target.id }).sort({ createdAt: -1 }).limit(15);
+                if (warns.length === 0) return interaction.reply({ content: `${target} لا يملك أي تحذيرات.`, ephemeral: true });
+                const embed = new EmbedBuilder().setTitle(`تحذيرات ${target.username}`).setColor(0xffac33)
+                    .setDescription(warns.map((w, i) => `**${i + 1}.** ${w.reason} — بواسطة <@${w.moderatorId}> <t:${Math.floor(w.createdAt.getTime() / 1000)}:R>`).join('\n'))
+                    .setTimestamp();
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            const modalTitle = {
-                'add_mem': 'اضافة عضو للكلان',
-                'kick_mem': 'طرد عضو من الكلان',
-                'add_assist': 'اضافة مساعد',
-                'remove_assist': 'سحب رتبة مساعد'
-            }[selected];
+            if (interaction.commandName === 'clearwarns') {
+                const target = interaction.options.getUser('عضو');
+                await Warn.deleteMany({ guildId: interaction.guild.id, userId: target.id });
+                return interaction.reply({ content: `تم مسح جميع تحذيرات ${target}.` });
+            }
 
-            if (modalTitle) {
-                if ((selected === 'add_assist' || selected === 'remove_assist') && !isLeader) {
-                    return interaction.reply({ content: 'هذا الخيار للقائد فقط.', ephemeral: true });
+            if (interaction.commandName === 'purge') {
+                const amount = interaction.options.getInteger('عدد');
+                if (amount < 1 || amount > 100) return interaction.reply({ content: 'العدد يجب أن يكون بين 1 و 100.', ephemeral: true });
+                const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
+                return interaction.reply({ content: `تم حذف ${deleted?.size || 0} رسالة.`, ephemeral: true });
+            }
+
+            if (interaction.commandName === 'lock') {
+                await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false }).catch(() => {});
+                return interaction.reply({ content: '🔒 تم قفل الروم.' });
+            }
+
+            if (interaction.commandName === 'unlock') {
+                await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: null }).catch(() => {});
+                return interaction.reply({ content: '🔓 تم فتح الروم.' });
+            }
+
+            if (interaction.commandName === 'slowmode') {
+                const seconds = interaction.options.getInteger('ثواني');
+                await interaction.channel.setRateLimitPerUser(seconds).catch(() => {});
+                return interaction.reply({ content: seconds > 0 ? `تم ضبط وضع البطء على ${seconds} ثانية.` : 'تم إيقاف وضع البطء.' });
+            }
+
+            if (interaction.commandName === 'nickname') {
+                const target = interaction.options.getUser('عضو');
+                const newName = interaction.options.getString('اسم');
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
+                await member.setNickname(newName || null).catch(() => {});
+                return interaction.reply({ content: newName ? `تم تغيير اسم ${target} إلى **${newName}**.` : `تم إرجاع اسم ${target} الأصلي.` });
+            }
+
+            if (interaction.commandName === 'addrole') {
+                const target = interaction.options.getUser('عضو');
+                const role = interaction.options.getRole('رتبة');
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
+                await member.roles.add(role).catch(() => {});
+                return interaction.reply({ content: `تم إعطاء رتبة **${role.name}** لـ ${target}.` });
+            }
+
+            if (interaction.commandName === 'removerole') {
+                const target = interaction.options.getUser('عضو');
+                const role = interaction.options.getRole('رتبة');
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
+                await member.roles.remove(role).catch(() => {});
+                return interaction.reply({ content: `تم سحب رتبة **${role.name}** من ${target}.` });
+            }
+
+            if (interaction.commandName === 'announce') {
+                const title = interaction.options.getString('عنوان');
+                const text = interaction.options.getString('نص');
+                const channel = interaction.options.getChannel('روم');
+                const role = interaction.options.getRole('منشن_رتبة');
+                const image = interaction.options.getAttachment('صورة');
+
+                const embed = new EmbedBuilder()
+                    .setTitle(title)
+                    .setDescription(text)
+                    .setColor(0x1e90ff)
+                    .setFooter({ text: `ABOUD SYSTEM - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                    .setTimestamp();
+                if (image) embed.setImage(image.url);
+
+                await channel.send({ content: role ? `${role}` : undefined, embeds: [embed] }).catch(() => {
+                    return interaction.reply({ content: 'تعذر إرسال الإعلان بهذا الروم.', ephemeral: true });
+                });
+                return interaction.reply({ content: `تم نشر الإعلان في ${channel}.`, ephemeral: true });
+            }
+
+            if (interaction.commandName === 'say') {
+                const text = interaction.options.getString('نص');
+                const channel = interaction.options.getChannel('روم') || interaction.channel;
+                await channel.send({ content: text }).catch(() => {});
+                return interaction.reply({ content: `تم إرسال الرسالة في ${channel}.`, ephemeral: true });
+            }
+
+            if (interaction.commandName === 'userinfo') {
+                const target = interaction.options.getUser('عضو') || interaction.user;
+                const member = await interaction.guild.members.fetch(target.id).catch(() => null);
+                const embed = new EmbedBuilder()
+                    .setTitle(`معلومات ${target.username}`)
+                    .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+                    .setColor(0x1e90ff)
+                    .addFields(
+                        { name: 'الاسم الكامل', value: target.tag, inline: true },
+                        { name: 'ID', value: target.id, inline: true },
+                        { name: 'تاريخ إنشاء الحساب', value: `<t:${Math.floor(target.createdTimestamp / 1000)}:D>`, inline: true },
+                    );
+                if (member) {
+                    embed.addFields(
+                        { name: 'تاريخ الانضمام', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:D>`, inline: true },
+                        { name: 'عدد الرتب', value: `${member.roles.cache.size - 1}`, inline: true }
+                    );
                 }
-
-                const modal = new ModalBuilder()
-                    .setCustomId(`clmod_${selected}_${clanIdx}`)
-                    .setTitle(modalTitle);
-                
-                const input = new TextInputBuilder()
-                    .setCustomId(`member_input_${clanIdx}`)
-                    .setLabel('ID العضو / المساعد')
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder('ادخل الـ ID هنا...')
-                    .setRequired(true);
-
-                modal.addComponents(new ActionRowBuilder().addComponents(input));
-                return interaction.showModal(modal);
-            }
-        }
-
-        // --- [ Clan Control Modals ] ---
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('clmod_')) {
-            const parts = interaction.customId.split('_');
-            const action = parts[1];
-            const clanIdxStr = parts[parts.length - 1];
-            const clanIdx = parseInt(clanIdxStr);
-            
-            if (isNaN(clanIdx)) {
-                return interaction.reply({ content: 'خطأ في معالجة بيانات رقم الكلان من النموذج.', ephemeral: true });
-            }
-            const memberId = interaction.fields.getTextInputValue(`member_input_${clanIdx}`).trim();
-
-            const clan = await Clan.findOne({ guildId: interaction.guild.id, clanIndex: clanIdx });
-            if (!clan) return interaction.reply({ content: 'الكلان غير موجود.', ephemeral: true });
-
-            if (action === 'add_mem') {
-                if (clan.members.length >= 10) return interaction.reply({ content: 'الكلان ممتلئ!', ephemeral: true });
-                if (clan.members.includes(memberId)) return interaction.reply({ content: 'العضو موجود مسبقاً.', ephemeral: true });
-                clan.members.push(memberId);
-                await clan.save();
-                const mem = await interaction.guild.members.fetch(memberId).catch(() => null);
-                if (mem && clan.roleId) await mem.roles.add(clan.roleId).catch(() => {});
-                return interaction.reply({ content: `تمت إضافة <@${memberId}> للكلان بنجاح.`, ephemeral: true });
-            }
-            
-            if (action === 'kick_mem') {
-                clan.members = clan.members.filter(id => id !== memberId);
-                clan.assistantIds = (clan.assistantIds || []).filter(id => id !== memberId);
-                await clan.save();
-                const mem = await interaction.guild.members.fetch(memberId).catch(() => null);
-                if (mem && clan.roleId) await mem.roles.remove(clan.roleId).catch(() => {});
-                return interaction.reply({ content: `تم طرد <@${memberId}> من الكلان.`, ephemeral: true });
+                return interaction.reply({ embeds: [embed] });
             }
 
-            if (action === 'add_assist') {
-                if (!clan.members.includes(memberId)) return interaction.reply({ content: 'العضو ليس في الكلان، أضفه أولاً.', ephemeral: true });
-                if (!clan.assistantIds) clan.assistantIds = [];
-                if (!clan.assistantIds.includes(memberId)) clan.assistantIds.push(memberId);
-                await clan.save();
-                return interaction.reply({ content: `تمت ترقية <@${memberId}> لمساعد بنجاح.`, ephemeral: true });
+            if (interaction.commandName === 'serverinfo') {
+                const g = interaction.guild;
+                const embed = new EmbedBuilder()
+                    .setTitle(g.name)
+                    .setThumbnail(g.iconURL({ dynamic: true }))
+                    .setColor(0x1e90ff)
+                    .addFields(
+                        { name: 'المالك', value: `<@${g.ownerId}>`, inline: true },
+                        { name: 'عدد الأعضاء', value: `${g.memberCount}`, inline: true },
+                        { name: 'عدد الرومات', value: `${g.channels.cache.size}`, inline: true },
+                        { name: 'عدد الرتب', value: `${g.roles.cache.size}`, inline: true },
+                        { name: 'تاريخ الإنشاء', value: `<t:${Math.floor(g.createdTimestamp / 1000)}:D>`, inline: true },
+                    )
+                    .setFooter({ text: 'ABOUD SYSTEM' })
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed] });
             }
 
-            if (action === 'remove_assist') {
-                clan.assistantIds = (clan.assistantIds || []).filter(id => id !== memberId);
-                await clan.save();
-                return interaction.reply({ content: `تم سحب رتبة المساعد من <@${memberId}>.`, ephemeral: true });
+            if (interaction.commandName === 'avatar') {
+                const target = interaction.options.getUser('عضو') || interaction.user;
+                const embed = new EmbedBuilder()
+                    .setTitle(`صورة ${target.username}`)
+                    .setImage(target.displayAvatarURL({ dynamic: true, size: 1024 }))
+                    .setColor(0x1e90ff);
+                return interaction.reply({ embeds: [embed] });
             }
         }
 
@@ -3134,6 +2929,104 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
             }
             await openTicket(interaction, tConfig, ticketType);
         }
+        // --- [ Suggestion Menu ] ---
+        if (interaction.isStringSelectMenu() && interaction.customId === 'suggestion_menu') {
+            const isStaff = interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers) || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+            if (!isStaff) return interaction.reply({ content: 'هذا الإجراء مخصص للإدارة فقط.', ephemeral: true });
+
+            const suggestion = await Suggestion.findOne({ guildId: interaction.guild.id, messageId: interaction.message.id });
+            if (!suggestion) return interaction.reply({ content: 'لم يتم العثور على بيانات الاقتراح.', ephemeral: true });
+
+            const selected = interaction.values[0];
+
+            if (selected === 'reply') {
+                const modal = new ModalBuilder()
+                    .setCustomId(`suggestion_reply_modal:${interaction.message.id}`)
+                    .setTitle('الرد على الاقتراح');
+                modal.addComponents(new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId('reply_text').setLabel('نص رد الإدارة').setStyle(TextInputStyle.Paragraph).setRequired(true)
+                ));
+                return interaction.showModal(modal);
+            }
+
+            if (selected === 'accept') {
+                suggestion.status = 'accepted';
+                await suggestion.save();
+                await interaction.message.reactions.removeAll().catch(() => {});
+                const embed = EmbedBuilder.from(interaction.message.embeds[0]).setDescription(
+                    `${interaction.message.embeds[0].description || ''}\n\n**✅ تمت الموافقة على الاقتراح.**`
+                );
+                await interaction.update({ embeds: [embed], components: [] });
+                return;
+            }
+
+            if (selected === 'delete') {
+                await Suggestion.deleteOne({ _id: suggestion._id });
+                await interaction.message.delete().catch(() => {});
+                return interaction.reply({ content: 'تم حذف الاقتراح.', ephemeral: true });
+            }
+        }
+
+        // --- [ Suggestion Reply Modal ] ---
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('suggestion_reply_modal:')) {
+            const messageId = interaction.customId.split(':')[1];
+            const suggestion = await Suggestion.findOne({ guildId: interaction.guild.id, messageId });
+            if (!suggestion) return interaction.reply({ content: 'لم يتم العثور على بيانات الاقتراح.', ephemeral: true });
+
+            const replyText = interaction.fields.getTextInputValue('reply_text');
+            const channel = interaction.channel;
+
+            let thread = suggestion.replyThreadId ? await channel.threads.fetch(suggestion.replyThreadId).catch(() => null) : null;
+
+            if (!thread) {
+                const suggestionMsg = await channel.messages.fetch(messageId).catch(() => null);
+                if (!suggestionMsg) return interaction.reply({ content: 'لم يتم العثور على رسالة الاقتراح.', ephemeral: true });
+
+                thread = await suggestionMsg.startThread({
+                    name: `رد-الإدارة-${interaction.user.username}`,
+                    autoArchiveDuration: 1440,
+                    type: ChannelType.PrivateThread
+                }).catch(async () => {
+                    return await suggestionMsg.startThread({
+                        name: `رد-الإدارة-${interaction.user.username}`,
+                        autoArchiveDuration: 1440
+                    }).catch(() => null);
+                });
+
+                if (!thread) return interaction.reply({ content: 'تعذر إنشاء الثريد الخاص بالرد.', ephemeral: true });
+                suggestion.replyThreadId = thread.id;
+                await suggestion.save();
+
+                const suggestionEmbed = EmbedBuilder.from(suggestionMsg.embeds[0]);
+                const existingComponents = suggestionMsg.components.map(row => ActionRowBuilder.from(row));
+                const viewBtnRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`view_admin_reply:${messageId}`).setLabel('عرض رد الإدارة').setStyle(ButtonStyle.Secondary).setEmoji('💬')
+                );
+                await suggestionMsg.edit({ embeds: [suggestionEmbed], components: [...existingComponents, viewBtnRow] }).catch(() => {});
+            }
+
+            const replyEmbed = new EmbedBuilder()
+                .setAuthor({ name: `رد الإدارة - ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                .setDescription(replyText)
+                .setColor(0x1e90ff)
+                .setTimestamp();
+            await thread.send({ embeds: [replyEmbed] });
+
+            return interaction.reply({ content: 'تم إرسال ردك بنجاح.', ephemeral: true });
+        }
+
+        // --- [ View Admin Reply Button ] ---
+        if (interaction.isButton() && interaction.customId.startsWith('view_admin_reply:')) {
+            const messageId = interaction.customId.split(':')[1];
+            const suggestion = await Suggestion.findOne({ guildId: interaction.guild.id, messageId });
+            if (!suggestion?.replyThreadId) return interaction.reply({ content: 'لا يوجد رد من الإدارة على هذا الاقتراح بعد.', ephemeral: true });
+
+            const thread = await interaction.channel.threads.fetch(suggestion.replyThreadId).catch(() => null);
+            if (!thread) return interaction.reply({ content: 'الثريد غير موجود.', ephemeral: true });
+
+            await thread.members.add(interaction.user.id).catch(() => {});
+            return interaction.reply({ content: `تمت إضافتك لثريد رد الإدارة: ${thread}`, ephemeral: true });
+        }
     } catch (err) {
         console.error('[Interaction Error]', err);
     }
@@ -3189,7 +3082,7 @@ async function openTicket(interaction, tConfig, ticketType) {
             )
             .setThumbnail(interaction.user.displayAvatarURL())
             .setTimestamp()
-            .setFooter({ text: 'VORTEX System - Tickets' });
+            .setFooter({ text: 'ABOUD SYSTEM - Tickets' });
 
         if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
             const topName = path.basename(tConfig.topImagePath);
@@ -3227,138 +3120,80 @@ async function openTicket(interaction, tConfig, ticketType) {
     }
 }
 
-async function askNextQuestion(thread, user, clan, questionIndex, guild) {
-    if (questionIndex >= clan.questions.length) {
-        // جمع الإجابات من سجل الثريد
-        const messages = await thread.messages.fetch({ limit: 100 }).catch(() => new Map());
-        const answers = [];
-        messages.forEach(m => {
-            if (!m.author.bot && m.content) answers.unshift(m.content);
-        });
-
-        const resultsChannel = guild.channels.cache.get(clan.resultsChannelId);
-        if (resultsChannel) {
-            const embed = new EmbedBuilder()
-                .setTitle(`طلب انضمام جديد - ${clan.clanName}`)
-                .setColor(0x1e90ff)
-                .setThumbnail(user.displayAvatarURL())
-                .addFields({ name: 'المتقدم', value: `${user} (${user.tag})`, inline: false })
-                .setTimestamp()
-                .setFooter({ text: 'VORTEX System - Clans' });
-
-            clan.questions.forEach((q, i) => {
-                embed.addFields({ name: `السؤال ${i + 1}: ${q}`, value: answers[i] || 'لم يجب' });
-            });
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`accept_member:${user.id}:${clan.clanIndex}`).setLabel('قبول').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`reject_member:${user.id}:${clan.clanIndex}`).setLabel('رفض').setStyle(ButtonStyle.Danger)
-            );
-
-            await resultsChannel.send({ embeds: [embed], components: [row] });
-        }
-
-        await thread.send('شكراً! تم إرسال طلبك للإدارة. سيتم إخطارك بالنتيجة قريباً.');
-        setTimeout(() => thread.delete().catch(() => {}), 5000);
-        return;
-    }
-
-    const embed = new EmbedBuilder()
-        .setDescription(`**السؤال ${questionIndex + 1}/${clan.questions.length}:**\n${clan.questions[questionIndex]}`)
-        .setColor(0x1e90ff)
-        .setFooter({ text: `VORTEX System - ${clan.clanName}` });
-
-    await thread.send({ embeds: [embed] });
-
-    const filter = m => m.author.id === user.id;
-    const collector = thread.createMessageCollector({ filter, max: 1, time: 120000 });
-
-    collector.on('collect', async (m) => {
-        await askNextQuestion(thread, user, clan, questionIndex + 1, guild);
-    });
-
-    collector.on('end', async (collected) => {
-        if (collected.size === 0) {
-            await thread.send('انتهى الوقت! تم إلغاء التقديم.');
-            setTimeout(() => thread.delete().catch(() => {}), 3000);
-        }
-    });
-}
-
 // ==========================================
 // 14. Kick Live Checker
 // ==========================================
 
 async function checkKickLive() {
-    const configs = await KickConfig.find({});
-    for (const config of configs) {
-        const guild = client.guilds.cache.get(config.guildId);
-        if (!guild) continue;
-        for (let i = 0; i < config.streamers.length; i++) {
-            const s = config.streamers[i];
-            try {
-                const res = await axios.get(`https://kick.com/api/v1/channels/${s.kickUsername}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-                const data = res.data;
-                const isLive = data.livestream !== null;
-                const currentCat = data.livestream?.categories?.[0]?.name;
+    try {
+        const allConfigs = await KickConfig.find({});
+        for (const config of allConfigs) {
+            if (!config.streamers || config.streamers.length === 0) continue;
 
-                // 1. Normal Live Alert (When stream starts)
-                if (isLive && !s.isLive) {
-                    config.streamers[i].isLive = true;
-                    config.streamers[i].lastCategory = currentCat;
-                    await config.save();
-                    
-                    const channel = guild.channels.cache.get(s.channelId);
-                    if (channel) {
+            const guild = client.guilds.cache.get(config.guildId);
+            if (!guild) continue;
+
+            for (let i = 0; i < config.streamers.length; i++) {
+                const streamer = config.streamers[i];
+                if (!streamer.kickUsername) continue;
+
+                try {
+                    const response = await fetch(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
+                        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
+                    });
+
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    const isLive = data?.livestream !== null && data?.livestream !== undefined;
+
+                    if (isLive && !streamer.isLive) {
+                        config.streamers[i].isLive = true;
+                        config.markModified('streamers');
+                        await config.save();
+
+                        const channel = guild.channels.cache.get(streamer.channelId);
+                        if (!channel) continue;
+
+                        const streamTitle = data.livestream?.session_title || 'بث مباشر';
+                        const streamCategory = data.livestream?.categories?.[0]?.name || 'غير محدد';
+                        const thumbnailUrl = data.user?.profile_pic || '';
+                        const viewers = data.livestream?.viewer_count || 0;
+
                         const embed = new EmbedBuilder()
-                            .setTitle(`🔴 ${s.kickUsername} بدأ البث الآن!`)
-                            .setURL(`https://kick.com/${s.kickUsername}`)
+                            .setTitle(`${streamer.kickUsername} بدأ البث المباشر`)
+                            .setDescription(
+                                (streamer.customMessage || '%name% بدأ البث الآن!').replace(/%name%/g, streamer.kickUsername)
+                            )
+                            .setURL(`https://kick.com/${streamer.kickUsername}`)
                             .setColor(0x53fc18)
                             .addFields(
-                                { name: 'العنوان', value: data.livestream.session_title || 'بدون عنوان', inline: false },
-                                { name: 'الكاتيقوري', value: currentCat || 'غير معروف', inline: true },
-                                { name: 'المشاهدين', value: `${data.livestream.viewer_count}`, inline: true }
+                                { name: 'عنوان البث', value: streamTitle, inline: true },
+                                { name: 'الفئة', value: streamCategory, inline: true },
+                                { name: 'المشاهدون', value: `${viewers}`, inline: true }
                             )
-                            .setImage(data.livestream.thumbnail?.url || data.user.profile_pic)
-                            .setTimestamp();
-                        
-                        channel.send({ embeds: [embed] });
-                    }
-                }
-                
-                // 2. Category Specific Mention Alert (When switching to a specific category)
-                if (isLive && s.mentionCategories?.includes(currentCat) && s.lastCategory !== currentCat) {
-                    config.streamers[i].lastCategory = currentCat;
-                    await config.save();
-                    
-                    const channel = guild.channels.cache.get(s.channelId);
-                    if (channel) {
-                        const mention = s.roleId ? `<@&${s.roleId}>` : '';
-                        const embed = new EmbedBuilder()
-                            .setTitle(`🔥 تنبيه كاتيقوري: ${currentCat}`)
-                            .setDescription(`${s.kickUsername} يلعب الآن **${currentCat}**!`)
-                            .setURL(`https://kick.com/${s.kickUsername}`)
-                            .setColor(0xffac33)
-                            .addFields(
-                                { name: 'العنوان', value: data.livestream.session_title || 'بدون عنوان', inline: false },
-                                { name: 'المشاهدين', value: `${data.livestream.viewer_count}`, inline: true }
-                            )
-                            .setImage(data.livestream.thumbnail?.url || data.user.profile_pic)
-                            .setTimestamp();
-                        
-                        channel.send({ content: mention, embeds: [embed] });
-                    }
-                }
+                            .setTimestamp()
+                            .setFooter({ text: 'ABOUD SYSTEM - Kick Notifications' });
 
-                if (!isLive && s.isLive) {
-                    config.streamers[i].isLive = false;
-                    config.streamers[i].lastCategory = null;
-                    await config.save();
+                        if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
+
+                        const mentionContent = streamer.roleId ? `<@&${streamer.roleId}>` : '';
+                        await channel.send({ content: mentionContent || undefined, embeds: [embed] });
+
+                    } else if (!isLive && streamer.isLive) {
+                        config.streamers[i].isLive = false;
+                        config.markModified('streamers');
+                        await config.save();
+                    }
+                } catch (err) {
+                    // تجاهل أخطاء API كيك الفردية
                 }
-            } catch (e) {}
+            }
         }
+    } catch (err) {
+        console.error('[Kick Checker Error]', err);
     }
 }
+
 setInterval(checkKickLive, 60000);
 
 // ==========================================
@@ -3370,18 +3205,109 @@ async function registerSlashCommands() {
         new SlashCommandBuilder()
             .setName('setbanner')
             .setDescription('ضبط بنر الترحيب')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addAttachmentOption(opt => opt.setName('image').setDescription('صورة البنر').setRequired(true)),
         new SlashCommandBuilder()
             .setName('rename_panel')
             .setDescription('إرسال لوحة تغيير الاسم')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
             .addStringOption(opt => opt.setName('name').setDescription('الاسم الجديد').setRequired(true))
             .addAttachmentOption(opt => opt.setName('image').setDescription('صورة اللوحة').setRequired(false)),
+
+        // ===== 20 أمر إشراف قوية =====
+        new SlashCommandBuilder().setName('ban').setDescription('حظر عضو من السيرفر')
+            .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب حظره').setRequired(true))
+            .addStringOption(o => o.setName('سبب').setDescription('سبب الحظر').setRequired(false)),
+
+        new SlashCommandBuilder().setName('unban').setDescription('فك حظر عضو عبر الـ ID')
+            .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+            .addStringOption(o => o.setName('id').setDescription('ID العضو').setRequired(true))
+            .addStringOption(o => o.setName('سبب').setDescription('سبب فك الحظر').setRequired(false)),
+
+        new SlashCommandBuilder().setName('kick').setDescription('طرد عضو من السيرفر')
+            .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب طرده').setRequired(true))
+            .addStringOption(o => o.setName('سبب').setDescription('سبب الطرد').setRequired(false)),
+
+        new SlashCommandBuilder().setName('timeout').setDescription('كتم عضو (تايم اوت) لفترة محددة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب كتمه').setRequired(true))
+            .addIntegerOption(o => o.setName('دقائق').setDescription('مدة الكتم بالدقائق').setRequired(true))
+            .addStringOption(o => o.setName('سبب').setDescription('سبب الكتم').setRequired(false)),
+
+        new SlashCommandBuilder().setName('untimeout').setDescription('فك الكتم عن عضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب فك كتمه').setRequired(true)),
+
+        new SlashCommandBuilder().setName('warn').setDescription('توجيه تحذير لعضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب تحذيره').setRequired(true))
+            .addStringOption(o => o.setName('سبب').setDescription('سبب التحذير').setRequired(true)),
+
+        new SlashCommandBuilder().setName('warnings').setDescription('عرض تحذيرات عضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب عرض تحذيراته').setRequired(true)),
+
+        new SlashCommandBuilder().setName('clearwarns').setDescription('مسح كل تحذيرات عضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب مسح تحذيراته').setRequired(true)),
+
+        new SlashCommandBuilder().setName('purge').setDescription('حذف عدد من الرسائل من الروم')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+            .addIntegerOption(o => o.setName('عدد').setDescription('عدد الرسائل (1-100)').setRequired(true)),
+
+        new SlashCommandBuilder().setName('lock').setDescription('قفل الروم الحالي عن الأعضاء')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+
+        new SlashCommandBuilder().setName('unlock').setDescription('فتح الروم الحالي للأعضاء')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+
+        new SlashCommandBuilder().setName('slowmode').setDescription('ضبط وضع البطء بالروم الحالي')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addIntegerOption(o => o.setName('ثواني').setDescription('عدد الثواني (0 للإيقاف)').setRequired(true)),
+
+        new SlashCommandBuilder().setName('nickname').setDescription('تغيير اسم عضو داخل السيرفر')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(true))
+            .addStringOption(o => o.setName('اسم').setDescription('الاسم الجديد (اتركه فاضي للإرجاع)').setRequired(false)),
+
+        new SlashCommandBuilder().setName('addrole').setDescription('إعطاء رتبة لعضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(true))
+            .addRoleOption(o => o.setName('رتبة').setDescription('الرتبة المطلوب إعطاؤها').setRequired(true)),
+
+        new SlashCommandBuilder().setName('removerole').setDescription('سحب رتبة من عضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(true))
+            .addRoleOption(o => o.setName('رتبة').setDescription('الرتبة المطلوب سحبها').setRequired(true)),
+
+        new SlashCommandBuilder().setName('announce').setDescription('نشر إعلان رسمي بالسيرفر')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+            .addStringOption(o => o.setName('عنوان').setDescription('عنوان الإعلان').setRequired(true))
+            .addStringOption(o => o.setName('نص').setDescription('نص الإعلان').setRequired(true))
+            .addChannelOption(o => o.setName('روم').setDescription('روم النشر').setRequired(true))
+            .addRoleOption(o => o.setName('منشن_رتبة').setDescription('الرتبة المطلوب منشنها').setRequired(false))
+            .addAttachmentOption(o => o.setName('صورة').setDescription('صورة الإعلان').setRequired(false)),
+
+        new SlashCommandBuilder().setName('say').setDescription('إرسال رسالة من البوت لروم محدد')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+            .addStringOption(o => o.setName('نص').setDescription('نص الرسالة').setRequired(true))
+            .addChannelOption(o => o.setName('روم').setDescription('روم الإرسال').setRequired(false)),
+
+        new SlashCommandBuilder().setName('userinfo').setDescription('عرض معلومات عن عضو')
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(false)),
+
+        new SlashCommandBuilder().setName('serverinfo').setDescription('عرض معلومات عن السيرفر'),
+
+        new SlashCommandBuilder().setName('avatar').setDescription('عرض صورة عضو')
+            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(false)),
     ].map(cmd => cmd.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
-        console.log('[VORTEX] Slash commands registered.');
+        console.log('[ABOUD SYSTEM] Slash commands registered.');
     } catch (err) {
         console.error('[Slash Register Error]', err);
     }
@@ -3392,28 +3318,21 @@ async function registerSlashCommands() {
 // ==========================================
 
 client.once('ready', async () => {
-    console.log(`[VORTEX] Bot is online as ${client.user.tag}`);
+    console.log(`[ABOUD SYSTEM] Bot is online as ${client.user.tag}`);
     client.user.setPresence({
-        activities: [{ name: 'VORTEX System', type: ActivityType.Watching }],
+        activities: [{ name: 'ABOUD SYSTEM', type: ActivityType.Watching }],
         status: 'online'
     });
 
-    // استئناف السجون المنتهية والنشطة
+    // استئناف السجون المنتهية
     try {
         const now = new Date();
-        const allJails = await JailData.find({});
-        for (const jailEntry of allJails) {
+        const expiredJails = await JailData.find({ endAt: { $lte: now } });
+        for (const jailEntry of expiredJails) {
             const guild = client.guilds.cache.get(jailEntry.guildId);
             if (!guild) continue;
             const member = await guild.members.fetch(jailEntry.userId).catch(() => null);
-            if (member) {
-                if (jailEntry.endAt <= now) {
-                    await handleUnjail(member, jailEntry.guildId);
-                } else {
-                    const remaining = jailEntry.endAt.getTime() - now.getTime();
-                    setTimeout(async () => { await handleUnjail(member, jailEntry.guildId); }, remaining);
-                }
-            }
+            if (member) await handleUnjail(member, jailEntry.guildId);
         }
     } catch (err) {
         console.error('[Jail Resume Error]', err);
@@ -3429,10 +3348,10 @@ client.once('ready', async () => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`[VORTEX] Dashboard running on port ${PORT}`);
+    console.log(`[ABOUD SYSTEM] Dashboard running on port ${PORT}`);
 });
 
 client.login(process.env.TOKEN).catch(err => {
-    console.error('[VORTEX] Login failed:', err);
+    console.error('[ABOUD SYSTEM] Login failed:', err);
     process.exit(1);
 });
