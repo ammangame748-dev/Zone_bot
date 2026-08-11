@@ -1,6 +1,3 @@
-// ==========================================
-// ABOUD SYSTEM BOT - Full Version
-// ==========================================
 
 require('dotenv').config();
 const express = require('express');
@@ -332,7 +329,7 @@ passport.use(new Strategy({
 }, (accessToken, refreshToken, profile, done) => done(null, profile)));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'aboud-system-secret-key-2026',
+    secret: process.env.SESSION_SECRET || 'VORTEX -secret-key-2026',
     resave: false,
     saveUninitialized: false
 }));
@@ -360,7 +357,7 @@ app.get('/login', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ABOUD SYSTEM - تسجيل الدخول</title>
+    <title>VORTEX  - تسجيل الدخول</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -461,7 +458,7 @@ app.get('/login', (req, res) => {
     <div class="grid-bg"></div>
     <div class="login-wrapper">
         <div class="logo-area">
-            <div class="logo-text">ABOUD SYSTEM</div>
+            <div class="logo-text">VORTEX </div>
             <div class="logo-sub">DISCORD BOT SYSTEM</div>
         </div>
         <div class="login-card">
@@ -543,7 +540,7 @@ function ui(guild, active, content) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ABOUD SYSTEM | Dashboard</title>
+    <title> VORTEX  | Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -906,7 +903,8 @@ function ui(guild, active, content) {
     <div class="orb orb-3"></div>
     <div class="sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-logo">ABOUD <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
+            <span class="sidebar-logo">VORTEX 
+ <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
             <div class="sidebar-tagline">Bot Dashboard</div>
         </div>
         <nav class="nav">
@@ -959,7 +957,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
         <div style="font-size:48px; font-weight:800; letter-spacing:6px;
             background: linear-gradient(135deg, var(--blue), #fff, var(--red));
             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-            margin-bottom:10px;">ABOUD SYSTEM</div>
+            margin-bottom:10px;">VORTEX </div>
         <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
         <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
             <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
@@ -1881,7 +1879,7 @@ client.on('messageCreate', async (msg) => {
                     .setAuthor({ name: `اقتراح من ${msg.author.username}`, iconURL: authorAvatar })
                     .setDescription(content || '*بدون نص*')
                     .setColor(0x1e90ff)
-                    .setFooter({ text: 'ABOUD SYSTEM - Suggestions' })
+                    .setFooter({ text: 'VORTEX  - Suggestions' })
                     .setTimestamp()
                     .addFields(
                         { name: getEmojiDisplay(msg.guild, sugCfg.emoji1), value: '0', inline: true },
@@ -2390,7 +2388,7 @@ client.on('guildMemberAdd', async (member) => {
             .setDescription(welcomeMsg)
             .setColor(0x1e90ff)
             .setTimestamp()
-            .setFooter({ text: `ABOUD SYSTEM - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+            .setFooter({ text: `VORTEX  - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
         try {
             const canvas = createCanvas(800, 400);
@@ -2721,7 +2719,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setTitle(title)
                     .setDescription(text)
                     .setColor(0x1e90ff)
-                    .setFooter({ text: `ABOUD SYSTEM - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                    .setFooter({ text: `VORTEX  - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                     .setTimestamp();
                 if (image) embed.setImage(image.url);
 
@@ -2772,7 +2770,7 @@ client.on('interactionCreate', async (interaction) => {
                         { name: 'عدد الرتب', value: `${g.roles.cache.size}`, inline: true },
                         { name: 'تاريخ الإنشاء', value: `<t:${Math.floor(g.createdTimestamp / 1000)}:D>`, inline: true },
                     )
-                    .setFooter({ text: 'ABOUD SYSTEM' })
+                    .setFooter({ text: 'VORTEX ' })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
             }
@@ -3082,7 +3080,7 @@ async function openTicket(interaction, tConfig, ticketType) {
             )
             .setThumbnail(interaction.user.displayAvatarURL())
             .setTimestamp()
-            .setFooter({ text: 'ABOUD SYSTEM - Tickets' });
+            .setFooter({ text: 'VORTEX  - Tickets' });
 
         if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
             const topName = path.basename(tConfig.topImagePath);
@@ -3172,7 +3170,7 @@ async function checkKickLive() {
                                 { name: 'المشاهدون', value: `${viewers}`, inline: true }
                             )
                             .setTimestamp()
-                            .setFooter({ text: 'ABOUD SYSTEM - Kick Notifications' });
+                            .setFooter({ text: 'VORTEX  - Kick Notifications' });
 
                         if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
 
@@ -3307,7 +3305,7 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
-        console.log('[ABOUD SYSTEM] Slash commands registered.');
+        console.log('[VORTEX ] Slash commands registered.');
     } catch (err) {
         console.error('[Slash Register Error]', err);
     }
@@ -3318,9 +3316,9 @@ async function registerSlashCommands() {
 // ==========================================
 
 client.once('ready', async () => {
-    console.log(`[ABOUD SYSTEM] Bot is online as ${client.user.tag}`);
+    console.log(`[VORTEX ] Bot is online as ${client.user.tag}`);
     client.user.setPresence({
-        activities: [{ name: 'ABOUD SYSTEM', type: ActivityType.Watching }],
+        activities: [{ name: 'VORTEX ', type: ActivityType.Watching }],
         status: 'online'
     });
 
@@ -3348,10 +3346,10 @@ client.once('ready', async () => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`[ABOUD SYSTEM] Dashboard running on port ${PORT}`);
+    console.log(`[VORTEX ] Dashboard running on port ${PORT}`);
 });
 
 client.login(process.env.TOKEN).catch(err => {
-    console.error('[ABOUD SYSTEM] Login failed:', err);
+    console.error('[VORTEX ] Login failed:', err);
     process.exit(1);
 });
