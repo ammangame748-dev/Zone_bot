@@ -357,22 +357,20 @@ app.get('/login', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX - دخول النظام</title>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <title>VORTEX - تسجيل الدخول</title>
+    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary: #06b6d4;
-            --bg: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --text: #f8fafc;
+            --blue: #1e90ff;
+            --red: #e63946;
+            --black: #050508;
+            --dark: #0d0d18;
+            --border: rgba(30, 144, 255, 0.3);
         }
         body {
-            font-family: 'Tajawal', sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            font-family: 'Changa', sans-serif;
+            background: var(--black);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -380,59 +378,50 @@ app.get('/login', (req, res) => {
             overflow: hidden;
             position: relative;
         }
-        .mesh-bg {
-            position: fixed; inset: 0; z-index: -1;
-            background: 
-                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+        .grid-bg {
+            position: fixed; inset: 0; z-index: 0;
+            background-image: linear-gradient(rgba(30,144,255,0.05) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(30,144,255,0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
         }
-        .login-container {
-            width: 100%; max-width: 420px; padding: 20px;
-            animation: fadeIn 0.8s ease-out;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 40px;
+        .login-card {
+            position: relative; z-index: 10;
+            background: rgba(10, 10, 20, 0.9);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 60px;
             text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 0 50px rgba(0,0,0,1), 0 0 20px rgba(30,144,255,0.2);
+            min-width: 400px;
         }
-        .logo {
-            font-size: 42px; font-weight: 800; margin-bottom: 10px;
-            background: linear-gradient(to left, var(--primary), var(--secondary));
+        .logo-text {
+            font-size: 70px; font-weight: 800; letter-spacing: 5px;
+            background: linear-gradient(135deg, var(--blue), #ffffff, var(--red));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            letter-spacing: -1px;
+            filter: drop-shadow(0 0 20px rgba(30,144,255,0.5));
+            margin-bottom: 40px;
         }
-        .subtitle { color: #94a3b8; font-size: 14px; margin-bottom: 40px; }
         .btn-discord {
-            display: flex; align-items: center; justify-content: center; gap: 12px;
-            background: var(--primary);
-            color: white; padding: 14px 28px; border-radius: 12px;
-            text-decoration: none; font-weight: 700; font-size: 16px;
-            transition: all 0.3s;
-            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+            display: inline-block;
+            background: linear-gradient(135deg, var(--blue), #0a6ecc);
+            color: white; padding: 18px 50px; border-radius: 12px;
+            text-decoration: none; font-weight: 800; font-size: 18px;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(30,144,255,0.3);
         }
         .btn-discord:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.5);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(30,144,255,0.5);
+            filter: brightness(1.1);
         }
     </style>
 </head>
 <body>
-    <div class="mesh-bg"></div>
-    <div class="login-container">
-        <div class="card">
-            <div class="logo">VORTEX</div>
-            <p class="subtitle">نظام إدارة البوت المتطور</p>
-            <a href="/auth/discord" class="btn-discord">
-                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-                تسجيل الدخول
-            </a>
-        </div>
+    <div class="grid-bg"></div>
+    <div class="login-card">
+        <div class="logo-text">VORTEX</div>
+        <a href="/auth/discord" class="btn-discord">تسجيل الدخول بالديسكورد</a>
     </div>
 </body>
 </html>`);
@@ -445,29 +434,24 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // 8. UI Helper Function
 // ==========================================
 function ui(guild, active, content) {
-    const guildName = guild.name || 'لوحة التحكم';
+    const guildName = guild.name || 'نظام فورتكس';
     const navItems = guild.id ? [
-        { id: 'home', label: 'الإحصائيات', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', url: `/manage/${guild.id}/home` },
-        { id: 'security', label: 'الحماية', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', url: `/manage/${guild.id}/security` },
-        { id: 'kick', label: 'تنبيهات Kick', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', url: `/manage/${guild.id}/kick` },
-        { id: 'suggestions', label: 'الاقتراحات', icon: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0012 18.75c-1.03 0-1.9-.4-2.593-.912l-.547-.547z', url: `/manage/${guild.id}/suggestions` },
-        { id: 'logs', label: 'السجلات', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', url: `/manage/${guild.id}/logs` },
-        { id: 'tickets', label: 'التذاكر', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', url: `/manage/${guild.id}/tickets` },
-        { id: 'autoreply', label: 'الرد الآلي', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', url: `/manage/${guild.id}/autoreply` },
-        { id: 'levels', label: 'المستويات', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6', url: `/manage/${guild.id}/levels` },
-        { id: 'welcome', label: 'الترحيب', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', url: `/manage/${guild.id}/welcome` },
-        { id: 'giveaway', label: 'القيف اواي', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V6a2 2 0 10-2 2h2zm0 0H5.5A2.5 2.5 0 003 10.5v2a2.5 2.5 0 002.5 2.5L12 15m0-7h6.5A2.5 2.5 0 0121 10.5v2a2.5 2.5 0 01-2.5 2.5L12 15', url: `/manage/${guild.id}/giveaway` },
-        { id: 'roles', label: 'الرتب', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', url: `/manage/${guild.id}/roles` },
-        { id: 'mod', label: 'الإشراف', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', url: `/manage/${guild.id}/mod` }
+        { id: 'home', label: 'الإحصائيات', url: `/manage/${guild.id}/home` },
+        { id: 'security', label: 'الحماية', url: `/manage/${guild.id}/security` },
+        { id: 'kick', label: 'تنبيهات كيك', url: `/manage/${guild.id}/kick` },
+        { id: 'suggestions', label: 'الاقتراحات', url: `/manage/${guild.id}/suggestions` },
+        { id: 'logs', label: 'السجلات', url: `/manage/${guild.id}/logs` },
+        { id: 'tickets', label: 'التذاكر', url: `/manage/${guild.id}/tickets` },
+        { id: 'autoreply', label: 'الرد الآلي', url: `/manage/${guild.id}/autoreply` },
+        { id: 'levels', label: 'المستويات', url: `/manage/${guild.id}/levels` },
+        { id: 'welcome', label: 'الترحيب', url: `/manage/${guild.id}/welcome` },
+        { id: 'giveaway', label: 'القيف اواي', url: `/manage/${guild.id}/giveaway` },
+        { id: 'roles', label: 'الرتب', url: `/manage/${guild.id}/roles` },
+        { id: 'mod', label: 'الإشراف', url: `/manage/${guild.id}/mod` }
     ] : [];
 
     const renderedNav = navItems.map(item => `
-        <a href="${item.url}" class="nav-link ${active === item.id ? 'active' : ''}">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${item.icon}"></path>
-            </svg>
-            <span>${item.label}</span>
-        </a>
+        <a href="${item.url}" class="nav-link ${active === item.id ? 'active' : ''}">${item.label}</a>
     `).join('');
 
     return `<!DOCTYPE html>
@@ -476,95 +460,88 @@ function ui(guild, active, content) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VORTEX | ${guildName}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --blue: #1e90ff;
+            --red: #e63946;
+            --black: #050508;
+            --dark: #0a0a14;
+            --border: rgba(30, 144, 255, 0.2);
+            --text: #ffffff;
+        }
         body {
-            font-family: 'Tajawal', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+            font-family: 'Changa', sans-serif;
+            background: var(--black);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: row-reverse;
         }
         .sidebar {
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            width: 260px; background: var(--dark);
+            border-left: 1px solid var(--border);
+            height: 100vh; position: fixed; right: 0; top: 0;
+            padding: 40px 20px;
+        }
+        .logo {
+            font-size: 32px; font-weight: 800; text-align: center;
+            background: linear-gradient(135deg, var(--blue), var(--red));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 40px;
         }
         .nav-link {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 16px; border-radius: 12px;
-            color: #94a3b8; transition: all 0.2s;
-            margin-bottom: 4px;
+            display: block; padding: 12px 20px; color: #888;
+            text-decoration: none; font-weight: 700; font-size: 14px;
+            border-radius: 8px; margin-bottom: 5px; transition: 0.3s;
         }
-        .nav-link:hover {
-            background: rgba(99, 102, 241, 0.1);
-            color: #6366f1;
+        .nav-link:hover, .nav-link.active {
+            background: rgba(30, 144, 255, 0.1); color: var(--blue);
+            box-shadow: inset 0 0 10px rgba(30, 144, 255, 0.1);
         }
-        .nav-link.active {
-            background: #6366f1;
-            color: white;
-            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+        .nav-link.active { border-right: 3px solid var(--blue); }
+        .main {
+            margin-right: 260px; flex: 1; padding: 40px;
         }
-        .main-content {
-            background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.05), transparent);
+        .header {
+            font-size: 28px; font-weight: 800; margin-bottom: 30px;
+            border-bottom: 1px solid var(--border); padding-bottom: 20px;
         }
-        .glass-card {
-            background: rgba(30, 41, 59, 0.5);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
+        .card {
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            border-radius: 15px; padding: 25px; margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
         input, select, textarea {
-            background: rgba(15, 23, 42, 0.6) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: white !important;
-            border-radius: 10px !important;
+            width: 100%; padding: 12px; background: #000;
+            border: 1px solid var(--border); border-radius: 8px;
+            color: #fff; font-family: 'Changa'; margin-top: 10px;
         }
-        input:focus { border-color: #6366f1 !important; outline: none; }
-        .btn-primary {
-            background: #6366f1; color: white; padding: 10px 20px;
-            border-radius: 10px; font-weight: 600; transition: all 0.2s;
+        .btn-save {
+            background: var(--blue); color: #fff; border: none;
+            padding: 12px 30px; border-radius: 8px; cursor: pointer;
+            font-weight: 800; transition: 0.3s; margin-top: 20px;
         }
-        .btn-primary:hover { background: #4f46e5; transform: translateY(-1px); }
-        .btn-danger {
-            background: #f43f5e; color: white; padding: 8px 16px;
-            border-radius: 8px; font-size: 14px;
-        }
-        .tag-blue { background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 2px 8px; border-radius: 6px; font-size: 12px; }
+        .btn-save:hover { filter: brightness(1.2); transform: scale(1.02); }
+        .btn-danger { background: var(--red); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { text-align: right; color: #555; padding: 10px; font-size: 12px; }
+        td { padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .tag { padding: 4px 10px; border-radius: 5px; font-size: 12px; }
+        .tag-blue { background: rgba(30,144,255,0.2); color: var(--blue); }
     </style>
 </head>
-<body class="min-h-screen flex">
-    <!-- Sidebar -->
-    <aside class="sidebar w-72 fixed inset-y-0 right-0 z-50 overflow-y-auto">
-        <div class="p-8">
-            <div class="text-2xl font-bold bg-gradient-to-l from-indigo-500 to-cyan-400 bg-clip-text text-transparent mb-8">
-                VORTEX
-            </div>
-            <nav>
-                ${renderedNav}
-                <div class="mt-8 pt-8 border-t border-white/5">
-                    <a href="/logout" class="nav-link text-rose-400 hover:bg-rose-500/10 hover:text-rose-500">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        <span>تسجيل الخروج</span>
-                    </a>
-                </div>
-            </nav>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 mr-72 p-8 main-content">
-        <header class="flex justify-between items-center mb-10">
-            <h1 class="text-3xl font-bold text-white">${guildName}</h1>
-            ${guild.id ? `<div class="flex items-center gap-3">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="text-slate-400 text-sm">نظام متصل</span>
-            </div>` : ''}
-        </header>
-        
-        <div class="max-w-6xl">
-            ${content}
-        </div>
-    </main>
+<body>
+    <div class="sidebar">
+        <div class="logo">VORTEX</div>
+        <nav>${renderedNav}</nav>
+        <a href="/logout" class="nav-link" style="color:var(--red); margin-top: 20px;">تسجيل الخروج</a>
+    </div>
+    <div class="main">
+        <div class="header">${guildName}</div>
+        ${content}
+    </div>
 </body>
 </html>`;
 }
@@ -1534,8 +1511,10 @@ client.on('messageCreate', async (msg) => {
 
                 const files = [];
                 if (attachmentImg) {
+                    // إذا كان هناك مرفق، نستخدمه هو فقط ونلغي صورة الإعدادات
                     embed.setImage(attachmentImg.url);
                 } else if (sugCfg.imagePath && fs.existsSync(sugCfg.imagePath)) {
+                    // إذا لم يكن هناك مرفق وكان هناك صورة في الإعدادات
                     const imgName = path.basename(sugCfg.imagePath);
                     files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
                     embed.setImage(`attachment://${imgName}`);
