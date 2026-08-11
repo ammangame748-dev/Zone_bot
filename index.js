@@ -23,6 +23,20 @@ const {
 // 1. تعريف الـ Schemas (قاعدة البيانات)
 // ==========================================
 
+
+const AdminCmdConfig = mongoose.model('AdminCmdConfig', new mongoose.Schema({
+    guildId: String,
+    adminRoles: { type: [String], default: [] },
+    shortcuts: {
+        lock: { type: String, default: '-ق' },
+        unlock: { type: String, default: '-ف' },
+        timeout: { type: String, default: '-ت' },
+        untimeout: { type: String, default: '-فت' },
+        ban: { type: String, default: '-ب' },
+        unban: { type: String, default: '-فب' },
+        kick: { type: String, default: '-ك' }
+    }
+}));
 const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
     guildId: String,
     streamers: [{
@@ -493,9 +507,14 @@ function ui(guild, active, content) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             الحماية
         </a>
+        
         <a class="${active === 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
             تنبيهات Kick
+        </a>
+        <a class="${active === 'admincmds' ? 'active' : ''}" href="/manage/${guild.id}/admincmds">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            الأوامر الإدارية
         </a>
         <a class="${active === 'suggestions' ? 'active' : ''}" href="/manage/${guild.id}/suggestions">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
@@ -565,9 +584,426 @@ function ui(guild, active, content) {
             --sidebar-w: 280px;
         }
 
+        body {
+            font-family: 'Changa', sans-serif;
+            background: var(--black);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: row-reverse;
+            direction: rtl;
+            animation: pageFadeIn 0.5s ease both;
+        }
+        @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ===== BACKGROUND ===== */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: -3;
+            background:
+                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.09) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 60% 10%, rgba(255,183,3,0.05) 0%, transparent 45%),
+                radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
+        }
+        body::after {
+            content: '';
+            position: fixed; inset: 0; z-index: -2;
+            background-image:
+                linear-gradient(rgba(30,144,255,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(30,144,255,0.025) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        .orb {
+            position: fixed; z-index: -1; border-radius: 50%;
+            filter: blur(60px); opacity: 0.35; pointer-events: none;
+            animation: floatOrb 14s ease-in-out infinite;
+        }
+        .orb-1 { width: 320px; height: 320px; background: var(--blue); top: -80px; right: -60px; animation-delay: 0s; }
+        .orb-2 { width: 260px; height: 260px; background: var(--red); bottom: -60px; left: -40px; animation-delay: 3s; }
+        .orb-3 { width: 200px; height: 200px; background: var(--gold); top: 40%; left: 30%; animation-delay: 6s; opacity: 0.15; }
+        @keyframes floatOrb {
+            0%, 100% { transform: translate(0,0) scale(1); }
+            50% { transform: translate(30px,-30px) scale(1.12); }
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: rgba(7,7,15,0.95);
+            border-left: 1px solid var(--border);
+            position: relative;
+            display: flex; flex-direction: column;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--blue) transparent;
+            flex-shrink: 0;
+            height: 100vh;
+        }
+        .sidebar::-webkit-scrollbar { width: 4px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 10px; }
+
+        .sidebar-header {
+            padding: 30px 20px 20px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .sidebar-logo {
+            font-size: 27px; font-weight: 800; letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--blue), #ffffff 50%, var(--red));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            display: block;
+            animation: logoShimmer 4s ease-in-out infinite alternate;
+        }
+        @keyframes logoShimmer {
+            from { filter: drop-shadow(0 0 8px rgba(30,144,255,0.4)); }
+            to   { filter: drop-shadow(0 0 20px rgba(30,144,255,0.8)); }
+        }
+        .sidebar-tagline {
+            font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
+            margin-top: 4px; text-transform: uppercase;
+        }
+
+        .nav {
+            display: ${showNav};
+            flex-direction: column;
+            gap: 4px;
+            padding: 20px 12px 30px;
+            flex: 1;
+        }
+        .nav a {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: 12px;
+            color: var(--text-muted); text-decoration: none;
+            font-size: 14px; font-weight: 500;
+            transition: all 0.25s cubic-bezier(.2,.9,.3,1.2);
+            border: 1px solid transparent;
+            position: relative; overflow: hidden;
+        }
+        .nav a svg { flex-shrink: 0; opacity: 0.6; transition: opacity 0.25s; }
+        .nav a:hover {
+            background: var(--blue-glow);
+            color: white;
+            border-color: var(--border);
+            transform: translateX(-4px);
+        }
+        .nav a:hover svg { opacity: 1; }
+        .nav a.active {
+            background: linear-gradient(135deg, rgba(30,144,255,0.22), rgba(30,144,255,0.08));
+            color: var(--blue);
+            border-color: rgba(30,144,255,0.4);
+            font-weight: 700;
+            box-shadow: 0 0 18px rgba(30,144,255,0.18) inset;
+        }
+        .nav a.active svg { opacity: 1; color: var(--blue); }
+        .nav a.active::before {
+            content: '';
+            position: absolute; right: 0; top: 20%; bottom: 20%;
+            width: 3px; background: linear-gradient(var(--blue), var(--gold));
+            border-radius: 3px 0 0 3px;
+            animation: pulseBar 1.6s ease-in-out infinite;
+        }
+        @keyframes pulseBar { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            margin-right: 0;
+            padding: 40px 50px;
+            flex: 1;
+            min-height: 100vh;
+            overflow-y: auto;
+        }
+
+        .page-header {
+            display: flex; align-items: center; gap: 15px;
+            margin-bottom: 35px; padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .page-header h1 {
+            font-size: 24px; font-weight: 700; color: white;
+        }
+        .page-header .badge {
+            background: var(--blue-glow); border: 1px solid var(--border);
+            color: var(--blue); padding: 4px 12px; border-radius: 20px; font-size: 12px;
+        }
+
+        /* ===== CARDS ===== */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(15px);
+            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--blue), var(--gold), transparent);
+            opacity: 0.5;
+        }
+        .card:hover {
+            border-color: rgba(30,144,255,0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.35), 0 0 30px rgba(30,144,255,0.08);
+        }
+        .card h3 {
+            color: white; font-size: 17px; font-weight: 700;
+            margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+        }
+        .card h3 svg { color: var(--blue); }
+
+        /* ===== FORMS ===== */
+        label {
+            display: block; color: var(--text-muted); font-size: 13px;
+            margin-bottom: 6px; margin-top: 16px; font-weight: 500;
+        }
+        input, select, textarea {
+            width: 100%; padding: 12px 16px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; color: white;
+            font-family: 'Changa', sans-serif; font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(30,144,255,0.12);
+        }
+        select option { background: #0d0d1a; color: white; }
+        textarea { resize: vertical; min-height: 100px; }
+
+        /* ===== BUTTONS ===== */
+        .btn-save {
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            color: white; border: none; padding: 13px 24px;
+            border-radius: 12px; cursor: pointer; font-weight: 700;
+            font-size: 14px; font-family: 'Changa', sans-serif;
+            transition: all 0.3s; display: inline-block; text-decoration: none;
+            text-align: center; width: 100%;
+            box-shadow: 0 4px 20px rgba(30,144,255,0.25);
+            position: relative; overflow: hidden;
+        }
+        .btn-save::after {
+            content: ''; position: absolute; top: 0; left: -60%;
+            width: 40%; height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.6s ease;
+        }
+        .btn-save:hover::after { left: 130%; }
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(30,144,255,0.4);
+            filter: brightness(1.1);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, var(--red), #c0392b);
+            box-shadow: 0 4px 20px rgba(230,57,70,0.25);
+        }
+        .btn-danger:hover { box-shadow: 0 8px 30px rgba(230,57,70,0.4); }
+        .btn-sm { padding: 8px 16px; font-size: 13px; width: auto; border-radius: 8px; }
+        .btn-green {
+            background: linear-gradient(135deg, #00c853, #00a040);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.25);
+        }
+
+        /* ===== STAT BOXES ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px; margin-top: 16px;
+        }
+        .stat-box {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px;
+            text-align: center; transition: all 0.3s;
+        }
+        .stat-box:hover { border-color: var(--blue); transform: translateY(-3px); }
+        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); }
+        .stat-box .stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+        /* ===== GUILD GRID (Dashboard) ===== */
+        .guild-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px; max-width: 1000px; margin: 0 auto;
+        }
+        .guild-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px; padding: 28px 20px;
+            text-align: center; transition: all 0.35s;
+            cursor: pointer;
+        }
+        .guild-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--blue);
+            box-shadow: 0 20px 50px rgba(30,144,255,0.15);
+        }
+        .guild-icon {
+            width: 75px; height: 75px; border-radius: 50%;
+            border: 2px solid var(--border); margin-bottom: 14px;
+            transition: border-color 0.3s;
+        }
+        .guild-card:hover .guild-icon { border-color: var(--blue); }
+        .guild-card h3 { color: white; font-size: 15px; margin-bottom: 12px; }
+        .guild-card a { font-size: 13px; font-weight: 600; text-decoration: none; }
+
+        /* ===== TABLE ===== */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th {
+            padding: 12px 16px; text-align: right;
+            color: var(--text-muted); font-size: 12px; font-weight: 600;
+            border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 1px;
+        }
+        .data-table td {
+            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 14px; color: var(--text);
+        }
+        .data-table tr:hover td { background: rgba(30,144,255,0.04); }
+
+        /* ===== BADGE ===== */
+        .tag {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 11px; font-weight: 600;
+        }
+        .tag-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid var(--border); }
+        .tag-red { background: var(--red-glow); color: var(--red-light); border: 1px solid var(--border-red); }
+        .tag-green { background: rgba(0,200,83,0.1); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
+
+        /* ===== DIVIDER ===== */
+        .section-divider {
+            height: 1px; background: var(--border);
+            margin: 24px 0;
+        }
+
+        /* ===== TOGGLE SWITCH ===== */
+        .toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .toggle-row label { margin: 0; color: var(--text); font-size: 14px; }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .card { animation: fadeInUp 0.4s ease both; }
+        .card:nth-child(2) { animation-delay: 0.05s; }
+        .card:nth-child(3) { animation-delay: 0.1s; }
+        .card:nth-child(4) { animation-delay: 0.15s; }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(30,144,255,0.3); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .sidebar { width: 240px; }
+            .main { margin-right: 240px; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">VORTEX 
+ <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
+            <div class="sidebar-tagline">Bot Dashboard</div>
+        </div>
+        <nav class="nav">
+            ${navItems}
+        </nav>
+    </div>
+    <div class="main">
+        <div class="page-header">
+            <h1>${guildName}</h1>
+            ${guild.id ? `<span class="badge">مدير</span>` : ''}
+        </div>
+        ${content}
+    </div>
+</body>
+</html>`;
+}
+
+
 // ==========================================
 // 9. Dashboard Routes
 // ==========================================
+
+
+// --- [ Dashboard - Admin Commands ] ---
+app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const config = await AdminCmdConfig.findOne({ guildId: g.id }) || { adminRoles: [], shortcuts: { lock: '-ق', unlock: '-ف', timeout: '-ت', untimeout: '-فت', ban: '-ب', unban: '-فب', kick: '-ك' } };
+    
+    const content = `
+        <div class="card">
+            <h3>الاختصارات الإدارية</h3>
+            <p style="color:#888; font-size:13px; margin-bottom:20px;">حدد الاختصارات التي تريد استخدامها والرتب المسموح لها.</p>
+            
+            <form method="POST" action="/save/${g.id}/admincmds">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="card" style="margin-bottom:0;">
+                        <h4>الرتب المسموح لها</h4>
+                        <p style="font-size:11px; color:#666;">ضع معرفات الرتب (IDs) مفصولة بفاصلة</p>
+                        <input type="text" name="adminRoles" value="${config.adminRoles.join(',')}" placeholder="مثلاً: 123456789,987654321">
+                    </div>
+                    
+                    <div class="card" style="margin-bottom:0;">
+                        <h4>اختصارات الأوامر</h4>
+                        <label>قفل الشات</label>
+                        <input type="text" name="lock" value="${config.shortcuts.lock}">
+                        <label>فتح الشات</label>
+                        <input type="text" name="unlock" value="${config.shortcuts.unlock}">
+                        <label>كتم (Timeout)</label>
+                        <input type="text" name="timeout" value="${config.shortcuts.timeout}">
+                        <label>فك الكتم</label>
+                        <input type="text" name="untimeout" value="${config.shortcuts.untimeout}">
+                        <label>حظر (Ban)</label>
+                        <input type="text" name="ban" value="${config.shortcuts.ban}">
+                        <label>فك الحظر</label>
+                        <input type="text" name="unban" value="${config.shortcuts.unban}">
+                        <label>طرد (Kick)</label>
+                        <input type="text" name="kick" value="${config.shortcuts.kick}">
+                    </div>
+                </div>
+                <button type="submit" class="btn-save">حفظ الإعدادات</button>
+            </form>
+        </div>
+    `;
+    res.send(ui(g, 'admincmds', content));
+});
+
+app.post('/save/:guildId/admincmds', checkAuth, async (req, res) => {
+    const { adminRoles, lock, unlock, timeout, untimeout, ban, unban, kick } = req.body;
+    const rolesArray = adminRoles.split(',').map(r => r.trim()).filter(Boolean);
+    await AdminCmdConfig.findOneAndUpdate(
+        { guildId: req.params.guildId },
+        { 
+            adminRoles: rolesArray,
+            shortcuts: { lock, unlock, timeout, untimeout, ban, unban, kick }
+        },
+        { upsert: true }
+    );
+    res.redirect(`/manage/${req.params.guildId}/admincmds`);
+});
 
 // --- [ Dashboard - Server List ] ---
 app.get('/dashboard', checkAuth, (req, res) => {
@@ -575,7 +1011,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
         const p = BigInt(g.permissions);
         return (p & 8n) === 8n || (p & 32n) === 32n;
     });
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
+    const inviteLink = 'https://discord.com/oauth2/authorize?client_id=' + process.env.CLIENT_ID + '&permissions=8&scope=bot%20applications.commands';
 
     const cards = adminGuilds.map(g => {
         const hasBot = client.guilds.cache.has(g.id);
@@ -1507,6 +1943,57 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
 client.on('messageCreate', async (msg) => {
     if (!msg.guild || msg.author.bot) return;
 
+    
+    // --- [ نظام اختصارات الأوامر الإدارية ] ---
+    try {
+        const adminCfg = await AdminCmdConfig.findOne({ guildId: msg.guild.id });
+        if (adminCfg) {
+            const sc = adminCfg.shortcuts;
+            const args = msg.content.split(' ');
+            const cmd = args[0];
+            
+            const isShortcut = Object.values(sc).includes(cmd);
+            if (isShortcut) {
+                const hasPermission = msg.member.permissions.has(PermissionFlagsBits.Administrator) || 
+                                      msg.member.roles.cache.some(r => adminCfg.adminRoles.includes(r.id));
+                
+                if (hasPermission) {
+                    const target = msg.mentions.members.first() || msg.guild.members.cache.get(args[1]);
+
+                    if (cmd === sc.lock) {
+                        await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: false });
+                        return msg.reply('🔒 تم قفل الشات بنجاح.');
+                    }
+                    if (cmd === sc.unlock) {
+                        await msg.channel.permissionOverwrites.edit(msg.guild.roles.everyone, { SendMessages: null });
+                        return msg.reply('🔓 تم فتح الشات بنجاح.');
+                    }
+                    if (cmd === sc.timeout && target) {
+                        const mins = parseInt(args[2]) || 60;
+                        await target.timeout(mins * 60 * 1000).catch(() => {});
+                        return msg.reply(`⏳ تم إعطاء تايم أوت لـ ${target.user.username} لمدة ${mins} دقيقة.`);
+                    }
+                    if (cmd === sc.untimeout && target) {
+                        await target.timeout(null).catch(() => {});
+                        return msg.reply(`✅ تم فك التايم أوت عن ${target.user.username}.`);
+                    }
+                    if (cmd === sc.ban && target) {
+                        await target.ban().catch(() => {});
+                        return msg.reply(`🔨 تم حظر ${target.user.username} بنجاح.`);
+                    }
+                    if (cmd === sc.unban && args[1]) {
+                        await msg.guild.members.unban(args[1]).catch(() => {});
+                        return msg.reply(`✅ تم فك الحظر عن العضو بنجاح.`);
+                    }
+                    if (cmd === sc.kick && target) {
+                        await target.kick().catch(() => {});
+                        return msg.reply(`👢 تم طرد ${target.user.username} بنجاح.`);
+                    }
+                }
+            }
+        }
+    } catch (e) { console.error('Shortcut Error:', e); }
+
     // --- [ نظام الاقتراحات ] ---
     try {
         const sugCfg = await SuggestionConfig.findOne({ guildId: msg.guild.id, channelId: msg.channel.id });
@@ -1530,10 +2017,8 @@ client.on('messageCreate', async (msg) => {
 
                 const files = [];
                 if (attachmentImg) {
-                    // إذا كان هناك مرفق، نستخدمه هو فقط ونلغي صورة الإعدادات
                     embed.setImage(attachmentImg.url);
                 } else if (sugCfg.imagePath && fs.existsSync(sugCfg.imagePath)) {
-                    // إذا لم يكن هناك مرفق وكان هناك صورة في الإعدادات
                     const imgName = path.basename(sugCfg.imagePath);
                     files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
                     embed.setImage(`attachment://${imgName}`);
@@ -2763,7 +3248,7 @@ async function openTicket(interaction, tConfig, ticketType) {
 }
 
 // ==========================================
-// 14. Kick Live Checker (Enhanced & Fixed)
+// 14. Kick Live Checker
 // ==========================================
 
 async function checkKickLive() {
@@ -2771,95 +3256,53 @@ async function checkKickLive() {
         const allConfigs = await KickConfig.find({});
         for (const config of allConfigs) {
             if (!config.streamers || config.streamers.length === 0) continue;
-
             const guild = client.guilds.cache.get(config.guildId);
             if (!guild) continue;
-
             for (let i = 0; i < config.streamers.length; i++) {
                 const streamer = config.streamers[i];
                 if (!streamer.kickUsername) continue;
-
                 try {
                     let data = null;
-                    // محاولة الاستعلام من API الإصدار الثاني v2 مع Headers متكاملة لتجنب الحظر
                     const response = await fetch(`https://kick.com/api/v2/channels/${streamer.kickUsername}`, {
-                        headers: {
-                            'Accept': 'application/json, text/plain, */*',
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                            'Referer': `https://kick.com/${streamer.kickUsername}`
-                        }
+                        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
                     });
-
-                    if (response.ok) {
-                        data = await response.json();
-                    } else {
-                        // محاولة احتياطية عبر v1 في حال فشل v2
+                    if (response.ok) data = await response.json();
+                    else {
                         const resV1 = await fetch(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
-                            headers: {
-                                'Accept': 'application/json, text/plain, */*',
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                                'Referer': `https://kick.com/${streamer.kickUsername}`
-                            }
+                            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
                         });
-                        if (resV1.ok) {
-                            data = await resV1.json();
-                        }
+                        if (resV1.ok) data = await resV1.json();
                     }
-
                     if (!data) continue;
-
                     const livestream = data?.livestream || data?.data?.livestream;
                     const isLive = livestream !== null && livestream !== undefined;
-
                     if (isLive && !streamer.isLive) {
                         config.streamers[i].isLive = true;
-                        config.markModified('streamers');
-                        await config.save();
-
+                        config.markModified('streamers'); await config.save();
                         const channel = guild.channels.cache.get(streamer.channelId);
                         if (!channel) continue;
-
-                        const streamTitle = livestream.session_title || 'بث مباشر';
-                        const streamCategory = livestream.categories?.[0]?.name || 'غير محدد';
-                        const thumbnailUrl = data.user?.profile_pic || livestream.thumbnail?.url || '';
-                        const viewers = livestream.viewer_count || 0;
-
                         const embed = new EmbedBuilder()
                             .setTitle(`${streamer.kickUsername} بدأ البث المباشر`)
-                            .setDescription(
-                                (streamer.customMessage || '%name% بدأ البث الآن!').replace(/%name%/g, streamer.kickUsername)
-                            )
+                            .setDescription((streamer.customMessage || '%name% بدأ البث الآن!').replace(/%name%/g, streamer.kickUsername))
                             .setURL(`https://kick.com/${streamer.kickUsername}`)
                             .setColor(0x53fc18)
                             .addFields(
-                                { name: 'عنوان البث', value: streamTitle, inline: true },
-                                { name: 'الفئة', value: streamCategory, inline: true },
-                                { name: 'المشاهدون', value: `${viewers}`, inline: true }
-                            )
-                            .setTimestamp()
-                            .setFooter({ text: 'VORTEX - Kick Notifications' });
-
-                        if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
-
-                        const mentionContent = streamer.roleId ? `<@&${streamer.roleId}>` : '';
-                        await channel.send({ content: mentionContent || undefined, embeds: [embed] });
-
+                                { name: 'عنوان البث', value: livestream.session_title || 'بث مباشر', inline: true },
+                                { name: 'المشاهدون', value: `${livestream.viewer_count || 0}`, inline: true }
+                            ).setTimestamp();
+                        const thumb = data.user?.profile_pic || livestream.thumbnail?.url;
+                        if (thumb) embed.setThumbnail(thumb);
+                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : '';
+                        await channel.send({ content: mention || undefined, embeds: [embed] });
                     } else if (!isLive && streamer.isLive) {
                         config.streamers[i].isLive = false;
-                        config.markModified('streamers');
-                        await config.save();
+                        config.markModified('streamers'); await config.save();
                     }
-                } catch (err) {
-                    console.error(`[Kick Checker Error for ${streamer.kickUsername}]:`, err.message);
-                }
+                } catch (err) {}
             }
         }
-    } catch (err) {
-        console.error('[Kick Checker Global Error]', err);
-    }
+    } catch (err) {}
 }
-
-// فحص كل 25 ثانية لضمان إرسال التنبيه فور بدء البث بدون تأخير
 setInterval(checkKickLive, 25000);
 
 // ==========================================
