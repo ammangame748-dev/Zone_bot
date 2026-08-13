@@ -55,6 +55,7 @@ const TicketData = mongoose.model('TicketData', new mongoose.Schema({
     channelId: String,
     ownerId: String,
     ticketType: { type: String, default: 'تذكرة دعم' },
+    adminRoleId: String,
     claimedBy: String,
     openedAt: Date,
     closedAt: Date,
@@ -142,6 +143,11 @@ const GuildConfig = mongoose.model('GuildConfig', new mongoose.Schema({
     },
 }));
 
+
+const EconomyConfig=mongoose.model('EconomyConfig',new mongoose.Schema({guildId:{type:String,unique:true},enabled:{type:Boolean,default:true},currencyName:{type:String,default:'كاش'},bankTax:{type:Number,default:0},heistEnabled:{type:Boolean,default:true},cooldownMinutes:{type:Number,default:30},jailRoleId:String,jailChannelId:String,bankMapPrice:{type:Number,default:5000},getawayCarPrice:{type:Number,default:8000},successChance:{type:Number,default:70},planningImagePath:String}));
+const EconomyUser=mongoose.model('EconomyUser',new mongoose.Schema({guildId:String,userId:String,cash:{type:Number,default:500},bank:{type:Number,default:0},gold:{type:Number,default:0},bankCapacity:{type:Number,default:10000},bankMap:{type:Boolean,default:false},getawayCar:{type:Boolean,default:false},lastHeistAt:Date}));
+const HeistSession=mongoose.model('HeistSession',new mongoose.Schema({guildId:String,leaderId:String,driverId:String,infiltrators:{type:[String],default:[]},status:{type:String,default:'planning'},hasMap:Boolean,jailChannelId:String,createdAt:{type:Date,default:Date.now}}));
+
 const Stats = mongoose.model('Stats', new mongoose.Schema({
     guildId: String,
     messages: {
@@ -205,8 +211,8 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     topImagePath: String,
     bottomImagePath: String,
     ticketCount: { type: Number, default: 0 },
-    buttons: [{ label: String, emoji: String }],
-    menuOptions: [{ label: String, emoji: String }]
+    buttons: [{ label: String, emoji: String, roleId: String }],
+    menuOptions: [{ label: String, emoji: String, roleId: String }]
 }));
 
 // ==========================================
@@ -344,7 +350,7 @@ passport.use(new Strategy({
 }, (accessToken, refreshToken, profile, done) => done(null, profile)));
 
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'VORTEX -secret-key-2026',
+    secret: process.env.SESSION_SECRET || 'Abood System -secret-key-2026',
     resave: false,
     saveUninitialized: false
 }));
@@ -372,7 +378,7 @@ app.get('/login', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VORTEX  - تسجيل الدخول</title>
+    <title>Abood System  - تسجيل الدخول</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -473,7 +479,7 @@ app.get('/login', (req, res) => {
     <div class="grid-bg"></div>
     <div class="login-wrapper">
         <div class="logo-area">
-            <div class="logo-text">VORTEX </div>
+            <div class="logo-text">Abood System </div>
             <div class="logo-sub">DISCORD BOT SYSTEM</div>
         </div>
         <div class="login-card">
@@ -545,10 +551,17 @@ function ui(guild, active, content) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="20,12 20,22 4,22 4,12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
             القيف اواي
         </a>
+        <a class="${active === 'bulk_role' ? 'active' : ''}" href="/manage/${guild.id}/bulk-role">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            توزيع الرتب
+        </a>
         <a class="${active === 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             الرتب
         </a>
+        <a class="${active === 'economy' ? 'active' : ''}" href="/manage/${guild.id}/economy">💰 اقتصاد السيرفر</a>
+        <a class="${active === 'heist' ? 'active' : ''}" href="/manage/${guild.id}/heist">🥷 سرقة القرن</a>
+        <a class="${active === 'shop' ? 'active' : ''}" href="/manage/${guild.id}/shop">🛒 متجر السيرفر</a>
         <a class="${active === 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             أوامر الإشراف
@@ -560,7 +573,7 @@ function ui(guild, active, content) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> VORTEX  | Dashboard</title>
+    <title> Abood System  | Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -923,7 +936,7 @@ function ui(guild, active, content) {
     <div class="orb orb-3"></div>
     <div class="sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-logo">VORTEX 
+            <span class="sidebar-logo">Abood System 
  <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
             <div class="sidebar-tagline">Bot Dashboard</div>
         </div>
@@ -947,6 +960,131 @@ function ui(guild, active, content) {
 // ==========================================
 // 9. Dashboard Routes
 // ==========================================
+
+// --- [ Dashboard - Bulk Role Assignment ] ---
+app.get('/manage/:guildId/bulk-role', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+
+    const roles = g.roles.cache
+        .filter(r => r.id !== g.id && !r.managed)
+        .sort((a, b) => b.position - a.position);
+
+    let rolesOptions = '';
+    roles.forEach(r => {
+        rolesOptions += `<option value="${r.id}" style="color:${r.hexColor || '#fff'}">@${r.name}</option>`;
+    });
+
+    const channels = g.channels.cache
+        .filter(c => c.type === ChannelType.GuildText)
+        .sort((a, b) => a.position - b.position);
+
+    let channelsOptions = '';
+    channels.forEach(c => {
+        channelsOptions += `<option value="${c.id}">#${c.name}</option>`;
+    });
+
+    const successQuery = req.query.success;
+    const alertHtml = successQuery ? `
+        <div style="background:rgba(0,200,83,0.15); border:1px solid #00c853; padding:15px; border-radius:12px; margin-bottom:20px; color:#00c853; font-weight:700;">
+            ✅ تم بدء عملية توزيع الرتبة في الخلفية بنجاح! سيتم إرسال تقرير بالنتائج إلى القناة المحددة فور الانتهاء.
+        </div>
+    ` : '';
+
+    const content = `
+        <div class="card">
+            <h2 style="margin-bottom:10px;">توزيع رتبة جماعية لجميع الأعضاء</h2>
+            <p style="color:#888; font-size:13px; margin-bottom:30px;">اختر الرتبة التي تريد منحها لجميع أعضاء السيرفر دفعة واحدة (حتى 3000 شخص أو أكثر)، واختر القناة التي سيتم إرسال تقرير مفصل فيها بالنتائج ومن وصلتهم الرتبة.</p>
+            ${alertHtml}
+            <form method="POST" action="/save/${g.id}/bulk-role">
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-weight:800; margin-bottom:8px;">اختر الرتبة المراد توزيعها</label>
+                    <select name="roleId" style="width:100%; padding:14px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; color:white; font-family:'Changa',sans-serif;" required>
+                        <option value="" disabled selected>-- اختر رتبة --</option>
+                        ${rolesOptions}
+                    </select>
+                </div>
+                <div style="margin-bottom:30px;">
+                    <label style="display:block; font-weight:800; margin-bottom:8px;">اختر قناة إرسال تقرير النتائج</label>
+                    <select name="channelId" style="width:100%; padding:14px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; color:white; font-family:'Changa',sans-serif;" required>
+                        <option value="" disabled selected>-- اختر قناة --</option>
+                        ${channelsOptions}
+                    </select>
+                </div>
+                <button type="submit" class="btn-save" style="font-size:16px; padding:15px; width:100%; background:linear-gradient(135deg, #00c853, #007e33);">🚀 بدء توزيع الرتبة على جميع الأعضاء الآن</button>
+            </form>
+        </div>
+    `;
+    res.send(ui(g, 'bulk_role', content));
+});
+
+app.post('/save/:guildId/bulk-role', checkAuth, async (req, res) => {
+    const guildId = req.params.guildId;
+    const { roleId, channelId } = req.body;
+
+    const g = client.guilds.cache.get(guildId);
+    if (!g) return res.redirect('/dashboard');
+
+    res.redirect(`/manage/${guildId}/bulk-role?success=1`);
+
+    (async () => {
+        try {
+            await g.members.fetch();
+            const role = g.roles.cache.get(roleId);
+            const channel = g.channels.cache.get(channelId);
+            if (!role || !channel) return;
+
+            let successList = [];
+            let alreadyHasList = [];
+            let failedList = [];
+
+            for (const [memberId, member] of g.members.cache) {
+                if (member.user.bot) continue;
+                try {
+                    if (!member.roles.cache.has(roleId)) {
+                        await member.roles.add(role);
+                        successList.push(`<@${memberId}>`);
+                        await new Promise(r => setTimeout(r, 120));
+                    } else {
+                        alreadyHasList.push(`<@${memberId}>`);
+                    }
+                } catch (err) {
+                    failedList.push(`<@${memberId}>`);
+                }
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle('📊 تقرير توزيع الرتبة الجماعي')
+                .setDescription(`تم إكمال عملية منح الرتبة **@${role.name}** لجميع أعضاء السيرفر بنجاح.`)
+                .addFields(
+                    { name: '✅ تم منحها لـ', value: `${successList.length} عضو`, inline: true },
+                    { name: 'ℹ️ يمتلكونها مسبقاً', value: `${alreadyHasList.length} عضو`, inline: true },
+                    { name: '❌ فشل (صلاحيات / أخطاء)', value: `${failedList.length} عضو`, inline: true }
+                )
+                .setColor(0x00ff88)
+                .setTimestamp();
+
+            await channel.send({ embeds: [embed] });
+
+            if (successList.length > 0) {
+                let chunkText = '**📋 قائمة الأعضاء الذين وصلتهم الرتبة:**\n';
+                for (const entry of successList) {
+                    if ((chunkText + entry + ', ').length > 1950) {
+                        await channel.send(chunkText);
+                        chunkText = '';
+                    }
+                    chunkText += entry + ' ';
+                }
+                if (chunkText.trim().length > 30) {
+                    await channel.send(chunkText);
+                }
+            }
+        } catch (e) {
+            console.error('[Bulk Role Background Error]', e);
+        }
+    })();
+});
+
 
 // --- [ Dashboard - Admin Commands ] ---
 app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
@@ -1031,7 +1169,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
         const p = BigInt(g.permissions);
         return (p & 8n) === 8n || (p & 32n) === 32n;
     });
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
+    const inviteLink = 'https://discord.com/oauth2/authorize?client_id=' + process.env.CLIENT_ID + '&permissions=8&scope=bot%20applications.commands';
 
     const cards = adminGuilds.map(g => {
         const hasBot = client.guilds.cache.has(g.id);
@@ -1055,7 +1193,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
         <div style="font-size:48px; font-weight:800; letter-spacing:6px;
             background: linear-gradient(135deg, var(--blue), #fff, var(--red));
             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-            margin-bottom:10px;">VORTEX </div>
+            margin-bottom:10px;">Abood System </div>
         <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
         <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
             <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
@@ -1643,13 +1781,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     <label>عنوان التذكرة</label>
                     <input name="title" value="${s.title || ''}" placeholder="عنوان نظام التذاكر">
                 </div>
-                <div>
-                    <label>رتبة الإدارة</label>
-                    <select name="adminRole">
-                        <option value="">-- اختر رتبة الإدارة --</option>
-                        ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-                    </select>
-                </div>
+                
             </div>
             <label>الوصف</label>
             <textarea name="description">${s.description || ''}</textarea>
@@ -1657,28 +1789,38 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;">
                 <div>
                     <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:10px;">الازرار (حتى 4)</div>
-                    ${[0,1,2,3].map(i => `
-                    <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
+${[0,1,2,3].map(i => `
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="btn_label_${i}" value="${s.buttons?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
-                        <input name="btn_emoji_${i}" value="${s.buttons?.[i]?.emoji || ''}" placeholder="ID الإيموجي">
+                        <input name="btn_emoji_${i}" value="${s.buttons?.[i]?.emoji || ''}" placeholder="ايموجي">
+                        <select name="btn_role_${i}">
+                            <option value="">-- رتبة القسم --</option>
+                            ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.buttons?.[i]?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+                        </select>
                     </div>`).join('')}
                 </div>
                 <div>
                     <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:10px;">خيارات المنيو (حتى 4)</div>
-                    ${[0,1,2,3].map(i => `
-                    <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
-                        <input name="menu_label_${i}" value="${s.menuOptions?.[i]?.label || ''}" placeholder="خيار ${i+1}">
-                        <input name="menu_emoji_${i}" value="${s.menuOptions?.[i]?.emoji || ''}" placeholder="ID الإيموجي">
+${[0,1,2,3].map(i => `
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <input name="menu_label_${i}" value="${s.menuOptions?.[i]?.label || ''}" placeholder="نص الخيار ${i+1}">
+                        <input name="menu_emoji_${i}" value="${s.menuOptions?.[i]?.emoji || ''}" placeholder="ايموجي">
+                        <select name="menu_role_${i}">
+                            <option value="">-- رتبة القسم --</option>
+                            ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.menuOptions?.[i]?.roleId === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
+                        </select>
                     </div>`).join('')}
                 </div>
             </div>
 
-            <label style="margin-top:16px;">قناة الإرسال (اختياري)</label>
+            
+            
+            <label style="margin-top:16px;">قناة إرسال لوحة التذاكر</label>
             <select name="targetChannel">
-                <option value="">-- لا ترسل الآن --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')}
+                <option value="">-- اختر القناة للإرسال --</option>
+                ${g.channels.cache.filter(c => c.type === 0).map(c => `<option value="${c.id}" ${s.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`).join('')}
             </select>
-            <button class="btn-save" style="margin-top:20px;">حفظ وإرسال</button>
+            <button class="btn-save" style="margin-top:12px;">حفظ وإرسال اللوحة</button>
         </div>
     </form>`;
 
@@ -1688,32 +1830,44 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
 app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' }, { name: 'bottomImage' }]), async (req, res) => {
     try {
         const b = req.body;
-        const g = client.guilds.cache.get(req.params.guildId);
+        const guildId = req.params.guildId;
+        const g = client.guilds.cache.get(guildId);
         if (!g) return res.status(404).send('Guild not found');
 
         let buttons = [], menuOptions = [];
         for (let i = 0; i < 4; i++) {
             const btnLabel = b[`btn_label_${i}`]?.trim();
             const btnEmoji = b[`btn_emoji_${i}`]?.trim();
+            const btnRole = b[`btn_role_${i}`]?.trim();
             const menuLabel = b[`menu_label_${i}`]?.trim();
             const menuEmoji = b[`menu_emoji_${i}`]?.trim();
-            if (btnLabel) buttons.push({ label: btnLabel, emoji: btnEmoji || '' });
-            if (menuLabel) menuOptions.push({ label: menuLabel, emoji: menuEmoji || '' });
+            const menuRole = b[`menu_role_${i}`]?.trim();
+            if (btnLabel) buttons.push({ label: btnLabel, emoji: btnEmoji || '', roleId: btnRole || '' });
+            if (menuLabel) menuOptions.push({ label: menuLabel, emoji: menuEmoji || '', roleId: menuRole || '' });
         }
 
-        let updateData = { title: b.title, description: b.description, color: b.color || '#1e90ff', adminRole: b.adminRole, buttons, menuOptions };
+        let updateData = { 
+            guildId,
+            channelId: b.targetChannel,
+            title: b.title, 
+            description: b.description, 
+            color: b.color || '#1e90ff', 
+            buttons, 
+            menuOptions 
+        };
+        
         if (req.files?.topImage?.[0]) updateData.topImagePath = req.files.topImage[0].path;
         if (req.files?.bottomImage?.[0]) updateData.bottomImagePath = req.files.bottomImage[0].path;
 
-        const config = await TicketConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: updateData }, { upsert: true, new: true });
-
+        const config = await TicketConfig.findOneAndUpdate({ guildId }, { $set: updateData }, { upsert: true, new: true });
+        
         if (b.targetChannel) {
             const channel = g.channels.cache.get(b.targetChannel);
             if (channel) {
                 const files = [];
                 const embed = new EmbedBuilder()
                     .setTitle(config.title || 'نظام التذاكر')
-                    .setDescription(config.description || 'اضغط للفتح')
+                    .setDescription(config.description || 'اضغط لفتح تذكرة')
                     .setColor(parseInt((config.color || '#1e90ff').replace('#', ''), 16));
 
                 if (config.topImagePath && fs.existsSync(config.topImagePath)) {
@@ -1727,46 +1881,37 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
                     embed.setImage(`attachment://${bottomName}`);
                 }
 
-                const components = [];
+                const rows = [];
                 if (config.buttons?.length > 0) {
                     const btnRow = new ActionRowBuilder();
                     config.buttons.forEach((btn, i) => {
                         const button = new ButtonBuilder().setCustomId(`ticket_btn_${i}`).setLabel(btn.label).setStyle(ButtonStyle.Primary);
-                        if (btn.emoji && btn.emoji.trim() !== '') {
-                            const em = btn.emoji.trim();
+                        if (btn.emoji) {
                             try {
-                                if (/^\d+$/.test(em)) button.setEmoji({ id: em });
-                                else if (/^<a?:\w+:\d+>$/.test(em)) button.setEmoji(em);
+                                if (/^\d+$/.test(btn.emoji)) button.setEmoji({ id: btn.emoji });
+                                else button.setEmoji(btn.emoji);
                             } catch (e) {}
                         }
                         btnRow.addComponents(button);
                     });
-                    if (btnRow.components.length > 0) components.push(btnRow);
+                    rows.push(btnRow);
                 }
+                
                 if (config.menuOptions?.length > 0) {
-                    const select = new StringSelectMenuBuilder().setCustomId('ticket_menu').setPlaceholder('اختر من القائمة...');
+                    const menu = new StringSelectMenuBuilder().setCustomId('ticket_menu').setPlaceholder('اختر نوع التذكرة');
                     config.menuOptions.forEach((opt, i) => {
-                        const option = { label: opt.label, value: `ticket_opt_${i}` };
-                        if (opt.emoji && opt.emoji.trim() !== '') {
-                            const em = opt.emoji.trim();
-                            try { option.emoji = /^\d+$/.test(em) ? { id: em } : em; } catch (e) {}
-                        }
-                        select.addOptions(option);
+                        menu.addOptions({ label: opt.label, value: `ticket_opt_${i}`, emoji: opt.emoji || undefined });
                     });
-                    components.push(new ActionRowBuilder().addComponents(select));
+                    rows.push(new ActionRowBuilder().addComponents(menu));
                 }
-                if (components.length === 0) {
-                    components.push(new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId('open_ticket').setLabel('فتح تذكرة').setStyle(ButtonStyle.Primary)
-                    ));
-                }
-                await channel.send({ embeds: [embed], components, files }).catch(e => console.error('[Ticket Send Error]', e));
+
+                await channel.send({ embeds: [embed], components: rows, files }).catch(e => console.error('[Send Ticket Panel Error]', e));
             }
         }
-        res.redirect(`/manage/${req.params.guildId}/tickets`);
-    } catch (error) {
-        console.error('[Ticket Save Error]', error);
-        res.status(500).send('Internal Error');
+        res.redirect(`/manage/${guildId}/tickets`);
+    } catch (err) {
+        console.error('[Ticket Save Error]', err);
+        res.status(500).send('Error saving ticket config');
     }
 });
 
@@ -1956,6 +2101,23 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
 
 
 
+
+async function ecoConfig(g){return EconomyConfig.findOneAndUpdate({guildId:g},{$setOnInsert:{guildId:g}},{upsert:true,new:true})}
+async function ecoUser(g,u){return EconomyUser.findOneAndUpdate({guildId:g,userId:u},{$setOnInsert:{guildId:g,userId:u}},{upsert:true,new:true})}
+const fmt=n=>Number(n||0).toLocaleString('en-US');
+const ecoEmbed=(t,d,c=0xffb703)=>new EmbedBuilder().setTitle(t).setDescription(d).setColor(c).setTimestamp().setFooter({text:'Nebula Economy'});
+async function showEco(i){const c=await ecoConfig(i.guild.id),u=await ecoUser(i.guild.id,i.user.id);return i.reply({embeds:[ecoEmbed('💰 محفظتي وبنكي',`المحفظة: **${fmt(u.cash)} ${c.currencyName}**\nالبنك: **${fmt(u.bank)} / ${fmt(u.bankCapacity)} ${c.currencyName}**\nالذهب: **${fmt(u.gold)} قطعة**\n\nالكاش معرض للسرقة والبنك آمن.`)],components:[new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('eco_profile').setLabel('تحديث المحفظة').setStyle(ButtonStyle.Secondary))],ephemeral:true})}
+async function runHeist(i,ss){const c=await ecoConfig(i.guild.id),ids=[ss.driverId,...ss.infiltrators].filter(Boolean);if(ids.length!==3)return i.reply({content:'تحتاج العملية إلى سائق ومقتحمين اثنين.',ephemeral:true});const chance=ss.hasMap?85:70,ok=Math.random()*100<chance;ss.status=ok?'success':'failed';await ss.save();if(ok){for(const id of ids){const r=Math.min(7000,Math.max(3000,Math.round(4000+Math.random()*2000)));await EconomyUser.findOneAndUpdate({guildId:i.guild.id,userId:id},{$inc:{cash:r},$set:{lastHeistAt:new Date()}},{upsert:true})}return i.reply({embeds:[ecoEmbed('✅ تمت سرقة القرن بنجاح',`نسبة النجاح: **${chance}%**\nحصل كل عضو على مكافأة متغيرة لا تتجاوز **7,000 كاش**.`,0x00c853)]})}const escaped=(await ecoUser(i.guild.id,ss.driverId)).getawayCar,jailed=escaped?ids.filter(x=>x!==ss.driverId):ids,role=c.jailRoleId&&i.guild.roles.cache.get(c.jailRoleId);for(const id of jailed){const m=await i.guild.members.fetch(id).catch(()=>null);if(m&&role)await m.roles.add(role).catch(()=>{})}let ch=c.jailChannelId&&i.guild.channels.cache.get(c.jailChannelId);if(!ch)ch=await i.guild.channels.create({name:'🔒-زنزانة-السجن',type:ChannelType.GuildText,permissionOverwrites:[{id:i.guild.id,deny:[PermissionFlagsBits.ViewChannel]},...jailed.map(id=>({id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages]}))]}).catch(()=>null);if(ch){await ch.send({content:jailed.map(id=>`<@${id}>`).join(' '),embeds:[ecoEmbed('⛓️ فشلت العملية',`${escaped?'السائق هرب بالسيارة.':'تم القبض على الفريق.'}\nالسجن: **15 دقيقة**. الكفالة: **5 قطع ذهب**.`,0xe63946)],components:[new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`heist_bail:${ss._id}`).setLabel('دفع الكفالة - 5 ذهب').setStyle(ButtonStyle.Success))]}).catch(()=>{});ss.jailChannelId=ch.id;await ss.save()}setTimeout(async()=>{for(const id of jailed){const m=await i.guild.members.fetch(id).catch(()=>null);if(m&&role)await m.roles.remove(role).catch(()=>{})}if(ch&&!c.jailChannelId)await ch.delete().catch(()=>{})},900000);return i.reply({embeds:[ecoEmbed('❌ فشلت سرقة القرن',`${escaped?'السائق هرب وتم سجن المقتحمين.':'تم سجن الفريق.'}`,0xe63946)]})}
+async function beginHeist(i){const c=await ecoConfig(i.guild.id);if(!c.enabled||!c.heistEnabled)return i.reply({content:'النظام متوقف من الداشبورد.',ephemeral:true});if(await HeistSession.findOne({guildId:i.guild.id,status:'planning'}))return i.reply({content:'هناك عملية قيد التخطيط.',ephemeral:true});const u=await ecoUser(i.guild.id,i.user.id);if(u.lastHeistAt&&Date.now()-u.lastHeistAt.getTime()<(c.cooldownMinutes||30)*60000)return i.reply({content:`الكولداون ${c.cooldownMinutes} دقيقة.`,ephemeral:true});const s=await HeistSession.create({guildId:i.guild.id,leaderId:i.user.id});const e=ecoEmbed('🥷 سرقة القرن - طاولة التخطيط','اختروا سائق هرب ومقتحمين اثنين، ثم يبدأ القائد العملية.',0x8b5cf6).addFields({name:'الفريق',value:'السائق: لا أحد\nالمقتحمون: 0/2'});const row=new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`heist_driver:${s._id}`).setLabel('الانضمام كسائق هرب').setStyle(ButtonStyle.Primary),new ButtonBuilder().setCustomId(`heist_infiltrator:${s._id}`).setLabel('الانضمام كمقتحم').setStyle(ButtonStyle.Danger),new ButtonBuilder().setCustomId(`heist_start:${s._id}`).setLabel('بدء العملية').setStyle(ButtonStyle.Success),new ButtonBuilder().setCustomId(`heist_cancel:${s._id}`).setLabel('إلغاء').setStyle(ButtonStyle.Secondary));return i.reply({embeds:[e],components:[row]})}
+
+
+app.get('/manage/:guildId/economy',checkAuth,async(req,res)=>{const g=client.guilds.cache.get(req.params.guildId);if(!g)return res.redirect('/dashboard');const c=await ecoConfig(g.id);res.send(ui(g,'economy',`<form method="POST" action="/save/${g.id}/economy"><div class="card"><h3>💰 إعدادات اقتصاد السيرفر</h3><label><input type="checkbox" name="enabled" ${c.enabled?'checked':''}> تفعيل الاقتصاد</label><label>اسم العملة</label><input name="currencyName" value="${c.currencyName}"><label>ضريبة التحويل (%)</label><input type="number" name="bankTax" min="0" max="100" value="${c.bankTax}"><button class="btn-save">حفظ</button></div></form>`))});
+app.post('/save/:guildId/economy',checkAuth,async(req,res)=>{await EconomyConfig.findOneAndUpdate({guildId:req.params.guildId},{$set:{enabled:req.body.enabled==='on',currencyName:req.body.currencyName||'كاش',bankTax:Number(req.body.bankTax||0)}},{upsert:true});res.redirect(`/manage/${req.params.guildId}/economy`)});
+app.get('/manage/:guildId/heist',checkAuth,async(req,res)=>{const g=client.guilds.cache.get(req.params.guildId);if(!g)return res.redirect('/dashboard');const c=await ecoConfig(g.id),roles=g.roles.cache.filter(r=>r.id!==g.id&&!r.managed).map(r=>`<option value="${r.id}" ${c.jailRoleId===r.id?'selected':''}>${r.name}</option>`).join(''),chs=g.channels.cache.filter(x=>x.type===ChannelType.GuildText).map(x=>`<option value="${x.id}" ${c.jailChannelId===x.id?'selected':''}># ${x.name}</option>`).join('');res.send(ui(g,'heist',`<form method="POST" action="/save/${g.id}/heist" enctype="multipart/form-data"><div class="card"><h3>🥷 إدارة سرقة القرن</h3><label><input type="checkbox" name="heistEnabled" ${c.heistEnabled?'checked':''}> تفعيل السرقة</label><label>الكولداون بالدقائق</label><input type="number" name="cooldownMinutes" value="${c.cooldownMinutes}" min="1"><label>رتبة المسجون</label><select name="jailRoleId"><option value="">-- اختر --</option>${roles}</select><label>قناة الزنزانة</label><select name="jailChannelId"><option value="">إنشاء تلقائي</option>${chs}</select><label>صورة طاولة التخطيط</label><input type="file" name="planningImage" accept="image/*"><button class="btn-save">حفظ</button></div></form>`))});
+app.post('/save/:guildId/heist',checkAuth,upload.single('planningImage'),async(req,res)=>{const d={heistEnabled:req.body.heistEnabled==='on',cooldownMinutes:Number(req.body.cooldownMinutes||30),jailRoleId:req.body.jailRoleId||'',jailChannelId:req.body.jailChannelId||''};if(req.file)d.planningImagePath=path.join(__dirname,'uploads',req.file.filename);await EconomyConfig.findOneAndUpdate({guildId:req.params.guildId},{$set:d},{upsert:true});res.redirect(`/manage/${req.params.guildId}/heist`)});
+app.get('/manage/:guildId/shop',checkAuth,async(req,res)=>{const g=client.guilds.cache.get(req.params.guildId);if(!g)return res.redirect('/dashboard');const c=await ecoConfig(g.id);res.send(ui(g,'shop',`<form method="POST" action="/save/${g.id}/shop"><div class="card"><h3>🛒 متجر_السيرفر</h3><label>سعر خريطة البنك</label><input type="number" name="bankMapPrice" value="${c.bankMapPrice}"><label>سعر سيارة الهرب</label><input type="number" name="getawayCarPrice" value="${c.getawayCarPrice}"><button class="btn-save">حفظ الأسعار</button></div></form>`))});
+app.post('/save/:guildId/shop',checkAuth,async(req,res)=>{await EconomyConfig.findOneAndUpdate({guildId:req.params.guildId},{$set:{bankMapPrice:Number(req.body.bankMapPrice||5000),getawayCarPrice:Number(req.body.getawayCarPrice||8000)}},{upsert:true});res.redirect(`/manage/${req.params.guildId}/shop`)});
+
 // ==========================================
 // 10. Discord Event Handlers
 // ==========================================
@@ -2033,7 +2195,7 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
                     .setAuthor({ name: `اقتراح من ${msg.author.username}`, iconURL: authorAvatar })
                     .setDescription(content || '*بدون نص*')
                     .setColor(0x1e90ff)
-                    .setFooter({ text: 'VORTEX  - Suggestions' })
+                    .setFooter({ text: 'Abood System  - Suggestions' })
                     .setTimestamp()
                     .addFields(
                         { name: getEmojiDisplay(msg.guild, sugCfg.emoji1), value: '0', inline: true },
@@ -2051,7 +2213,13 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
                         embed.setImage(`${dashboardUrl.replace(/\/$/, '')}/uploads/${imgName}`);
                     } else {
                         files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
-                        embed.setImage(`attachment://${imgName}`);
+                        const dashboardUrl = process.env.RENDER_EXTERNAL_URL || '';
+                if (dashboardUrl) {
+                    embed.setImage(`${dashboardUrl.replace(/\/$/, '')}/uploads/${imgName}`);
+                } else {
+                    files.push(new AttachmentBuilder(sugCfg.imagePath, { name: imgName }));
+                    embed.setImage(`attachment://${imgName}`);
+                }
                     }
                 }
 
@@ -2464,7 +2632,7 @@ async function updateSuggestionVotes(reaction, user, isAdd) {
             { name: getEmojiDisplay(message.guild, sugCfg.emoji1), value: `${suggestion.votes1.length}`, inline: true },
             { name: getEmojiDisplay(message.guild, sugCfg.emoji2), value: `${suggestion.votes2.length}`, inline: true }
         );
-        await message.edit({ embeds: [embed] }).catch(() => {});
+        await message.edit({ embeds: [embed], attachments: [] }).catch(() => {});
     } catch (err) {
         console.error('[Suggestion Vote Error]', err);
     }
@@ -2549,7 +2717,7 @@ client.on('guildMemberAdd', async (member) => {
             .setDescription(welcomeMsg)
             .setColor(0x1e90ff)
             .setTimestamp()
-            .setFooter({ text: `VORTEX  - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+            .setFooter({ text: `Abood System  - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
         try {
             const canvas = createCanvas(800, 400);
@@ -2700,6 +2868,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.guild) return;
+
+        if (interaction.isChatInputCommand() && ['economy_help','wallet','bank','deposit','withdraw','server_shop','plan_heist','heist'].includes(interaction.commandName)) { const c=await ecoConfig(interaction.guild.id); if(!c.enabled)return interaction.reply({content:'نظام الاقتصاد متوقف.',ephemeral:true}); if(['wallet','bank'].includes(interaction.commandName))return showEco(interaction); if(interaction.commandName==='economy_help')return interaction.reply({embeds:[ecoEmbed('📖 شرح البنك والاقتصاد','المحفظة معرضة للسرقة، البنك آمن، والإيداع والسحب متاحان بالأوامر. الاستثمارات والتداول يمكن إضافتهما لاحقاً حسب نظامك. سرقة القرن تحتاج سائقاً ومقتحمين اثنين.')],ephemeral:true}); if(['plan_heist','heist'].includes(interaction.commandName))return beginHeist(interaction); if(interaction.commandName==='server_shop')return interaction.reply({embeds:[ecoEmbed('🛒 متجر_السيرفر',`خريطة البنك: ${fmt(c.bankMapPrice)} ${c.currencyName}\nسيارة الهرب: ${fmt(c.getawayCarPrice)} ${c.currencyName}`)]}); const n=interaction.options.getInteger('amount'),u=await ecoUser(interaction.guild.id,interaction.user.id);if(!n||n<1)return interaction.reply({content:'المبلغ غير صحيح.',ephemeral:true});if(interaction.commandName==='deposit'){if(u.cash<n||u.bank+n>u.bankCapacity)return interaction.reply({content:'الرصيد أو سعة البنك غير كافية.',ephemeral:true});u.cash-=n;u.bank+=n}else{if(u.bank<n)return interaction.reply({content:'رصيد البنك غير كافٍ.',ephemeral:true});const tax=Math.floor(n*c.bankTax/100);u.bank-=n;u.cash+=n-tax}await u.save();return interaction.reply({content:'تم تنفيذ العملية بنجاح.',ephemeral:true}) }
+        if (interaction.isButton() && interaction.customId.startsWith('heist_')) { const [a,id]=interaction.customId.split(':');const s=await HeistSession.findById(id);if(!s||s.status!=='planning')return interaction.reply({content:'انتهى التخطيط.',ephemeral:true});if(a==='heist_cancel'){if(s.leaderId!==interaction.user.id)return interaction.reply({content:'القائد فقط.',ephemeral:true});s.status='cancelled';await s.save();return interaction.update({content:'تم الإلغاء.',embeds:[],components:[]})}if(a==='heist_driver'){s.driverId=interaction.user.id;await s.save();return interaction.reply({content:'تم تسجيلك كسائق.',ephemeral:true})}if(a==='heist_infiltrator'){if(!s.infiltrators.includes(interaction.user.id)&&s.infiltrators.length<2)s.infiltrators.push(interaction.user.id);await s.save();return interaction.reply({content:'تم تسجيلك كمقتحم.',ephemeral:true})}if(a==='heist_start'){if(s.leaderId!==interaction.user.id)return interaction.reply({content:'القائد فقط.',ephemeral:true});s.hasMap=(await ecoUser(interaction.guild.id,interaction.user.id)).bankMap;return runHeist(interaction,s)}if(a==='heist_bail'){const u=await ecoUser(interaction.guild.id,interaction.user.id);if(u.gold<5)return interaction.reply({content:'تحتاج 5 ذهب.',ephemeral:true});u.gold-=5;await u.save();return interaction.reply({content:'تم دفع الكفالة.',ephemeral:true})} }
 
         // --- [ Slash Commands ] ---
         if (interaction.isChatInputCommand()) {
@@ -2880,7 +3051,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setTitle(title)
                     .setDescription(text)
                     .setColor(0x1e90ff)
-                    .setFooter({ text: `VORTEX  - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
+                    .setFooter({ text: `Abood System  - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                     .setTimestamp();
                 if (image) embed.setImage(image.url);
 
@@ -2931,7 +3102,7 @@ client.on('interactionCreate', async (interaction) => {
                         { name: 'عدد الرتب', value: `${g.roles.cache.size}`, inline: true },
                         { name: 'تاريخ الإنشاء', value: `<t:${Math.floor(g.createdTimestamp / 1000)}:D>`, inline: true },
                     )
-                    .setFooter({ text: 'VORTEX ' })
+                    .setFooter({ text: 'Abood System ' })
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
             }
@@ -2993,35 +3164,47 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // --- [ Ticket Control Menu ] ---
-        if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
+                if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_control_menu') {
             const selected = interaction.values[0];
-            const ticketData = await TicketData.findOne({ channelId: interaction.channelId });
-            if (!ticketData) return interaction.reply({ content: 'لم يتم العثور على بيانات التكت.', ephemeral: true });
+            
+            // For modals, we can't defer. For others, we should.
+            if (selected === 'claim_ticket' || selected === 'close_ticket' || selected === 'summon_member') {
+                await interaction.deferReply({ ephemeral: true }).catch(() => {});
+            }
 
-            const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            const adminRole = tConfig?.adminRole;
-            const isAdmin = adminRole && interaction.member.roles.cache.has(adminRole);
-            const isOwner = ticketData.ownerId === interaction.user.id;
+            const ticketData = await TicketData.findOne({ channelId: interaction.channelId });
+            if (!ticketData) {
+                const msg = 'لم يتم العثور على بيانات التكت.';
+                if (interaction.deferred) return interaction.editReply(msg);
+                return interaction.reply({ content: msg, ephemeral: true });
+            }
+
+            const adminRoleId = ticketData.adminRoleId;
+            const isAdmin = adminRoleId ? interaction.member.roles.cache.has(adminRoleId) : interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+            
+            if (!isAdmin) {
+                const msg = 'هذه القائمة مخصصة لرتبة الإدارة المسؤولة عن هذا القسم فقط.';
+                if (interaction.deferred) return interaction.editReply(msg);
+                return interaction.reply({ content: msg, ephemeral: true });
+            }
 
             if (selected === 'claim_ticket') {
-                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم استلام التكت.', ephemeral: true });
                 ticketData.claimedBy = interaction.user.id;
                 await ticketData.save();
-                return interaction.reply({ content: `تم استلام التكت بواسطة ${interaction.user}.`, ephemeral: false });
+                await interaction.editReply(`تم استلام التكت بواسطة ${interaction.user}.`);
+                return interaction.channel.send(`✅ تم استلام التكت بواسطة ${interaction.user}.`);
             }
 
             if (selected === 'close_ticket') {
-                if (!isAdmin && !isOwner) return interaction.reply({ content: 'ليس لديك صلاحية لإغلاق التكت.', ephemeral: true });
                 ticketData.closedAt = new Date();
                 ticketData.closedBy = interaction.user.id;
                 await ticketData.save();
-                await interaction.reply({ content: 'سيتم حذف التكت خلال 5 ثوان...', ephemeral: false });
+                await interaction.editReply('سيتم حذف التكت خلال 5 ثوان...');
                 setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
                 return;
             }
 
             if (selected === 'add_member') {
-                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم إضافة أعضاء.', ephemeral: true });
                 const modal = new ModalBuilder().setCustomId('ticket_add_member').setTitle('إضافة عضو للتكت');
                 modal.addComponents(new ActionRowBuilder().addComponents(
                     new TextInputBuilder().setCustomId('member_id').setLabel('ID العضو').setStyle(TextInputStyle.Short).setRequired(true)
@@ -3030,7 +3213,6 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (selected === 'remove_member') {
-                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم إزالة أعضاء.', ephemeral: true });
                 const modal = new ModalBuilder().setCustomId('ticket_remove_member').setTitle('إزالة عضو من التكت');
                 modal.addComponents(new ActionRowBuilder().addComponents(
                     new TextInputBuilder().setCustomId('member_id').setLabel('ID العضو').setStyle(TextInputStyle.Short).setRequired(true)
@@ -3039,9 +3221,8 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (selected === 'summon_member') {
-                if (!isAdmin) return interaction.reply({ content: 'فقط الإدارة يمكنهم استدعاء الأعضاء.', ephemeral: true });
-                await interaction.reply({ content: `<@${ticketData.ownerId}> تم استدعاؤك!`, ephemeral: false });
-                return;
+                await interaction.editReply('تم الاستدعاء.');
+                return interaction.channel.send(`<@${ticketData.ownerId}> تم استدعاؤك!`);
             }
         }
 
@@ -3206,12 +3387,22 @@ async function openTicket(interaction, tConfig, ticketType) {
         const ticketCount = await TicketData.countDocuments({ guildId: interaction.guild.id }) + 1;
         const channelName = `ticket-${ticketCount}-${interaction.user.username}`.substring(0, 100);
 
+        let adminRoleId = null; 
+        if (interaction.customId.startsWith('ticket_btn_')) {
+            const idx = parseInt(interaction.customId.replace('ticket_btn_', ''));
+            if (tConfig.buttons?.[idx]?.roleId) adminRoleId = tConfig.buttons[idx].roleId;
+        } else if (interaction.customId === 'ticket_menu') {
+            const selected = interaction.values[0];
+            const idx = parseInt(selected.replace('ticket_opt_', ''));
+            if (tConfig.menuOptions?.[idx]?.roleId) adminRoleId = tConfig.menuOptions[idx].roleId;
+        }
+
         const permOverwrites = [
             { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
             { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
         ];
-        if (tConfig.adminRole) {
-            permOverwrites.push({ id: tConfig.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] });
+        if (adminRoleId) {
+            permOverwrites.push({ id: adminRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] });
         }
 
         const ticketChannel = await interaction.guild.channels.create({
@@ -3227,6 +3418,7 @@ async function openTicket(interaction, tConfig, ticketType) {
             channelId: ticketChannel.id,
             ownerId: interaction.user.id,
             ticketType,
+            adminRoleId: adminRoleId,
             openedAt: new Date()
         });
 
@@ -3241,7 +3433,7 @@ async function openTicket(interaction, tConfig, ticketType) {
             )
             .setThumbnail(interaction.user.displayAvatarURL())
             .setTimestamp()
-            .setFooter({ text: 'VORTEX  - Tickets' });
+            .setFooter({ text: 'Abood System  - Tickets' });
 
         if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
             const topName = path.basename(tConfig.topImagePath);
@@ -3266,7 +3458,7 @@ async function openTicket(interaction, tConfig, ticketType) {
             ]);
 
         await ticketChannel.send({
-            content: `${interaction.user} ${tConfig.adminRole ? `<@&${tConfig.adminRole}>` : ''}`,
+            content: `${interaction.user} ${ticketDoc.adminRoleId ? `<@&${ticketDoc.adminRoleId}>` : ''}`,
             embeds: [embed],
             components: [new ActionRowBuilder().addComponents(controlMenu)],
             files
@@ -3442,6 +3634,14 @@ async function registerSlashCommands() {
 
         new SlashCommandBuilder().setName('serverinfo').setDescription('عرض معلومات عن السيرفر'),
 
+        new SlashCommandBuilder().setName('economy_help').setDescription('شرح الاقتصاد'),
+        new SlashCommandBuilder().setName('wallet').setDescription('عرض المحفظة'),
+        new SlashCommandBuilder().setName('bank').setDescription('عرض البنك'),
+        new SlashCommandBuilder().setName('deposit').setDescription('إيداع مبلغ').addIntegerOption(o=>o.setName('amount').setDescription('المبلغ').setRequired(true)),
+        new SlashCommandBuilder().setName('withdraw').setDescription('سحب مبلغ').addIntegerOption(o=>o.setName('amount').setDescription('المبلغ').setRequired(true)),
+        new SlashCommandBuilder().setName('server_shop').setDescription('متجر أدوات السرقة'),
+        new SlashCommandBuilder().setName('plan_heist').setDescription('تخطيط سرقة القرن'),
+        new SlashCommandBuilder().setName('heist').setDescription('تخطيط سرقة القرن'),
         new SlashCommandBuilder().setName('avatar').setDescription('عرض صورة عضو')
             .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(false)),
     ].map(cmd => cmd.toJSON());
@@ -3449,7 +3649,7 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
-        console.log('[VORTEX ] Slash commands registered.');
+        console.log('[Abood System ] Slash commands registered.');
     } catch (err) {
         console.error('[Slash Register Error]', err);
     }
@@ -3460,9 +3660,9 @@ async function registerSlashCommands() {
 // ==========================================
 
 client.once('ready', async () => {
-    console.log(`[VORTEX ] Bot is online as ${client.user.tag}`);
+    console.log(`[Abood System ] Bot is online as ${client.user.tag}`);
     client.user.setPresence({
-        activities: [{ name: 'VORTEX ', type: ActivityType.Watching }],
+        activities: [{ name: 'Abood System ', type: ActivityType.Watching }],
         status: 'online'
     });
 
@@ -3490,10 +3690,10 @@ client.once('ready', async () => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`[VORTEX ] Dashboard running on port ${PORT}`);
+    console.log(`[Abood System ] Dashboard running on port ${PORT}`);
 });
 
 client.login(process.env.TOKEN).catch(err => {
-    console.error('[VORTEX ] Login failed:', err);
+    console.error('[Abood System ] Login failed:', err);
     process.exit(1);
 });
