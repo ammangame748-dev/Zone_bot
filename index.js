@@ -465,7 +465,17 @@ app.get('/login', (req, res) => {
             transform: translateY(-3px);
             box-shadow: 0 15px 40px rgba(30,144,255,0.5);
             filter: brightness(1.1);
+        }        @media (max-width: 520px) {
+            body { padding: 16px; overflow: auto; }
+            .login-wrapper { width: 100%; max-width: 420px; }
+            .logo-text { font-size: 34px; letter-spacing: 3px; }
+            .logo-sub { font-size: 9px; letter-spacing: 2px; }
+            .login-card { padding: 26px 18px; }
+            .login-card h2 { font-size: 20px; }
+            .login-card p { font-size: 13px; margin-bottom: 24px; }
+            .btn-discord { width: 100%; justify-content: center; padding: 14px 16px; font-size: 14px; }
         }
+
     </style>
 </head>
 <body>
@@ -911,9 +921,71 @@ function ui(guild, active, content) {
         ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
 
         /* ===== RESPONSIVE ===== */
+        html { overflow-x: hidden; }
+        body { overflow-x: hidden; }
+        .main { min-width: 0; }
+        .card, .guild-card, .data-table { max-width: 100%; }
+        .data-table-wrap, .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .data-table { min-width: 620px; }
+        img { max-width: 100%; }
+
+        @media (max-width: 1100px) {
+            :root { --sidebar-w: 230px; }
+            .main { padding: 30px 24px; }
+            .sidebar { width: var(--sidebar-w); }
+            .guild-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+        }
+
         @media (max-width: 768px) {
-            .sidebar { width: 240px; }
-            .main { margin-right: 240px; padding: 20px; }
+            body { display: block; min-height: 100vh; }
+            .sidebar {
+                width: 100%; height: auto; min-height: 0;
+                position: relative; border-left: 0; border-bottom: 1px solid var(--border);
+                overflow: visible;
+            }
+            .sidebar-header { padding: 18px 16px 12px; }
+            .sidebar-logo { font-size: 22px; letter-spacing: 2px; }
+            .sidebar-tagline { font-size: 9px; }
+            .nav {
+                display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 7px; padding: 12px; max-height: 310px; overflow-y: auto;
+            }
+            .nav a { min-width: 0; padding: 10px 9px; gap: 7px; font-size: 12px; justify-content: flex-start; }
+            .nav a svg { width: 16px; height: 16px; }
+            .nav a:hover { transform: none; }
+            .main { width: 100%; margin: 0; padding: 20px 14px 32px; min-height: auto; overflow: visible; }
+            .page-header { flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding-bottom: 14px; }
+            .page-header h1 { font-size: 20px; overflow-wrap: anywhere; }
+            .card { padding: 18px 14px; border-radius: 14px; margin-bottom: 16px; }
+            .card h3 { font-size: 16px; line-height: 1.5; }
+            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .stat-box { padding: 14px 8px; }
+            .stat-box .stat-num { font-size: 26px; }
+            .stat-box .stat-label { font-size: 11px; }
+            .guild-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .guild-card { padding: 18px 10px; border-radius: 14px; }
+            .guild-icon { width: 58px; height: 58px; margin-bottom: 9px; }
+            .guild-card h3 { font-size: 13px; overflow-wrap: anywhere; }
+            input, select, textarea { font-size: 16px; padding: 11px 12px; }
+            .toggle-row { gap: 12px; align-items: flex-start; }
+            .toggle-row select { width: 52%; }
+            .btn-save { min-height: 46px; padding: 12px 16px; }
+            .btn-sm { min-height: 40px; padding: 8px 12px; }
+            .orb-1 { width: 190px; height: 190px; }
+            .orb-2 { width: 160px; height: 160px; }
+            .orb-3 { display: none; }
+        }
+
+        @media (max-width: 430px) {
+            .nav { grid-template-columns: 1fr 1fr; max-height: 280px; }
+            .nav a { font-size: 11px; padding: 9px 7px; }
+            .nav a svg { width: 14px; height: 14px; }
+            .main { padding: 16px 10px 28px; }
+            .page-header h1 { font-size: 18px; }
+            .card { padding: 15px 11px; }
+            .stats-grid, .guild-grid { grid-template-columns: 1fr 1fr; }
+            .stat-box .stat-num { font-size: 23px; }
+            .guild-card h3 { font-size: 12px; }
         }
     </style>
 </head>
