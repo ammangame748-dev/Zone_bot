@@ -357,6 +357,21 @@ const checkAuth = (req, res, next) => {
     res.redirect('/login');
 };
 
+const checkGuildAccess = (req, res, next) => {
+    const guildId = req.params.guildId;
+    const guild = req.user?.guilds?.find(g => g.id === guildId);
+    if (!guild) return res.status(403).send('ليس لديك صلاحية إدارة هذا السيرفر.');
+    try {
+        const permissions = BigInt(guild.permissions || 0);
+        if ((permissions & 8n) !== 8n && (permissions & 32n) !== 32n) return res.status(403).send('تحتاج إلى صلاحية إدارة السيرفر أو Administrator.');
+    } catch { return res.status(403).send('صلاحيات السيرفر غير صالحة.'); }
+    next();
+};
+
+app.use('/manage/:guildId', checkAuth, checkGuildAccess);
+app.use('/save/:guildId', checkAuth, checkGuildAccess);
+app.use('/delete-kick/:guildId', checkAuth, checkGuildAccess);
+
 app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
     res.redirect('/dashboard');
@@ -377,14 +392,15 @@ app.get('/login', (req, res) => {
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --blue: #1e90ff;
-            --blue-dark: #0a6ecc;
+            --gold: #d4af37;
+            --gold-dark: #8b6508;
+            --gold-dark: #8b6508;
             --red: #e63946;
             --red-light: #ff6b6b;
             --black: #050508;
             --dark: #0d0d18;
             --card: rgba(10, 10, 25, 0.85);
-            --border: rgba(30, 144, 255, 0.25);
+            --gold-border: rgba(30, 144, 255, 0.25);
         }
         body {
             font-family: 'Changa', sans-serif;
@@ -398,14 +414,14 @@ app.get('/login', (req, res) => {
         }
         .bg-particles {
             position: fixed; inset: 0; z-index: 0;
-            background: radial-gradient(ellipse at 20% 50%, rgba(30,144,255,0.08) 0%, transparent 60%),
+            background: radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.08) 0%, transparent 60%),
                         radial-gradient(ellipse at 80% 20%, rgba(230,57,70,0.06) 0%, transparent 50%),
-                        radial-gradient(ellipse at 50% 80%, rgba(30,144,255,0.05) 0%, transparent 50%);
+                        radial-gradient(ellipse at 50% 80%, rgba(212,175,55,0.05) 0%, transparent 50%);
         }
         .grid-bg {
             position: fixed; inset: 0; z-index: 0;
-            background-image: linear-gradient(rgba(30,144,255,0.04) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(30,144,255,0.04) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(212,175,55,0.04) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(212,175,55,0.04) 1px, transparent 1px);
             background-size: 50px 50px;
         }
         .login-wrapper {
@@ -417,26 +433,26 @@ app.get('/login', (req, res) => {
         }
         .logo-text {
             font-size: 64px; font-weight: 800; letter-spacing: 8px;
-            background: linear-gradient(135deg, var(--blue), #ffffff, var(--red));
+            background: linear-gradient(135deg, var(--gold), #ffffff, var(--red));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 30px rgba(30,144,255,0.4));
+            filter: drop-shadow(0 0 30px rgba(212,175,55,0.4));
             animation: logoGlow 3s ease-in-out infinite alternate;
         }
         @keyframes logoGlow {
-            from { filter: drop-shadow(0 0 20px rgba(30,144,255,0.3)); }
-            to   { filter: drop-shadow(0 0 50px rgba(30,144,255,0.7)); }
+            from { filter: drop-shadow(0 0 20px rgba(212,175,55,0.3)); }
+            to   { filter: drop-shadow(0 0 50px rgba(212,175,55,0.7)); }
         }
         .logo-sub {
             color: rgba(255,255,255,0.4); font-size: 14px; letter-spacing: 4px; margin-top: 5px;
         }
         .login-card {
             background: var(--card);
-            border: 1px solid var(--border);
+            border: 1px solid var(--gold-border);
             border-radius: 24px;
             padding: 50px 60px;
             text-align: center;
             backdrop-filter: blur(30px);
-            box-shadow: 0 0 60px rgba(30,144,255,0.1), 0 0 120px rgba(0,0,0,0.5);
+            box-shadow: 0 0 60px rgba(212,175,55,0.1), 0 0 120px rgba(0,0,0,0.5);
             min-width: 380px;
             position: relative;
             overflow: hidden;
@@ -444,7 +460,7 @@ app.get('/login', (req, res) => {
         .login-card::before {
             content: '';
             position: absolute; top: 0; left: 0; right: 0; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--blue), var(--red), transparent);
+            background: linear-gradient(90deg, transparent, var(--gold), var(--red), transparent);
             animation: scanLine 3s linear infinite;
         }
         @keyframes scanLine {
@@ -455,15 +471,15 @@ app.get('/login', (req, res) => {
         .login-card p { color: rgba(255,255,255,0.45); font-size: 14px; margin-bottom: 35px; }
         .btn-discord {
             display: inline-flex; align-items: center; gap: 12px;
-            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
             color: white; padding: 16px 40px; border-radius: 14px;
             text-decoration: none; font-weight: 700; font-size: 16px;
-            transition: all 0.3s; border: 1px solid rgba(30,144,255,0.3);
-            box-shadow: 0 8px 30px rgba(30,144,255,0.3);
+            transition: all 0.3s; border: 1px solid rgba(212,175,55,0.3);
+            box-shadow: 0 8px 30px rgba(212,175,55,0.3);
         }
         .btn-discord:hover {
             transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(30,144,255,0.5);
+            box-shadow: 0 15px 40px rgba(212,175,55,0.5);
             filter: brightness(1.1);
         }        @media (max-width: 520px) {
             body { padding: 16px; overflow: auto; }
@@ -575,11 +591,9 @@ function ui(guild, active, content) {
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --blue: #1e90ff;
-            --blue-dark: #0a6ecc;
-            --blue-glow: rgba(30,144,255,0.15);
-            --gold: #ffb703;
-            --gold-glow: rgba(255,183,3,0.15);
+            --gold: #d4af37;
+            --gold-dark: #8b6508;
+            --gold-glow: rgba(212,175,55,0.15);
             --red: #e63946;
             --red-light: #ff6b6b;
             --red-glow: rgba(230,57,70,0.12);
@@ -588,7 +602,7 @@ function ui(guild, active, content) {
             --darker: #07070f;
             --card: rgba(12,12,24,0.75);
             --card-hover: rgba(18,18,34,0.9);
-            --border: rgba(30,144,255,0.18);
+            --gold-border: rgba(212,175,55,0.22);
             --border-red: rgba(230,57,70,0.18);
             --text: #e8eaf6;
             --text-muted: rgba(255,255,255,0.45);
@@ -612,7 +626,7 @@ function ui(guild, active, content) {
             content: '';
             position: fixed; inset: 0; z-index: -3;
             background:
-                radial-gradient(ellipse at 10% 20%, rgba(30,144,255,0.09) 0%, transparent 50%),
+                radial-gradient(ellipse at 10% 20%, rgba(212,175,55,0.09) 0%, transparent 50%),
                 radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.06) 0%, transparent 50%),
                 radial-gradient(ellipse at 60% 10%, rgba(255,183,3,0.05) 0%, transparent 45%),
                 radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
@@ -621,8 +635,8 @@ function ui(guild, active, content) {
             content: '';
             position: fixed; inset: 0; z-index: -2;
             background-image:
-                linear-gradient(rgba(30,144,255,0.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(30,144,255,0.025) 1px, transparent 1px);
+                linear-gradient(rgba(212,175,55,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(212,175,55,0.025) 1px, transparent 1px);
             background-size: 60px 60px;
         }
         .orb {
@@ -630,7 +644,7 @@ function ui(guild, active, content) {
             filter: blur(60px); opacity: 0.35; pointer-events: none;
             animation: floatOrb 14s ease-in-out infinite;
         }
-        .orb-1 { width: 320px; height: 320px; background: var(--blue); top: -80px; right: -60px; animation-delay: 0s; }
+        .orb-1 { width: 320px; height: 320px; background: var(--gold); top: -80px; right: -60px; animation-delay: 0s; }
         .orb-2 { width: 260px; height: 260px; background: var(--red); bottom: -60px; left: -40px; animation-delay: 3s; }
         .orb-3 { width: 200px; height: 200px; background: var(--gold); top: 40%; left: 30%; animation-delay: 6s; opacity: 0.15; }
         @keyframes floatOrb {
@@ -642,36 +656,36 @@ function ui(guild, active, content) {
         .sidebar {
             width: var(--sidebar-w);
             background: rgba(7,7,15,0.95);
-            border-left: 1px solid var(--border);
+            border-left: 1px solid var(--gold-border);
             position: relative;
             display: flex; flex-direction: column;
             z-index: 100;
             backdrop-filter: blur(20px);
             overflow-y: auto;
             scrollbar-width: thin;
-            scrollbar-color: var(--blue) transparent;
+            scrollbar-color: var(--gold) transparent;
             flex-shrink: 0;
             height: 100vh;
         }
         .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 10px; }
+        .sidebar::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; }
 
         .sidebar-header {
             padding: 30px 20px 20px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--gold-border);
             text-align: center;
             flex-shrink: 0;
         }
         .sidebar-logo {
             font-size: 27px; font-weight: 800; letter-spacing: 3px;
-            background: linear-gradient(135deg, var(--blue), #ffffff 50%, var(--red));
+            background: linear-gradient(135deg, var(--gold), #ffffff 50%, var(--red));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             display: block;
             animation: logoShimmer 4s ease-in-out infinite alternate;
         }
         @keyframes logoShimmer {
-            from { filter: drop-shadow(0 0 8px rgba(30,144,255,0.4)); }
-            to   { filter: drop-shadow(0 0 20px rgba(30,144,255,0.8)); }
+            from { filter: drop-shadow(0 0 8px rgba(212,175,55,0.4)); }
+            to   { filter: drop-shadow(0 0 20px rgba(212,175,55,0.8)); }
         }
         .sidebar-tagline {
             font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
@@ -696,24 +710,24 @@ function ui(guild, active, content) {
         }
         .nav a svg { flex-shrink: 0; opacity: 0.6; transition: opacity 0.25s; }
         .nav a:hover {
-            background: var(--blue-glow);
+            background: var(--gold-glow);
             color: white;
-            border-color: var(--border);
+            border-color: var(--gold-border);
             transform: translateX(-4px);
         }
         .nav a:hover svg { opacity: 1; }
         .nav a.active {
-            background: linear-gradient(135deg, rgba(30,144,255,0.22), rgba(30,144,255,0.08));
-            color: var(--blue);
-            border-color: rgba(30,144,255,0.4);
+            background: linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.08));
+            color: var(--gold);
+            border-color: rgba(212,175,55,0.4);
             font-weight: 700;
-            box-shadow: 0 0 18px rgba(30,144,255,0.18) inset;
+            box-shadow: 0 0 18px rgba(212,175,55,0.18) inset;
         }
-        .nav a.active svg { opacity: 1; color: var(--blue); }
+        .nav a.active svg { opacity: 1; color: var(--gold); }
         .nav a.active::before {
             content: '';
             position: absolute; right: 0; top: 20%; bottom: 20%;
-            width: 3px; background: linear-gradient(var(--blue), var(--gold));
+            width: 3px; background: linear-gradient(var(--gold), var(--gold));
             border-radius: 3px 0 0 3px;
             animation: pulseBar 1.6s ease-in-out infinite;
         }
@@ -731,20 +745,20 @@ function ui(guild, active, content) {
         .page-header {
             display: flex; align-items: center; gap: 15px;
             margin-bottom: 35px; padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--gold-border);
         }
         .page-header h1 {
             font-size: 24px; font-weight: 700; color: white;
         }
         .page-header .badge {
-            background: var(--blue-glow); border: 1px solid var(--border);
-            color: var(--blue); padding: 4px 12px; border-radius: 20px; font-size: 12px;
+            background: var(--gold-glow); border: 1px solid var(--gold-border);
+            color: var(--gold); padding: 4px 12px; border-radius: 20px; font-size: 12px;
         }
 
         /* ===== CARDS ===== */
         .card {
             background: var(--card);
-            border: 1px solid var(--border);
+            border: 1px solid var(--gold-border);
             border-radius: 18px;
             padding: 28px;
             margin-bottom: 24px;
@@ -756,19 +770,19 @@ function ui(guild, active, content) {
         .card::before {
             content: '';
             position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--blue), var(--gold), transparent);
+            background: linear-gradient(90deg, transparent, var(--gold), var(--gold), transparent);
             opacity: 0.5;
         }
         .card:hover {
-            border-color: rgba(30,144,255,0.4);
+            border-color: rgba(212,175,55,0.4);
             transform: translateY(-3px);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.35), 0 0 30px rgba(30,144,255,0.08);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.35), 0 0 30px rgba(212,175,55,0.08);
         }
         .card h3 {
             color: white; font-size: 17px; font-weight: 700;
             margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
         }
-        .card h3 svg { color: var(--blue); }
+        .card h3 svg { color: var(--gold); }
 
         /* ===== FORMS ===== */
         label {
@@ -785,21 +799,21 @@ function ui(guild, active, content) {
             outline: none;
         }
         input:focus, select:focus, textarea:focus {
-            border-color: var(--blue);
-            box-shadow: 0 0 0 3px rgba(30,144,255,0.12);
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(212,175,55,0.12);
         }
         select option { background: #0d0d1a; color: white; }
         textarea { resize: vertical; min-height: 100px; }
 
         /* ===== BUTTONS ===== */
         .btn-save {
-            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
             color: white; border: none; padding: 13px 24px;
             border-radius: 12px; cursor: pointer; font-weight: 700;
             font-size: 14px; font-family: 'Changa', sans-serif;
             transition: all 0.3s; display: inline-block; text-decoration: none;
             text-align: center; width: 100%;
-            box-shadow: 0 4px 20px rgba(30,144,255,0.25);
+            box-shadow: 0 4px 20px rgba(212,175,55,0.25);
             position: relative; overflow: hidden;
         }
         .btn-save::after {
@@ -812,7 +826,7 @@ function ui(guild, active, content) {
         .btn-save:hover::after { left: 130%; }
         .btn-save:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(30,144,255,0.4);
+            box-shadow: 0 8px 30px rgba(212,175,55,0.4);
             filter: brightness(1.1);
         }
         .btn-danger {
@@ -834,12 +848,12 @@ function ui(guild, active, content) {
         }
         .stat-box {
             background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border);
+            border: 1px solid var(--gold-border);
             border-radius: 14px; padding: 20px;
             text-align: center; transition: all 0.3s;
         }
-        .stat-box:hover { border-color: var(--blue); transform: translateY(-3px); }
-        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--blue); }
+        .stat-box:hover { border-color: var(--gold); transform: translateY(-3px); }
+        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--gold); }
         .stat-box .stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
 
         /* ===== GUILD GRID (Dashboard) ===== */
@@ -850,22 +864,22 @@ function ui(guild, active, content) {
         }
         .guild-card {
             background: var(--card);
-            border: 1px solid var(--border);
+            border: 1px solid var(--gold-border);
             border-radius: 18px; padding: 28px 20px;
             text-align: center; transition: all 0.35s;
             cursor: pointer;
         }
         .guild-card:hover {
             transform: translateY(-8px);
-            border-color: var(--blue);
-            box-shadow: 0 20px 50px rgba(30,144,255,0.15);
+            border-color: var(--gold);
+            box-shadow: 0 20px 50px rgba(212,175,55,0.15);
         }
         .guild-icon {
             width: 75px; height: 75px; border-radius: 50%;
-            border: 2px solid var(--border); margin-bottom: 14px;
+            border: 2px solid var(--gold-border); margin-bottom: 14px;
             transition: border-color 0.3s;
         }
-        .guild-card:hover .guild-icon { border-color: var(--blue); }
+        .guild-card:hover .guild-icon { border-color: var(--gold); }
         .guild-card h3 { color: white; font-size: 15px; margin-bottom: 12px; }
         .guild-card a { font-size: 13px; font-weight: 600; text-decoration: none; }
 
@@ -874,26 +888,26 @@ function ui(guild, active, content) {
         .data-table th {
             padding: 12px 16px; text-align: right;
             color: var(--text-muted); font-size: 12px; font-weight: 600;
-            border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid var(--gold-border); text-transform: uppercase; letter-spacing: 1px;
         }
         .data-table td {
             padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
             font-size: 14px; color: var(--text);
         }
-        .data-table tr:hover td { background: rgba(30,144,255,0.04); }
+        .data-table tr:hover td { background: rgba(212,175,55,0.04); }
 
         /* ===== BADGE ===== */
         .tag {
             display: inline-block; padding: 3px 10px; border-radius: 20px;
             font-size: 11px; font-weight: 600;
         }
-        .tag-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid var(--border); }
+        .tag-blue { background: var(--gold-glow); color: var(--gold); border: 1px solid var(--gold-border); }
         .tag-red { background: var(--red-glow); color: var(--red-light); border: 1px solid var(--border-red); }
         .tag-green { background: rgba(0,200,83,0.1); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
 
         /* ===== DIVIDER ===== */
         .section-divider {
-            height: 1px; background: var(--border);
+            height: 1px; background: var(--gold-border);
             margin: 24px 0;
         }
 
@@ -917,8 +931,8 @@ function ui(guild, active, content) {
         /* ===== SCROLLBAR ===== */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(30,144,255,0.3); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+        ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
         /* ===== RESPONSIVE ===== */
         html { overflow-x: hidden; }
@@ -940,7 +954,7 @@ function ui(guild, active, content) {
             body { display: block; min-height: 100vh; }
             .sidebar {
                 width: 100%; height: auto; min-height: 0;
-                position: relative; border-left: 0; border-bottom: 1px solid var(--border);
+                position: relative; border-left: 0; border-bottom: 1px solid var(--gold-border);
                 overflow: visible;
             }
             .sidebar-header { padding: 18px 16px 12px; }
@@ -1035,7 +1049,7 @@ app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
 
     let classesHtml = '';
     classes.forEach(cls => {
-        classesHtml += `<div class="card" style="border-right: 4px solid var(--blue);"><h4 style="color:var(--blue); margin-bottom:15px;">${cls.title}</h4><div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
+        classesHtml += `<div class="card" style="border-right: 4px solid var(--gold);"><h4 style="color:var(--gold); margin-bottom:15px;">${cls.title}</h4><div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">`;
         cls.keys.forEach(k => {
             const s = config.settings[k];
             const label = k === 'lock' ? 'قفل الشات' : k === 'unlock' ? 'فتح الشات' : k === 'timeout' ? 'كتم' : k === 'untimeout' ? 'فك الكتم' : k === 'ban' ? 'باند' : k === 'unban' ? 'فك باند' : 'كيك';
@@ -1063,7 +1077,7 @@ app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
             <h2 style="margin-bottom:10px;">الأوامر الإدارية المتقدمة</h2>
             <p style="color:#666; font-size:13px; margin-bottom:30px;">تحكم في اختصارات الأوامر وطريقة تفاعل البوت معها في السيرفر.</p>
             <form method="POST" action="/save/${g.id}/admincmds">
-                <div class="card" style="background:rgba(30,144,255,0.05); border:1px dashed var(--blue);">
+                <div class="card" style="background:rgba(212,175,55,0.05); border:1px dashed var(--gold);">
                     <label style="font-weight:800;">الرتب المسموح لها (IDs مفصولة بفاصلة)</label>
                     <input type="text" name="adminRoles" value="${config.adminRoles.join(',')}" placeholder="مثلاً: 123456789,987654321">
                 </div>
@@ -1116,7 +1130,7 @@ app.get('/dashboard', checkAuth, (req, res) => {
             <img src="${iconURL}" class="guild-icon" alt="${g.name}">
             <h3>${g.name}</h3>
             ${hasBot
-                ? `<a href="/manage/${g.id}/home" style="color:var(--blue);">الإعدادات</a>`
+                ? `<a href="/manage/${g.id}/home" style="color:var(--gold);">الإعدادات</a>`
                 : `<a href="${inviteLink}" style="color:#00c853;">اضافة البوت</a>`
             }
         </div>`;
@@ -1125,12 +1139,12 @@ app.get('/dashboard', checkAuth, (req, res) => {
     const content = `
     <div style="text-align:center; margin-bottom:40px;">
         <div style="font-size:48px; font-weight:800; letter-spacing:6px;
-            background: linear-gradient(135deg, var(--blue), #fff, var(--red));
+            background: linear-gradient(135deg, var(--gold), #fff, var(--red));
             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
             margin-bottom:10px;">VORTEX </div>
         <p style="color:var(--text-muted); font-size:15px;">اختر السيرفر لإدارته</p>
         <div style="margin-top:20px; max-width:400px; margin-left:auto; margin-right:auto;">
-            <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(30,144,255,0.05); border:1px solid var(--border);">
+            <input type="text" id="guildSearch" placeholder="ابحث عن سيرفر..." onkeyup="filterGuilds()" style="text-align:center; border-radius:20px; background:rgba(212,175,55,0.05); border:1px solid var(--gold-border);">
         </div>
     </div>
     <div class="guild-grid" id="guildGrid">${cards}</div>
@@ -1181,15 +1195,15 @@ app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
                 <div class="stat-num">${statsData.messages?.total || 0}</div>
                 <div class="stat-label">اجمالي الرسائل</div>
             </div>
-            <div class="stat-box" style="--blue:#e63946;">
-                <div class="stat-num" style="color:var(--blue);">${g.memberCount}</div>
+            <div class="stat-box" style="--red:#e63946;">
+                <div class="stat-num" style="color:var(--gold);">${g.memberCount}</div>
                 <div class="stat-label">عدد الاعضاء</div>
             </div>
-            <div class="stat-box" style="--blue:#00c853;">
+            <div class="stat-box" style="--green:#00c853;">
                 <div class="stat-num" style="color:#00c853;">+${newMembersCount}</div>
                 <div class="stat-label">اعضاء جدد (7 ايام)</div>
             </div>
-            <div class="stat-box" style="--blue:#ff6b6b;">
+            <div class="stat-box" style="--red-light:#ff6b6b;">
                 <div class="stat-num" style="color:#ff6b6b;">-${leftMembersCount}</div>
                 <div class="stat-label">اعضاء غادروا (7 ايام)</div>
             </div>
@@ -1231,8 +1245,8 @@ app.get('/manage/:guildId/kick', checkAuth, async (req, res) => {
             نظام تنبيهات Kick
         </h3>
 
-        <div style="background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:24px;">
-            <h4 style="color:var(--blue); margin-bottom:18px; font-size:15px;">اضافة ستريمر جديد</h4>
+        <div style="background:rgba(0,0,0,0.3); border:1px solid var(--gold-border); border-radius:14px; padding:24px; margin-bottom:24px;">
+            <h4 style="color:var(--gold); margin-bottom:18px; font-size:15px;">اضافة ستريمر جديد</h4>
             <form method="POST" action="/save/${g.id}/kick">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                     <div>
@@ -1334,7 +1348,7 @@ app.get('/manage/:guildId/suggestions', checkAuth, async (req, res) => {
             </div>
             <label>صورة الاقتراح (تظهر داخل كل ايمبد اقتراح)</label>
             <input type="file" name="suggestImage" accept="image/*">
-            ${s.imagePath ? `<div style="margin-top:12px;"><img src="/${s.imagePath.replace(/^\.\//,'')}" style="max-width:220px; border-radius:12px; border:1px solid var(--border);"></div>` : ''}
+            ${s.imagePath ? `<div style="margin-top:12px;"><img src="/${s.imagePath.replace(/^\.\//,'')}" style="max-width:220px; border-radius:12px; border:1px solid var(--gold-border);"></div>` : ''}
             <button class="btn-save" style="margin-top:20px;">حفظ إعدادات الاقتراحات</button>
         </div>
     </form>`;
@@ -1376,7 +1390,7 @@ app.get('/manage/:guildId/logs', checkAuth, async (req, res) => {
             ${types.map(t => `
             <div class="toggle-row">
                 <div style="display:flex; align-items:center; gap:12px;">
-                    <input type="checkbox" name="${t}_st" id="chk_${t}" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer; accent-color:var(--blue);">
+                    <input type="checkbox" name="${t}_st" id="chk_${t}" ${s.logs?.[t]?.enabled ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer; accent-color:var(--gold);">
                     <label for="chk_${t}" style="margin:0; color:white; cursor:pointer;">${typeLabels[t]}</label>
                 </div>
                 <select name="${t}_ch" style="width:250px; margin:0;">
@@ -1414,9 +1428,9 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
     const content = `
     <style>
-        .preview-container { position:relative; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#000; width:100%; aspect-ratio:2/1; user-select:none; }
+        .preview-container { position:relative; border:1px solid var(--gold-border); border-radius:14px; overflow:hidden; background:#000; width:100%; aspect-ratio:2/1; user-select:none; }
         #previewAvatar { position:absolute; border:3px solid #fff; border-radius:50%; background-size:100% 100%; cursor:move; box-shadow:0 0 15px rgba(0,0,0,0.5); }
-        .resizer { width:12px; height:12px; background:var(--blue); position:absolute; border-radius:50%; cursor:se-resize; }
+        .resizer { width:12px; height:12px; background:var(--gold); position:absolute; border-radius:50%; cursor:se-resize; }
         .resizer.br { bottom:-6px; right:-6px; }
     </style>
     <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
@@ -1428,7 +1442,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
 
             <div class="toggle-row">
                 <label style="color:white; margin:0;">تفعيل نظام الترحيب</label>
-                <input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
+                <input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--gold); cursor:pointer;">
             </div>
 
             <label>قناة الترحيب</label>
@@ -1523,7 +1537,7 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
             </h3>
             <div class="toggle-row">
                 <label style="color:white; margin:0;">حظر الروابط</label>
-                <input type="checkbox" name="antiLinks" ${s.security?.antiLinks ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
+                <input type="checkbox" name="antiLinks" ${s.security?.antiLinks ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--gold); cursor:pointer;">
             </div>
             <label>الكلمات المحظورة (افصل بفاصلة)</label>
             <input type="text" name="badWords" value="${s.security?.badWords || ''}" placeholder="كلمة1, كلمة2, ...">
@@ -1532,7 +1546,7 @@ app.get('/manage/:guildId/security', checkAuth, async (req, res) => {
             <label>رتب الاستثناء (لن تطبق عليهم الحماية)</label>
             ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `
             <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">
-                <input type="checkbox" name="bypassRoles" value="${r.id}" id="bypass_${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--blue);">
+                <input type="checkbox" name="bypassRoles" value="${r.id}" id="bypass_${r.id}" ${s.security?.bypassRoles?.includes(r.id) ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--gold);">
                 <label for="bypass_${r.id}" style="margin:0; color:var(--text); cursor:pointer;">${r.name}</label>
             </div>`).join('')}
             <button class="btn-save" style="margin-top:20px;">حفظ الإعدادات</button>
@@ -1643,7 +1657,7 @@ app.get('/manage/:guildId/giveaway', checkAuth, async (req, res) => {
     <div class="card">
         <h3>القيف اوايات النشطة</h3>
         ${activeGiveaways.map(gw => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px; background:rgba(0,0,0,0.2); border-radius:10px; margin-bottom:10px; border:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px; background:rgba(0,0,0,0.2); border-radius:10px; margin-bottom:10px; border:1px solid var(--gold-border);">
             <div>
                 <span style="color:white; font-weight:700;">${gw.prize}</span>
                 <span class="tag tag-blue" style="margin-right:10px;">${gw.winnersCount} فائز</span>
@@ -1668,7 +1682,7 @@ app.post('/save/:guildId/giveaway', checkAuth, async (req, res) => {
     const embed = new EmbedBuilder()
         .setTitle(`قيف اواي: ${prize}`)
         .setDescription(`${description || 'لا يوجد وصف'}\n\nينتهي: <t:${Math.floor(endAt / 1000)}:R>\nعدد الفائزين: ${winners}`)
-        .setColor(0x1e90ff)
+        .setColor(0xd4af37)
         .setFooter({ text: 'اضغط على رد فعل للاشتراك' });
 
     const giveawayMsg = await targetCh.send({ embeds: [embed] });
@@ -1696,15 +1710,15 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
             <div style="display:flex; gap:30px; justify-content:center; margin-bottom:24px;">
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">الصورة العلوية</div>
-                    <img src="${topImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--border);">
-                    <label style="display:block; margin-top:8px; background:var(--blue-glow); border:1px solid var(--border); color:var(--blue); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
+                    <img src="${topImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--gold-border);">
+                    <label style="display:block; margin-top:8px; background:var(--gold-glow); border:1px solid var(--gold-border); color:var(--gold); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
                         تغيير <input type="file" name="topImage" style="display:none;" accept="image/*">
                     </label>
                 </div>
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">الصورة السفلية</div>
-                    <img src="${bottomImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--border);">
-                    <label style="display:block; margin-top:8px; background:var(--blue-glow); border:1px solid var(--border); color:var(--blue); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
+                    <img src="${bottomImg}" style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid var(--gold-border);">
+                    <label style="display:block; margin-top:8px; background:var(--gold-glow); border:1px solid var(--gold-border); color:var(--gold); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:12px;">
                         تغيير <input type="file" name="bottomImage" style="display:none;" accept="image/*">
                     </label>
                 </div>
@@ -1728,7 +1742,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;">
                 <div>
-                    <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:10px;">الازرار (حتى 4)</div>
+                    <div style="color:var(--gold); font-size:13px; font-weight:700; margin-bottom:10px;">الازرار (حتى 4)</div>
                     ${[0,1,2,3].map(i => `
                     <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="btn_label_${i}" value="${s.buttons?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
@@ -1736,7 +1750,7 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     </div>`).join('')}
                 </div>
                 <div>
-                    <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:10px;">خيارات المنيو (حتى 4)</div>
+                    <div style="color:var(--gold); font-size:13px; font-weight:700; margin-bottom:10px;">خيارات المنيو (حتى 4)</div>
                     ${[0,1,2,3].map(i => `
                     <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="menu_label_${i}" value="${s.menuOptions?.[i]?.label || ''}" placeholder="خيار ${i+1}">
@@ -1773,7 +1787,7 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
             if (menuLabel) menuOptions.push({ label: menuLabel, emoji: menuEmoji || '' });
         }
 
-        let updateData = { title: b.title, description: b.description, color: b.color || '#1e90ff', adminRole: b.adminRole, buttons, menuOptions };
+        let updateData = { title: b.title, description: b.description, color: b.color || '#d4af37', adminRole: b.adminRole, buttons, menuOptions };
         if (req.files?.topImage?.[0]) updateData.topImagePath = req.files.topImage[0].path;
         if (req.files?.bottomImage?.[0]) updateData.bottomImagePath = req.files.bottomImage[0].path;
 
@@ -1786,7 +1800,7 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
                 const embed = new EmbedBuilder()
                     .setTitle(config.title || 'نظام التذاكر')
                     .setDescription(config.description || 'اضغط للفتح')
-                    .setColor(parseInt((config.color || '#1e90ff').replace('#', ''), 16));
+                    .setColor(parseInt((config.color || '#d4af37').replace('#', ''), 16));
 
                 if (config.topImagePath && fs.existsSync(config.topImagePath)) {
                     const topName = path.basename(config.topImagePath);
@@ -1857,7 +1871,7 @@ app.get('/manage/:guildId/levels', checkAuth, async (req, res) => {
             </h3>
             <div class="toggle-row">
                 <label style="color:white; margin:0;">تفعيل نظام المستويات</label>
-                <input type="checkbox" name="enabled" ${s.levels?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--blue); cursor:pointer;">
+                <input type="checkbox" name="enabled" ${s.levels?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--gold); cursor:pointer;">
             </div>
             <label>XP لكل رسالة</label>
             <input type="number" name="xpPerMessage" value="${s.levels?.xpPerMessage || 10}" min="1">
@@ -1908,7 +1922,7 @@ app.get('/manage/:guildId/roles', checkAuth, async (req, res) => {
                 ).join('')}
             </select>
             <div style="margin-top:20px;">
-                <div style="color:var(--blue); font-size:13px; font-weight:700; margin-bottom:12px;">الرتب (حتى 10)</div>
+                <div style="color:var(--gold); font-size:13px; font-weight:700; margin-bottom:12px;">الرتب (حتى 10)</div>
                 ${Array.from({ length: 10 }, (_, i) => `
                 <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
                     <select name="role_id_${i}">
@@ -1955,7 +1969,7 @@ app.post('/save/:guildId/roles', checkAuth, async (req, res) => {
             if (row.components.length > 0) rows.push(row);
             
             await channel.send({ 
-                embeds: [new EmbedBuilder().setTitle('لوحة الرتب الذاتية').setDescription('اضغط على الزر للحصول على الرتبة أو إزالتها').setColor(0x1e90ff)],
+                embeds: [new EmbedBuilder().setTitle('لوحة الرتب الذاتية').setDescription('اضغط على الزر للحصول على الرتبة أو إزالتها').setColor(0xd4af37)],
                 components: rows 
             }).catch(() => {});
         }
@@ -2104,7 +2118,7 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
                 const embed = new EmbedBuilder()
                     .setAuthor({ name: `اقتراح من ${msg.author.username}`, iconURL: authorAvatar })
                     .setDescription(content || '*بدون نص*')
-                    .setColor(0x1e90ff)
+                    .setColor(0xd4af37)
                     .setFooter({ text: 'VORTEX  - Suggestions' })
                     .setTimestamp()
                     .addFields(
@@ -2173,7 +2187,7 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
 
             const embed = new EmbedBuilder()
                 .setTitle(`اعلى 15 ليفل في السيرفر`)
-                .setColor(0x1e90ff)
+                .setColor(0xd4af37)
                 .setThumbnail(msg.guild.iconURL({ dynamic: true }))
                 .setTimestamp();
 
@@ -2292,7 +2306,7 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
         const embed = new EmbedBuilder()
             .setTitle(tConfig.title || 'الدعم الفني')
             .setDescription(tConfig.description || 'اضغط أدناه لفتح تذكرة')
-            .setColor(parseInt((tConfig.color || '#1e90ff').replace('#', ''), 16));
+            .setColor(parseInt((tConfig.color || '#d4af37').replace('#', ''), 16));
 
         const files = [];
         if (tConfig.topImagePath && fs.existsSync(tConfig.topImagePath)) {
@@ -2358,14 +2372,14 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
         ctx.fillStyle = bgGradient;
         ctx.fillRect(0, 0, 850, 500);
 
-        ctx.strokeStyle = '#1e90ff';
+        ctx.strokeStyle = '#d4af37';
         ctx.lineWidth = 3;
         ctx.strokeRect(8, 8, 834, 484);
 
         ctx.save();
         ctx.beginPath();
         ctx.arc(150, 150, 90, 0, Math.PI * 2);
-        ctx.strokeStyle = '#1e90ff';
+        ctx.strokeStyle = '#d4af37';
         ctx.lineWidth = 5;
         ctx.stroke();
         ctx.clip();
@@ -2379,7 +2393,7 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
         ctx.fillText(target.username, 270, 130);
 
         ctx.font = '28px Arial';
-        ctx.fillStyle = '#1e90ff';
+        ctx.fillStyle = '#d4af37';
         ctx.fillText(`XP: ${uData.xp || 0}`, 270, 175);
 
         function drawStatBox(x, y, label, value) {
@@ -2391,7 +2405,7 @@ client.on('messageCreate', async (msg) => {if (!msg.guild || msg.author.bot) ret
             ctx.lineWidth = 1;
             ctx.stroke();
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#1e90ff';
+            ctx.fillStyle = '#d4af37';
             ctx.font = 'bold 20px Arial';
             ctx.fillText(label, x + 120, y + 48);
             ctx.fillStyle = '#ffffff';
@@ -2619,7 +2633,7 @@ client.on('guildMemberAdd', async (member) => {
         const welcomeEmbed = new EmbedBuilder()
             .setTitle('عضو جديد انضم إلينا')
             .setDescription(welcomeMsg)
-            .setColor(0x1e90ff)
+            .setColor(0xd4af37)
             .setTimestamp()
             .setFooter({ text: `VORTEX  - العضو رقم ${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
@@ -2648,7 +2662,7 @@ const background = await loadImage(bgUrl ).catch(() => loadImage('https://placeh
             if (avatar) ctx.drawImage(avatar, x - (avW / 2), y - (avH / 2), avW, avH);
             ctx.restore();
 
-            ctx.strokeStyle = '#1e90ff';
+            ctx.strokeStyle = '#d4af37';
             ctx.lineWidth = 5;
             ctx.beginPath();
             ctx.ellipse(x, y, avW / 2, avH / 2, 0, 0, Math.PI * 2);
@@ -2708,7 +2722,7 @@ client.on('channelCreate', async (channel) => {
     if (!channel.guild) return;
     const embed = new EmbedBuilder()
         .setTitle('قناة جديدة')
-        .setColor(0x1e90ff)
+        .setColor(0xd4af37)
         .addFields({ name: 'القناة', value: `${channel.name} (<#${channel.id}>)` })
         .setTimestamp();
     await sendLog(channel.guild, 'channels', embed);
@@ -2792,7 +2806,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle('لوحة تغيير الاسم')
                     .setDescription(`اضغط على الزر لتغيير اسمك إلى: **${name}**`)
-                    .setColor(0x1e90ff);
+                    .setColor(0xd4af37);
                 if (image) embed.setImage(image.url);
 
                 const row = new ActionRowBuilder().addComponents(
@@ -2805,8 +2819,8 @@ client.on('interactionCreate', async (interaction) => {
 
             // ===== أوامر الإشراف =====
             if (interaction.commandName === 'ban') {
-                const target = interaction.options.getUser('عضو');
-                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const target = interaction.options.getUser('user');
+                const reason = interaction.options.getString('reason') || 'بدون سبب';
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (member && !member.bannable) return interaction.reply({ content: 'لا يمكنني حظر هذا العضو (رتبته أعلى مني).', ephemeral: true });
                 await interaction.guild.members.ban(target.id, { reason }).catch(() => {});
@@ -2818,7 +2832,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (interaction.commandName === 'unban') {
                 const id = interaction.options.getString('id');
-                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const reason = interaction.options.getString('reason') || 'بدون سبب';
                 await interaction.guild.members.unban(id, reason).catch(() => {
                     return interaction.reply({ content: 'تعذر فك الحظر، تأكد من صحة الـ ID.', ephemeral: true });
                 });
@@ -2829,8 +2843,8 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'kick') {
-                const target = interaction.options.getUser('عضو');
-                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const target = interaction.options.getUser('user');
+                const reason = interaction.options.getString('reason') || 'بدون سبب';
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 if (!member.kickable) return interaction.reply({ content: 'لا يمكنني طرد هذا العضو (رتبته أعلى مني).', ephemeral: true });
@@ -2842,9 +2856,9 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'timeout') {
-                const target = interaction.options.getUser('عضو');
-                const minutes = interaction.options.getInteger('دقائق');
-                const reason = interaction.options.getString('سبب') || 'بدون سبب';
+                const target = interaction.options.getUser('user');
+                const minutes = interaction.options.getInteger('minutes');
+                const reason = interaction.options.getString('reason') || 'بدون سبب';
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 if (!member.moderatable) return interaction.reply({ content: 'لا يمكنني كتم هذا العضو (رتبته أعلى مني).', ephemeral: true });
@@ -2856,7 +2870,7 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'untimeout') {
-                const target = interaction.options.getUser('عضو');
+                const target = interaction.options.getUser('user');
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 await member.timeout(null).catch(() => {});
@@ -2864,8 +2878,8 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'warn') {
-                const target = interaction.options.getUser('عضو');
-                const reason = interaction.options.getString('سبب');
+                const target = interaction.options.getUser('user');
+                const reason = interaction.options.getString('reason');
                 await Warn.create({ guildId: interaction.guild.id, userId: target.id, reason, moderatorId: interaction.user.id });
                 const embed = new EmbedBuilder().setTitle('تم توجيه تحذير').setColor(0xffac33)
                     .addFields({ name: 'العضو', value: `${target}`, inline: true }, { name: 'بواسطة', value: `${interaction.user}`, inline: true }, { name: 'السبب', value: reason })
@@ -2876,7 +2890,7 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'warnings') {
-                const target = interaction.options.getUser('عضو');
+                const target = interaction.options.getUser('user');
                 const warns = await Warn.find({ guildId: interaction.guild.id, userId: target.id }).sort({ createdAt: -1 }).limit(15);
                 if (warns.length === 0) return interaction.reply({ content: `${target} لا يملك أي تحذيرات.`, ephemeral: true });
                 const embed = new EmbedBuilder().setTitle(`تحذيرات ${target.username}`).setColor(0xffac33)
@@ -2886,13 +2900,13 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'clearwarns') {
-                const target = interaction.options.getUser('عضو');
+                const target = interaction.options.getUser('user');
                 await Warn.deleteMany({ guildId: interaction.guild.id, userId: target.id });
                 return interaction.reply({ content: `تم مسح جميع تحذيرات ${target}.` });
             }
 
             if (interaction.commandName === 'purge') {
-                const amount = interaction.options.getInteger('عدد');
+                const amount = interaction.options.getInteger('amount');
                 if (amount < 1 || amount > 100) return interaction.reply({ content: 'العدد يجب أن يكون بين 1 و 100.', ephemeral: true });
                 const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
                 return interaction.reply({ content: `تم حذف ${deleted?.size || 0} رسالة.`, ephemeral: true });
@@ -2909,14 +2923,14 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'slowmode') {
-                const seconds = interaction.options.getInteger('ثواني');
+                const seconds = interaction.options.getInteger('seconds');
                 await interaction.channel.setRateLimitPerUser(seconds).catch(() => {});
                 return interaction.reply({ content: seconds > 0 ? `تم ضبط وضع البطء على ${seconds} ثانية.` : 'تم إيقاف وضع البطء.' });
             }
 
             if (interaction.commandName === 'nickname') {
-                const target = interaction.options.getUser('عضو');
-                const newName = interaction.options.getString('اسم');
+                const target = interaction.options.getUser('user');
+                const newName = interaction.options.getString('name');
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 await member.setNickname(newName || null).catch(() => {});
@@ -2924,8 +2938,8 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'addrole') {
-                const target = interaction.options.getUser('عضو');
-                const role = interaction.options.getRole('رتبة');
+                const target = interaction.options.getUser('user');
+                const role = interaction.options.getRole('role');
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 await member.roles.add(role).catch(() => {});
@@ -2933,8 +2947,8 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'removerole') {
-                const target = interaction.options.getUser('عضو');
-                const role = interaction.options.getRole('رتبة');
+                const target = interaction.options.getUser('user');
+                const role = interaction.options.getRole('role');
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 if (!member) return interaction.reply({ content: 'العضو غير موجود بالسيرفر.', ephemeral: true });
                 await member.roles.remove(role).catch(() => {});
@@ -2942,16 +2956,16 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'announce') {
-                const title = interaction.options.getString('عنوان');
-                const text = interaction.options.getString('نص');
-                const channel = interaction.options.getChannel('روم');
-                const role = interaction.options.getRole('منشن_رتبة');
-                const image = interaction.options.getAttachment('صورة');
+                const title = interaction.options.getString('title');
+                const text = interaction.options.getString('text');
+                const channel = interaction.options.getChannel('channel');
+                const role = interaction.options.getRole('mention_role');
+                const image = interaction.options.getAttachment('image');
 
                 const embed = new EmbedBuilder()
                     .setTitle(title)
                     .setDescription(text)
-                    .setColor(0x1e90ff)
+                    .setColor(0xd4af37)
                     .setFooter({ text: `VORTEX  - إعلان رسمي بواسطة ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                     .setTimestamp();
                 if (image) embed.setImage(image.url);
@@ -2963,19 +2977,19 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'say') {
-                const text = interaction.options.getString('نص');
-                const channel = interaction.options.getChannel('روم') || interaction.channel;
+                const text = interaction.options.getString('text');
+                const channel = interaction.options.getChannel('channel') || interaction.channel;
                 await channel.send({ content: text }).catch(() => {});
                 return interaction.reply({ content: `تم إرسال الرسالة في ${channel}.`, ephemeral: true });
             }
 
             if (interaction.commandName === 'userinfo') {
-                const target = interaction.options.getUser('عضو') || interaction.user;
+                const target = interaction.options.getUser('user') || interaction.user;
                 const member = await interaction.guild.members.fetch(target.id).catch(() => null);
                 const embed = new EmbedBuilder()
                     .setTitle(`معلومات ${target.username}`)
                     .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-                    .setColor(0x1e90ff)
+                    .setColor(0xd4af37)
                     .addFields(
                         { name: 'الاسم الكامل', value: target.tag, inline: true },
                         { name: 'ID', value: target.id, inline: true },
@@ -2995,7 +3009,7 @@ client.on('interactionCreate', async (interaction) => {
                 const embed = new EmbedBuilder()
                     .setTitle(g.name)
                     .setThumbnail(g.iconURL({ dynamic: true }))
-                    .setColor(0x1e90ff)
+                    .setColor(0xd4af37)
                     .addFields(
                         { name: 'المالك', value: `<@${g.ownerId}>`, inline: true },
                         { name: 'عدد الأعضاء', value: `${g.memberCount}`, inline: true },
@@ -3009,13 +3023,104 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (interaction.commandName === 'avatar') {
-                const target = interaction.options.getUser('عضو') || interaction.user;
+                const target = interaction.options.getUser('user') || interaction.user;
                 const embed = new EmbedBuilder()
                     .setTitle(`صورة ${target.username}`)
                     .setImage(target.displayAvatarURL({ dynamic: true, size: 1024 }))
-                    .setColor(0x1e90ff);
+                    .setColor(0xd4af37);
                 return interaction.reply({ embeds: [embed] });
             }
+        }
+
+        // ===== 20 أوامر إدارية إضافية =====
+        const command = interaction.commandName;
+        const reply = (content, ephemeral = false) => interaction.reply({ content, ephemeral });
+        if (command === 'clear') {
+            const amount = interaction.options.getInteger('amount');
+            if (amount < 1 || amount > 100) return reply('العدد يجب أن يكون بين 1 و100.', true);
+            const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
+            return reply(`تم حذف ${deleted?.size || 0} رسالة.`, true);
+        }
+        if (command === 'softban') {
+            const user = interaction.options.getUser('user'); const reason = interaction.options.getString('reason') || 'بدون سبب';
+            const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+            if (!member?.bannable) return reply('لا يمكنني تنفيذ الحظر على هذا العضو.', true);
+            await member.ban({ deleteMessageSeconds: 86400, reason });
+            await interaction.guild.members.unban(user.id, 'Softban مكتمل').catch(() => {});
+            return reply(`تم تنفيذ Softban على ${user.tag}.`);
+        }
+        if (command === 'roleinfo') {
+            const role = interaction.options.getRole('role');
+            return reply(`**${role.name}**\nID: ${role.id}\nالموضع: ${role.position}\nالأعضاء: ${role.members.size}`);
+        }
+        if (command === 'channelinfo') {
+            const channel = interaction.options.getChannel('channel') || interaction.channel;
+            return reply(`**${channel.name}**\nID: ${channel.id}\nالنوع: ${channel.type}\nالفئة: ${channel.parent?.name || 'بدون فئة'}`);
+        }
+        if (command === 'membercount') {
+            const g = interaction.guild; await g.members.fetch().catch(() => {});
+            const bots = g.members.cache.filter(m => m.user.bot).size;
+            return reply(`الأعضاء: **${g.memberCount}**\nالبوتات: **${bots}**\nالبشر: **${g.memberCount - bots}**`);
+        }
+        if (command === 'settopic') {
+            const text = interaction.options.getString('text') || null;
+            if (!interaction.channel.setTopic) return reply('هذه القناة لا تدعم الموضوع.', true);
+            await interaction.channel.setTopic(text); return reply(text ? 'تم تحديث موضوع القناة.' : 'تم حذف موضوع القناة.');
+        }
+        if (command === 'renamechannel') {
+            const channel = interaction.options.getChannel('channel'); const name = interaction.options.getString('name');
+            await channel.setName(name); return reply(`تم تغيير اسم القناة إلى **${name}**.`);
+        }
+        if (command === 'createchannel') {
+            const name = interaction.options.getString('name').toLowerCase().replace(/[^a-z0-9\-_]/g, '-').slice(0, 90) || 'new-channel';
+            const channel = await interaction.guild.channels.create({ name, type: ChannelType.GuildText });
+            return reply(`تم إنشاء القناة ${channel}.`);
+        }
+        if (command === 'deletechannel') {
+            const channel = interaction.options.getChannel('channel'); const name = channel.name;
+            await channel.delete('حذف بأمر إداري'); return reply(`تم حذف القناة **${name}**.`);
+        }
+        if (command === 'setnsfw') {
+            const enabled = interaction.options.getBoolean('enabled'); const channel = interaction.channel;
+            if (!channel.setNSFW) return reply('هذه القناة لا تدعم NSFW.', true);
+            await channel.setNSFW(enabled); return reply(enabled ? 'تم تفعيل NSFW.' : 'تم تعطيل NSFW.');
+        }
+        if (command === 'lockserver' || command === 'unlockserver') {
+            const value = command === 'lockserver' ? false : null; let count = 0;
+            for (const channel of interaction.guild.channels.cache.values()) if (channel.isTextBased() && channel.permissionOverwrites) { await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: value }).catch(() => {}); count++; }
+            return reply(`${command === 'lockserver' ? 'تم قفل' : 'تم فتح'} ${count} قناة.`);
+        }
+        if (command === 'hidechannel' || command === 'showchannel') {
+            const channel = interaction.options.getChannel('channel') || interaction.channel; const value = command === 'showchannel';
+            await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: value }); return reply(value ? 'تم إظهار القناة.' : 'تم إخفاء القناة.');
+        }
+        if (command === 'voicelimit') {
+            const channel = interaction.options.getChannel('channel'); const limit = interaction.options.getInteger('limit');
+            if (![ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(channel.type) || limit < 0 || limit > 99) return reply('اختر قناة صوتية وحدد حدًا بين 0 و99.', true);
+            await channel.setUserLimit(limit); return reply(`تم ضبط الحد إلى **${limit}**.`);
+        }
+        if (command === 'move') {
+            const user = interaction.options.getUser('user'); const channel = interaction.options.getChannel('channel'); const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+            if (!member?.voice?.channel) return reply('العضو ليس في قناة صوتية.', true); if (![ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(channel.type)) return reply('القناة ليست صوتية.', true);
+            await member.voice.setChannel(channel); return reply(`تم نقل ${user} إلى ${channel}.`);
+        }
+        if (command === 'disconnect') {
+            const user = interaction.options.getUser('user'); const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+            if (!member?.voice?.channel) return reply('العضو ليس في قناة صوتية.', true); await member.voice.disconnect(); return reply(`تم فصل ${user} من الصوت.`);
+        }
+        if (command === 'massrole') {
+            const role = interaction.options.getRole('role'); if (role.position >= interaction.guild.members.me.roles.highest.position) return reply('رتبة البوت أقل من الرتبة المطلوبة.', true);
+            await interaction.deferReply({ ephemeral: true }); await interaction.guild.members.fetch(); let count = 0;
+            for (const member of interaction.guild.members.cache.values()) if (!member.user.bot && !member.roles.cache.has(role.id)) { await member.roles.add(role).then(() => count++).catch(() => {}); }
+            return interaction.editReply(`تم إعطاء الرتبة لـ **${count}** عضو.`);
+        }
+        if (command === 'resetnick') {
+            const user = interaction.options.getUser('user'); const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+            if (!member?.manageable) return reply('لا يمكنني تعديل اسم هذا العضو.', true); await member.setNickname(null); return reply(`تم إرجاع اسم ${user}.`);
+        }
+        if (command === 'emojiinfo') {
+            const id = interaction.options.getString('emoji').match(/\d{15,}/)?.[0]; const emoji = id && interaction.guild.emojis.cache.get(id);
+            if (!emoji) return reply('الإيموجي غير موجود في السيرفر.', true); return reply(`**${emoji.name}**\nID: ${emoji.id}\nمتحرك: ${emoji.animated ? 'نعم' : 'لا'}\nالاستخدام: ${emoji}`);
         }
 
         // --- [ Self Roles ] ---
@@ -3239,7 +3344,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
             const replyEmbed = new EmbedBuilder()
                 .setAuthor({ name: `رد الإدارة - ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
                 .setDescription(replyText)
-                .setColor(0x1e90ff)
+                .setColor(0xd4af37)
                 .setTimestamp();
             await thread.send({ embeds: [replyEmbed] });
 
@@ -3306,7 +3411,7 @@ async function openTicket(interaction, tConfig, ticketType) {
         const embed = new EmbedBuilder()
             .setTitle(`تكت ${ticketType} | #${ticketCount}`)
             .setDescription(`مرحباً ${interaction.user}!\n\nالإدارة ستتواصل معك قريباً. يرجى شرح مشكلتك بالتفصيل.`)
-            .setColor(0x1e90ff)
+            .setColor(0xd4af37)
             .addFields(
                 { name: 'صاحب التكت', value: `${interaction.user}`, inline: true },
                 { name: 'النوع', value: ticketType, inline: true }
@@ -3355,59 +3460,94 @@ async function openTicket(interaction, tConfig, ticketType) {
 // 14. Kick Live Checker
 // ==========================================
 
-async function checkKickLive() {
+let kickCheckRunning = false;
+
+function normalizeKickUsername(value) {
+    return String(value || '')
+        .trim()
+        .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+        .replace(/^@/, '')
+        .replace(/\?.*$/, '')
+        .replace(/\/$/, '')
+        .toLowerCase();
+}
+
+async function fetchKickChannel(username) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
-        const allConfigs = await KickConfig.find({});
+        const headers = { Accept: 'application/json', 'User-Agent': 'VORTEX-Bot/2.0' };
+        for (const version of ['v2', 'v1']) {
+            const response = await fetch(`https://kick.com/api/${version}/channels/${encodeURIComponent(username)}`, {
+                headers, signal: controller.signal
+            });
+            if (response.ok) return await response.json();
+            if (response.status === 404) return null;
+        }
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function checkKickLive() {
+    if (kickCheckRunning) return;
+    kickCheckRunning = true;
+    try {
+        const allConfigs = await KickConfig.find({ 'streamers.0': { $exists: true } });
         for (const config of allConfigs) {
-            if (!config.streamers || config.streamers.length === 0) continue;
             const guild = client.guilds.cache.get(config.guildId);
             if (!guild) continue;
-            for (let i = 0; i < config.streamers.length; i++) {
-                const streamer = config.streamers[i];
-                if (!streamer.kickUsername) continue;
+            let changed = false;
+            for (const streamer of config.streamers) {
+                const username = normalizeKickUsername(streamer.kickUsername);
+                if (!username) continue;
                 try {
-                    let data = null;
-                    const response = await fetch(`https://kick.com/api/v2/channels/${streamer.kickUsername}`, {
-                        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-                    });
-                    if (response.ok) data = await response.json();
-                    else {
-                        const resV1 = await fetch(`https://kick.com/api/v1/channels/${streamer.kickUsername}`, {
-                            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-                        });
-                        if (resV1.ok) data = await resV1.json();
-                    }
-                    if (!data) continue;
-                    const livestream = data?.livestream || data?.data?.livestream;
-                    const isLive = livestream !== null && livestream !== undefined;
-                    if (isLive && !streamer.isLive) {
-                        config.streamers[i].isLive = true;
-                        config.markModified('streamers'); await config.save();
-                        const channel = guild.channels.cache.get(streamer.channelId);
-                        if (!channel) continue;
+                    const data = await fetchKickChannel(username);
+                    const livestream = data?.livestream ?? data?.data?.livestream ?? null;
+                    const isLive = Boolean(livestream && (livestream.id || livestream.session_title || livestream.viewer_count !== undefined));
+                    const channel = guild.channels.cache.get(streamer.channelId);
+
+                    // Send first, then persist state. This prevents a transient Discord/API failure from losing the alert forever.
+                    if (isLive && !streamer.isLive && channel?.isTextBased()) {
                         const embed = new EmbedBuilder()
-                            .setTitle(`${streamer.kickUsername} بدأ البث المباشر`)
-                            .setDescription((streamer.customMessage || '%name% بدأ البث الآن!').replace(/%name%/g, streamer.kickUsername))
-                            .setURL(`https://kick.com/${streamer.kickUsername}`)
+                            .setTitle(`${username} بدأ البث المباشر`)
+                            .setDescription((streamer.customMessage || '%name% بدأ البث الآن!').replace(/%name%/g, username))
+                            .setURL(`https://kick.com/${username}`)
                             .setColor(0x53fc18)
                             .addFields(
-                                { name: 'عنوان البث', value: livestream.session_title || 'بث مباشر', inline: true },
-                                { name: 'المشاهدون', value: `${livestream.viewer_count || 0}`, inline: true }
+                                { name: 'عنوان البث', value: String(livestream.session_title || 'بث مباشر').slice(0, 1024), inline: true },
+                                { name: 'المشاهدون', value: `${livestream.viewer_count ?? 0}`, inline: true }
                             ).setTimestamp();
-                        const thumb = data.user?.profile_pic || livestream.thumbnail?.url;
+                        const thumb = data?.user?.profile_pic || livestream.thumbnail?.url || (typeof livestream.thumbnail === 'string' ? livestream.thumbnail : null);
                         if (thumb) embed.setThumbnail(thumb);
-                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : '';
-                        await channel.send({ content: mention || undefined, embeds: [embed] });
+                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
+                        await channel.send({ content: mention, embeds: [embed] });
+                        streamer.isLive = true;
+                        streamer.kickUsername = username;
+                        changed = true;
                     } else if (!isLive && streamer.isLive) {
-                        config.streamers[i].isLive = false;
-                        config.markModified('streamers'); await config.save();
+                        streamer.isLive = false;
+                        streamer.kickUsername = username;
+                        changed = true;
                     }
-                } catch (err) {}
+                } catch (err) {
+                    console.error(`[Kick] ${username}:`, err.name === 'AbortError' ? 'request timeout' : err.message);
+                }
+            }
+            if (changed) {
+                config.markModified('streamers');
+                await config.save();
             }
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error('[Kick Checker Error]', err.message);
+    } finally {
+        kickCheckRunning = false;
+    }
 }
-setInterval(checkKickLive, 25000);
+
+setInterval(checkKickLive, Number(process.env.KICK_CHECK_INTERVAL_MS || 30000));
 
 
 // ==========================================
@@ -3431,45 +3571,45 @@ async function registerSlashCommands() {
         // ===== 20 أمر إشراف قوية =====
         new SlashCommandBuilder().setName('ban').setDescription('حظر عضو من السيرفر')
             .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب حظره').setRequired(true))
-            .addStringOption(o => o.setName('سبب').setDescription('سبب الحظر').setRequired(false)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب حظره').setRequired(true))
+            .addStringOption(o => o.setName('reason').setDescription('سبب الحظر').setRequired(false)),
 
         new SlashCommandBuilder().setName('unban').setDescription('فك حظر عضو عبر الـ ID')
             .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
             .addStringOption(o => o.setName('id').setDescription('ID العضو').setRequired(true))
-            .addStringOption(o => o.setName('سبب').setDescription('سبب فك الحظر').setRequired(false)),
+            .addStringOption(o => o.setName('reason').setDescription('سبب فك الحظر').setRequired(false)),
 
         new SlashCommandBuilder().setName('kick').setDescription('طرد عضو من السيرفر')
             .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب طرده').setRequired(true))
-            .addStringOption(o => o.setName('سبب').setDescription('سبب الطرد').setRequired(false)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب طرده').setRequired(true))
+            .addStringOption(o => o.setName('reason').setDescription('سبب الطرد').setRequired(false)),
 
         new SlashCommandBuilder().setName('timeout').setDescription('كتم عضو (تايم اوت) لفترة محددة')
             .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب كتمه').setRequired(true))
-            .addIntegerOption(o => o.setName('دقائق').setDescription('مدة الكتم بالدقائق').setRequired(true))
-            .addStringOption(o => o.setName('سبب').setDescription('سبب الكتم').setRequired(false)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب كتمه').setRequired(true))
+            .addIntegerOption(o => o.setName('minutes').setDescription('مدة الكتم بالدقائق').setRequired(true))
+            .addStringOption(o => o.setName('reason').setDescription('سبب الكتم').setRequired(false)),
 
         new SlashCommandBuilder().setName('untimeout').setDescription('فك الكتم عن عضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب فك كتمه').setRequired(true)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب فك كتمه').setRequired(true)),
 
         new SlashCommandBuilder().setName('warn').setDescription('توجيه تحذير لعضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب تحذيره').setRequired(true))
-            .addStringOption(o => o.setName('سبب').setDescription('سبب التحذير').setRequired(true)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب تحذيره').setRequired(true))
+            .addStringOption(o => o.setName('reason').setDescription('سبب التحذير').setRequired(true)),
 
         new SlashCommandBuilder().setName('warnings').setDescription('عرض تحذيرات عضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب عرض تحذيراته').setRequired(true)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب عرض تحذيراته').setRequired(true)),
 
         new SlashCommandBuilder().setName('clearwarns').setDescription('مسح كل تحذيرات عضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب مسح تحذيراته').setRequired(true)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب مسح تحذيراته').setRequired(true)),
 
         new SlashCommandBuilder().setName('purge').setDescription('حذف عدد من الرسائل من الروم')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-            .addIntegerOption(o => o.setName('عدد').setDescription('عدد الرسائل (1-100)').setRequired(true)),
+            .addIntegerOption(o => o.setName('amount').setDescription('عدد الرسائل (1-100)').setRequired(true)),
 
         new SlashCommandBuilder().setName('lock').setDescription('قفل الروم الحالي عن الأعضاء')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
@@ -3479,43 +3619,105 @@ async function registerSlashCommands() {
 
         new SlashCommandBuilder().setName('slowmode').setDescription('ضبط وضع البطء بالروم الحالي')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
-            .addIntegerOption(o => o.setName('ثواني').setDescription('عدد الثواني (0 للإيقاف)').setRequired(true)),
+            .addIntegerOption(o => o.setName('seconds').setDescription('عدد الثواني (0 للإيقاف)').setRequired(true)),
 
         new SlashCommandBuilder().setName('nickname').setDescription('تغيير اسم عضو داخل السيرفر')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(true))
-            .addStringOption(o => o.setName('اسم').setDescription('الاسم الجديد (اتركه فاضي للإرجاع)').setRequired(false)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true))
+            .addStringOption(o => o.setName('name').setDescription('الاسم الجديد (اتركه فاضي للإرجاع)').setRequired(false)),
 
         new SlashCommandBuilder().setName('addrole').setDescription('إعطاء رتبة لعضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(true))
-            .addRoleOption(o => o.setName('رتبة').setDescription('الرتبة المطلوب إعطاؤها').setRequired(true)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true))
+            .addRoleOption(o => o.setName('role').setDescription('الرتبة المطلوب إعطاؤها').setRequired(true)),
 
         new SlashCommandBuilder().setName('removerole').setDescription('سحب رتبة من عضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(true))
-            .addRoleOption(o => o.setName('رتبة').setDescription('الرتبة المطلوب سحبها').setRequired(true)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true))
+            .addRoleOption(o => o.setName('role').setDescription('الرتبة المطلوب سحبها').setRequired(true)),
 
         new SlashCommandBuilder().setName('announce').setDescription('نشر إعلان رسمي بالسيرفر')
             .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-            .addStringOption(o => o.setName('عنوان').setDescription('عنوان الإعلان').setRequired(true))
-            .addStringOption(o => o.setName('نص').setDescription('نص الإعلان').setRequired(true))
-            .addChannelOption(o => o.setName('روم').setDescription('روم النشر').setRequired(true))
-            .addRoleOption(o => o.setName('منشن_رتبة').setDescription('الرتبة المطلوب منشنها').setRequired(false))
-            .addAttachmentOption(o => o.setName('صورة').setDescription('صورة الإعلان').setRequired(false)),
+            .addStringOption(o => o.setName('title').setDescription('عنوان الإعلان').setRequired(true))
+            .addStringOption(o => o.setName('text').setDescription('نص الإعلان').setRequired(true))
+            .addChannelOption(o => o.setName('channel').setDescription('روم النشر').setRequired(true))
+            .addRoleOption(o => o.setName('mention_role').setDescription('الرتبة المطلوب منشنها').setRequired(false))
+            .addAttachmentOption(o => o.setName('image').setDescription('صورة الإعلان').setRequired(false)),
 
         new SlashCommandBuilder().setName('say').setDescription('إرسال رسالة من البوت لروم محدد')
             .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-            .addStringOption(o => o.setName('نص').setDescription('نص الرسالة').setRequired(true))
-            .addChannelOption(o => o.setName('روم').setDescription('روم الإرسال').setRequired(false)),
+            .addStringOption(o => o.setName('text').setDescription('نص الرسالة').setRequired(true))
+            .addChannelOption(o => o.setName('channel').setDescription('روم الإرسال').setRequired(false)),
 
         new SlashCommandBuilder().setName('userinfo').setDescription('عرض معلومات عن عضو')
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(false)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(false)),
 
         new SlashCommandBuilder().setName('serverinfo').setDescription('عرض معلومات عن السيرفر'),
 
         new SlashCommandBuilder().setName('avatar').setDescription('عرض صورة عضو')
-            .addUserOption(o => o.setName('عضو').setDescription('العضو المطلوب').setRequired(false)),
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(false)),
+
+        new SlashCommandBuilder().setName('clear').setDescription('حذف رسائل حديثة من الروم')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+            .addIntegerOption(o => o.setName('amount').setDescription('العدد من 1 إلى 100').setRequired(true)),
+        new SlashCommandBuilder().setName('softban').setDescription('حظر عضو مع حذف رسائله ثم فك الحظر')
+            .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+            .addUserOption(o => o.setName('user').setDescription('العضو').setRequired(true))
+            .addStringOption(o => o.setName('reason').setDescription('السبب').setRequired(false)),
+        new SlashCommandBuilder().setName('roleinfo').setDescription('عرض معلومات رتبة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+            .addRoleOption(o => o.setName('role').setDescription('الرتبة').setRequired(true)),
+        new SlashCommandBuilder().setName('channelinfo').setDescription('عرض معلومات قناة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addChannelOption(o => o.setName('channel').setDescription('القناة').setRequired(false)),
+        new SlashCommandBuilder().setName('membercount').setDescription('عرض إحصائية الأعضاء')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        new SlashCommandBuilder().setName('settopic').setDescription('تغيير موضوع القناة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addStringOption(o => o.setName('text').setDescription('الموضوع الجديد').setRequired(false)),
+        new SlashCommandBuilder().setName('renamechannel').setDescription('تغيير اسم قناة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addChannelOption(o => o.setName('channel').setDescription('القناة').setRequired(true))
+            .addStringOption(o => o.setName('name').setDescription('الاسم الجديد').setRequired(true)),
+        new SlashCommandBuilder().setName('createchannel').setDescription('إنشاء قناة نصية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addStringOption(o => o.setName('name').setDescription('اسم القناة').setRequired(true)),
+        new SlashCommandBuilder().setName('deletechannel').setDescription('حذف قناة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addChannelOption(o => o.setName('channel').setDescription('القناة').setRequired(true)),
+        new SlashCommandBuilder().setName('setnsfw').setDescription('تفعيل أو تعطيل محتوى NSFW للقناة')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addBooleanOption(o => o.setName('enabled').setDescription('تفعيل').setRequired(true)),
+        new SlashCommandBuilder().setName('lockserver').setDescription('قفل الكتابة في كل القنوات النصية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        new SlashCommandBuilder().setName('unlockserver').setDescription('فتح الكتابة في كل القنوات النصية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        new SlashCommandBuilder().setName('hidechannel').setDescription('إخفاء القناة عن الأعضاء')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addChannelOption(o => o.setName('channel').setDescription('القناة').setRequired(false)),
+        new SlashCommandBuilder().setName('showchannel').setDescription('إظهار القناة للأعضاء')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addChannelOption(o => o.setName('channel').setDescription('القناة').setRequired(false)),
+        new SlashCommandBuilder().setName('voicelimit').setDescription('ضبط حد أعضاء القناة الصوتية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .addChannelOption(o => o.setName('channel').setDescription('القناة الصوتية').setRequired(true))
+            .addIntegerOption(o => o.setName('limit').setDescription('0 إلى 99').setRequired(true)),
+        new SlashCommandBuilder().setName('move').setDescription('نقل عضو إلى قناة صوتية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers)
+            .addUserOption(o => o.setName('user').setDescription('العضو').setRequired(true))
+            .addChannelOption(o => o.setName('channel').setDescription('القناة الصوتية').setRequired(true)),
+        new SlashCommandBuilder().setName('disconnect').setDescription('فصل عضو من القناة الصوتية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.MoveMembers)
+            .addUserOption(o => o.setName('user').setDescription('العضو').setRequired(true)),
+        new SlashCommandBuilder().setName('massrole').setDescription('إعطاء رتبة لكل الأعضاء')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+            .addRoleOption(o => o.setName('role').setDescription('الرتبة').setRequired(true)),
+        new SlashCommandBuilder().setName('resetnick').setDescription('إرجاع أسماء الأعضاء المحدد')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames)
+            .addUserOption(o => o.setName('user').setDescription('العضو').setRequired(true)),
+        new SlashCommandBuilder().setName('emojiinfo').setDescription('عرض معلومات إيموجي')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageEmojisAndStickers)
+            .addStringOption(o => o.setName('emoji').setDescription('ID الإيموجي').setRequired(true)),
     ].map(cmd => cmd.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
