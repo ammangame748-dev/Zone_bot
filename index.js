@@ -522,517 +522,49 @@ app.get('/', (req, res) => res.redirect('/dashboard'));
 // 8. UI Helper Function
 // ==========================================
 function ui(guild, active, content) {
-    const showNav = guild.id ? 'flex' : 'none';
-    const guildName = guild.name || 'قائمة السيرفرات';
-
-    const navItems = guild.id ? `
-        <a class="${active === 'home' ? 'active' : ''}" href="/manage/${guild.id}/home">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-            الإحصائيات
-        </a>
-        <a class="${active === 'security' ? 'active' : ''}" href="/manage/${guild.id}/security">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            الحماية
-        </a>
-        
-        <a class="${active === 'kick' ? 'active' : ''}" href="/manage/${guild.id}/kick">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="var(--dark)"/></svg>
-            تنبيهات Kick
-        </a>
-        <a class="${active === 'admincmds' ? 'active' : ''}" href="/manage/${guild.id}/admincmds">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            الأوامر الإدارية
-        </a>
-        <a class="${active === 'suggestions' ? 'active' : ''}" href="/manage/${guild.id}/suggestions">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>
-            الاقتراحات
-        </a>
-        <a class="${active === 'logs' ? 'active' : ''}" href="/manage/${guild.id}/logs">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-            اللوق
-        </a>
-        <a class="${active === 'tickets' ? 'active' : ''}" href="/manage/${guild.id}/tickets">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/></svg>
-            التذاكر
-        </a>
-        <a class="${active === 'autoreply' ? 'active' : ''}" href="/manage/${guild.id}/autoreply">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            الرد الآلي
-        </a>
-        <a class="${active === 'levels' ? 'active' : ''}" href="/manage/${guild.id}/levels">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>
-            المستويات
-        </a>
-        <a class="${active === 'welcome' ? 'active' : ''}" href="/manage/${guild.id}/welcome">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            الترحيب
-        </a>
-        <a class="${active === 'giveaway' ? 'active' : ''}" href="/manage/${guild.id}/giveaway">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polyline points="20,12 20,22 4,22 4,12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
-            القيف اواي
-        </a>
-        <a class="${active === 'roles' ? 'active' : ''}" href="/manage/${guild.id}/roles">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            الرتب
-        </a>
-        <a class="${active === 'mod' ? 'active' : ''}" href="/manage/${guild.id}/mod">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            أوامر الإشراف
-        </a>
-    ` : '';
-
-    return `<!DOCTYPE html>
+    const guildId = guild?.id || '';
+    const guildName = guild?.name || 'مساحة الإدارة';
+    const safe = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[ch]));
+    const nav = guildId ? [
+        ['home', 'نظرة عامة', `/manage/${guildId}/home`, '<path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>'],
+        ['security', 'الحماية', `/manage/${guildId}/security`, '<path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/>'],
+        ['kick', 'تنبيهات Kick', `/manage/${guildId}/kick`, '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
+        ['admincmds', 'الأوامر الإدارية', `/manage/${guildId}/admincmds`, '<path d="m4 7 4-4 4 4-4 4zM12 17l4-4 4 4-4 4zM14 7h6M4 17h6"/>'],
+        ['suggestions', 'الاقتراحات', `/manage/${guildId}/suggestions`, '<path d="M20 11a7 7 0 0 1-7 7H8l-4 3v-6a7 7 0 1 1 16-4z"/>'],
+        ['logs', 'السجلات', `/manage/${guildId}/logs`, '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6M9 7h3"/>'],
+        ['tickets', 'التذاكر', `/manage/${guildId}/tickets`, '<path d="M4 7h16v10H4z"/><path d="M8 7v10M16 7v10"/>'],
+        ['autoreply', 'الردود الآلية', `/manage/${guildId}/autoreply`, '<path d="M4 5h16v11H8l-4 3z"/><path d="M8 9h8M8 12h5"/>'],
+        ['levels', 'نظام المستويات', `/manage/${guildId}/levels`, '<path d="M5 19V9M12 19V5M19 19v-8"/>'],
+        ['welcome', 'الترحيب', `/manage/${guildId}/welcome`, '<path d="M12 21s-8-4.5-8-10V5l8-3 8 3v6c0 5.5-8 10-8 10z"/><path d="m9 12 2 2 4-4"/>'],
+        ['giveaway', 'الهدايا', `/manage/${guildId}/giveaway`, '<path d="M4 10h16v10H4zM3 7h18v3H3zM12 7v13M12 7H8a2 2 0 1 1 2-2c2 0 2 2 2 2z"/>'],
+        ['roles', 'الرتب', `/manage/${guildId}/roles`, '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 0 1 5 2M17 20h4"/>'],
+        ['mod', 'الإشراف', `/manage/${guildId}/mod`, '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>']
+    ] : [];
+    const navHtml = nav.map(([key, label, href, path]) => `<a class="rail-link ${active === key ? 'is-active' : ''}" href="${href}" aria-current="${active === key ? 'page' : 'false'}"><svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg><span>${label}</span><i></i></a>`).join('');
+    return `<!doctype html>
 <html dir="rtl" lang="ar">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> VORTEX  | Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Changa:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --gold: #d4af37;
-            --gold-dark: #8b6508;
-            --gold-glow: rgba(212,175,55,0.15);
-            --red: #e63946;
-            --red-light: #ff6b6b;
-            --red-glow: rgba(230,57,70,0.12);
-            --black: #050508;
-            --dark: #0a0a14;
-            --darker: #07070f;
-            --card: rgba(12,12,24,0.75);
-            --card-hover: rgba(18,18,34,0.9);
-            --gold-border: rgba(212,175,55,0.22);
-            --border-red: rgba(230,57,70,0.18);
-            --text: #e8eaf6;
-            --text-muted: rgba(255,255,255,0.45);
-            --sidebar-w: 280px;
-        }
-
-        body {
-            font-family: 'Changa', sans-serif;
-            background: var(--black);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: row-reverse;
-            direction: rtl;
-            animation: pageFadeIn 0.5s ease both;
-        }
-        @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* ===== BACKGROUND ===== */
-        body::before {
-            content: '';
-            position: fixed; inset: 0; z-index: -3;
-            background:
-                radial-gradient(ellipse at 10% 20%, rgba(212,175,55,0.09) 0%, transparent 50%),
-                radial-gradient(ellipse at 90% 80%, rgba(230,57,70,0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 60% 10%, rgba(255,183,3,0.05) 0%, transparent 45%),
-                radial-gradient(ellipse at 50% 50%, rgba(10,10,30,1) 0%, rgba(5,5,8,1) 100%);
-        }
-        body::after {
-            content: '';
-            position: fixed; inset: 0; z-index: -2;
-            background-image:
-                linear-gradient(rgba(212,175,55,0.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(212,175,55,0.025) 1px, transparent 1px);
-            background-size: 60px 60px;
-        }
-        .orb {
-            position: fixed; z-index: -1; border-radius: 50%;
-            filter: blur(60px); opacity: 0.35; pointer-events: none;
-            animation: floatOrb 14s ease-in-out infinite;
-        }
-        .orb-1 { width: 320px; height: 320px; background: var(--gold); top: -80px; right: -60px; animation-delay: 0s; }
-        .orb-2 { width: 260px; height: 260px; background: var(--red); bottom: -60px; left: -40px; animation-delay: 3s; }
-        .orb-3 { width: 200px; height: 200px; background: var(--gold); top: 40%; left: 30%; animation-delay: 6s; opacity: 0.15; }
-        @keyframes floatOrb {
-            0%, 100% { transform: translate(0,0) scale(1); }
-            50% { transform: translate(30px,-30px) scale(1.12); }
-        }
-
-        /* ===== SIDEBAR ===== */
-        .sidebar {
-            width: var(--sidebar-w);
-            background: rgba(7,7,15,0.95);
-            border-left: 1px solid var(--gold-border);
-            position: relative;
-            display: flex; flex-direction: column;
-            z-index: 100;
-            backdrop-filter: blur(20px);
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: var(--gold) transparent;
-            flex-shrink: 0;
-            height: 100vh;
-        }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; }
-
-        .sidebar-header {
-            padding: 30px 20px 20px;
-            border-bottom: 1px solid var(--gold-border);
-            text-align: center;
-            flex-shrink: 0;
-        }
-        .sidebar-logo {
-            font-size: 27px; font-weight: 800; letter-spacing: 3px;
-            background: linear-gradient(135deg, var(--gold), #ffffff 50%, var(--red));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            display: block;
-            animation: logoShimmer 4s ease-in-out infinite alternate;
-        }
-        @keyframes logoShimmer {
-            from { filter: drop-shadow(0 0 8px rgba(212,175,55,0.4)); }
-            to   { filter: drop-shadow(0 0 20px rgba(212,175,55,0.8)); }
-        }
-        .sidebar-tagline {
-            font-size: 10px; letter-spacing: 3px; color: var(--text-muted);
-            margin-top: 4px; text-transform: uppercase;
-        }
-
-        .nav {
-            display: ${showNav};
-            flex-direction: column;
-            gap: 4px;
-            padding: 20px 12px 30px;
-            flex: 1;
-        }
-        .nav a {
-            display: flex; align-items: center; gap: 12px;
-            padding: 12px 16px; border-radius: 12px;
-            color: var(--text-muted); text-decoration: none;
-            font-size: 14px; font-weight: 500;
-            transition: all 0.25s cubic-bezier(.2,.9,.3,1.2);
-            border: 1px solid transparent;
-            position: relative; overflow: hidden;
-        }
-        .nav a svg { flex-shrink: 0; opacity: 0.6; transition: opacity 0.25s; }
-        .nav a:hover {
-            background: var(--gold-glow);
-            color: white;
-            border-color: var(--gold-border);
-            transform: translateX(-4px);
-        }
-        .nav a:hover svg { opacity: 1; }
-        .nav a.active {
-            background: linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.08));
-            color: var(--gold);
-            border-color: rgba(212,175,55,0.4);
-            font-weight: 700;
-            box-shadow: 0 0 18px rgba(212,175,55,0.18) inset;
-        }
-        .nav a.active svg { opacity: 1; color: var(--gold); }
-        .nav a.active::before {
-            content: '';
-            position: absolute; right: 0; top: 20%; bottom: 20%;
-            width: 3px; background: linear-gradient(var(--gold), var(--gold));
-            border-radius: 3px 0 0 3px;
-            animation: pulseBar 1.6s ease-in-out infinite;
-        }
-        @keyframes pulseBar { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-        /* ===== MAIN CONTENT ===== */
-        .main {
-            margin-right: 0;
-            padding: 40px 50px;
-            flex: 1;
-            min-height: 100vh;
-            overflow-y: auto;
-        }
-
-        .page-header {
-            display: flex; align-items: center; gap: 15px;
-            margin-bottom: 35px; padding-bottom: 20px;
-            border-bottom: 1px solid var(--gold-border);
-        }
-        .page-header h1 {
-            font-size: 24px; font-weight: 700; color: white;
-        }
-        .page-header .badge {
-            background: var(--gold-glow); border: 1px solid var(--gold-border);
-            color: var(--gold); padding: 4px 12px; border-radius: 20px; font-size: 12px;
-        }
-
-        /* ===== CARDS ===== */
-        .card {
-            background: var(--card);
-            border: 1px solid var(--gold-border);
-            border-radius: 18px;
-            padding: 28px;
-            margin-bottom: 24px;
-            backdrop-filter: blur(15px);
-            transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .card::before {
-            content: '';
-            position: absolute; top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--gold), var(--gold), transparent);
-            opacity: 0.5;
-        }
-        .card:hover {
-            border-color: rgba(212,175,55,0.4);
-            transform: translateY(-3px);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.35), 0 0 30px rgba(212,175,55,0.08);
-        }
-        .card h3 {
-            color: white; font-size: 17px; font-weight: 700;
-            margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
-        }
-        .card h3 svg { color: var(--gold); }
-
-        /* ===== FORMS ===== */
-        label {
-            display: block; color: var(--text-muted); font-size: 13px;
-            margin-bottom: 6px; margin-top: 16px; font-weight: 500;
-        }
-        input, select, textarea {
-            width: 100%; padding: 12px 16px;
-            background: rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px; color: white;
-            font-family: 'Changa', sans-serif; font-size: 14px;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            outline: none;
-        }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--gold);
-            box-shadow: 0 0 0 3px rgba(212,175,55,0.12);
-        }
-        select option { background: #0d0d1a; color: white; }
-        textarea { resize: vertical; min-height: 100px; }
-
-        /* ===== BUTTONS ===== */
-        .btn-save {
-            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-            color: white; border: none; padding: 13px 24px;
-            border-radius: 12px; cursor: pointer; font-weight: 700;
-            font-size: 14px; font-family: 'Changa', sans-serif;
-            transition: all 0.3s; display: inline-block; text-decoration: none;
-            text-align: center; width: 100%;
-            box-shadow: 0 4px 20px rgba(212,175,55,0.25);
-            position: relative; overflow: hidden;
-        }
-        .btn-save::after {
-            content: ''; position: absolute; top: 0; left: -60%;
-            width: 40%; height: 100%;
-            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
-            transform: skewX(-20deg);
-            transition: left 0.6s ease;
-        }
-        .btn-save:hover::after { left: 130%; }
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(212,175,55,0.4);
-            filter: brightness(1.1);
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, var(--red), #c0392b);
-            box-shadow: 0 4px 20px rgba(230,57,70,0.25);
-        }
-        .btn-danger:hover { box-shadow: 0 8px 30px rgba(230,57,70,0.4); }
-        .btn-sm { padding: 8px 16px; font-size: 13px; width: auto; border-radius: 8px; }
-        .btn-green {
-            background: linear-gradient(135deg, #00c853, #00a040);
-            box-shadow: 0 4px 20px rgba(0,200,83,0.25);
-        }
-
-        /* ===== STAT BOXES ===== */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px; margin-top: 16px;
-        }
-        .stat-box {
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--gold-border);
-            border-radius: 14px; padding: 20px;
-            text-align: center; transition: all 0.3s;
-        }
-        .stat-box:hover { border-color: var(--gold); transform: translateY(-3px); }
-        .stat-box .stat-num { font-size: 36px; font-weight: 800; color: var(--gold); }
-        .stat-box .stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
-
-        /* ===== GUILD GRID (Dashboard) ===== */
-        .guild-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 20px; max-width: 1000px; margin: 0 auto;
-        }
-        .guild-card {
-            background: var(--card);
-            border: 1px solid var(--gold-border);
-            border-radius: 18px; padding: 28px 20px;
-            text-align: center; transition: all 0.35s;
-            cursor: pointer;
-        }
-        .guild-card:hover {
-            transform: translateY(-8px);
-            border-color: var(--gold);
-            box-shadow: 0 20px 50px rgba(212,175,55,0.15);
-        }
-        .guild-icon {
-            width: 75px; height: 75px; border-radius: 50%;
-            border: 2px solid var(--gold-border); margin-bottom: 14px;
-            transition: border-color 0.3s;
-        }
-        .guild-card:hover .guild-icon { border-color: var(--gold); }
-        .guild-card h3 { color: white; font-size: 15px; margin-bottom: 12px; }
-        .guild-card a { font-size: 13px; font-weight: 600; text-decoration: none; }
-
-        /* ===== TABLE ===== */
-        .data-table { width: 100%; border-collapse: collapse; }
-        .data-table th {
-            padding: 12px 16px; text-align: right;
-            color: var(--text-muted); font-size: 12px; font-weight: 600;
-            border-bottom: 1px solid var(--gold-border); text-transform: uppercase; letter-spacing: 1px;
-        }
-        .data-table td {
-            padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-size: 14px; color: var(--text);
-        }
-        .data-table tr:hover td { background: rgba(212,175,55,0.04); }
-
-        /* ===== BADGE ===== */
-        .tag {
-            display: inline-block; padding: 3px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 600;
-        }
-        .tag-blue { background: var(--gold-glow); color: var(--gold); border: 1px solid var(--gold-border); }
-        .tag-red { background: var(--red-glow); color: var(--red-light); border: 1px solid var(--border-red); }
-        .tag-green { background: rgba(0,200,83,0.1); color: #00c853; border: 1px solid rgba(0,200,83,0.2); }
-
-        /* ===== DIVIDER ===== */
-        .section-divider {
-            height: 1px; background: var(--gold-border);
-            margin: 24px 0;
-        }
-
-        /* ===== TOGGLE SWITCH ===== */
-        .toggle-row {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .toggle-row label { margin: 0; color: var(--text); font-size: 14px; }
-
-        /* ===== ANIMATIONS ===== */
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-        .card { animation: fadeInUp 0.4s ease both; }
-        .card:nth-child(2) { animation-delay: 0.05s; }
-        .card:nth-child(3) { animation-delay: 0.1s; }
-        .card:nth-child(4) { animation-delay: 0.15s; }
-
-        /* ===== SCROLLBAR ===== */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
-
-        /* ===== RESPONSIVE ===== */
-        html { overflow-x: hidden; }
-        body { overflow-x: hidden; }
-        .main { min-width: 0; }
-        .card, .guild-card, .data-table { max-width: 100%; }
-        .data-table-wrap, .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .data-table { min-width: 620px; }
-        img { max-width: 100%; }
-
-        @media (max-width: 1100px) {
-            :root { --sidebar-w: 230px; }
-            .main { padding: 30px 24px; }
-            .sidebar { width: var(--sidebar-w); }
-            .guild-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
-        }
-
-        @media (max-width: 768px) {
-            body { display: block; min-height: 100vh; }
-            .sidebar {
-                width: 100%; height: auto; min-height: 0;
-                position: relative; border-left: 0; border-bottom: 1px solid var(--gold-border);
-                overflow: visible;
-            }
-            .sidebar-header { padding: 18px 16px 12px; }
-            .sidebar-logo { font-size: 22px; letter-spacing: 2px; }
-            .sidebar-tagline { font-size: 9px; }
-            .nav {
-                display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 7px; padding: 12px; max-height: 310px; overflow-y: auto;
-            }
-            .nav a { min-width: 0; padding: 10px 9px; gap: 7px; font-size: 12px; justify-content: flex-start; }
-            .nav a svg { width: 16px; height: 16px; }
-            .nav a:hover { transform: none; }
-            .main { width: 100%; margin: 0; padding: 20px 14px 32px; min-height: auto; overflow: visible; }
-            .page-header { flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding-bottom: 14px; }
-            .page-header h1 { font-size: 20px; overflow-wrap: anywhere; }
-            .card { padding: 18px 14px; border-radius: 14px; margin-bottom: 16px; }
-            .card h3 { font-size: 16px; line-height: 1.5; }
-            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-            .stat-box { padding: 14px 8px; }
-            .stat-box .stat-num { font-size: 26px; }
-            .stat-box .stat-label { font-size: 11px; }
-            .guild-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-            .guild-card { padding: 18px 10px; border-radius: 14px; }
-            .guild-icon { width: 58px; height: 58px; margin-bottom: 9px; }
-            .guild-card h3 { font-size: 13px; overflow-wrap: anywhere; }
-            input, select, textarea { font-size: 16px; padding: 11px 12px; }
-            .toggle-row { gap: 12px; align-items: flex-start; }
-            .toggle-row select { width: 52%; }
-            .btn-save { min-height: 46px; padding: 12px 16px; }
-            .btn-sm { min-height: 40px; padding: 8px 12px; }
-            .orb-1 { width: 190px; height: 190px; }
-            .orb-2 { width: 160px; height: 160px; }
-            .orb-3 { display: none; }
-        }
-
-        @media (max-width: 430px) {
-            .nav { grid-template-columns: 1fr 1fr; max-height: 280px; }
-            .nav a { font-size: 11px; padding: 9px 7px; }
-            .nav a svg { width: 14px; height: 14px; }
-            .main { padding: 16px 10px 28px; }
-            .page-header h1 { font-size: 18px; }
-            .card { padding: 15px 11px; }
-            .stats-grid, .guild-grid { grid-template-columns: 1fr 1fr; }
-            .stat-box .stat-num { font-size: 23px; }
-            .guild-card h3 { font-size: 12px; }
-        }
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${safe(guildName)} · VORTEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0c0b09;--panel:#15120e;--panel-2:#1b1711;--panel-3:#231d15;--line:rgba(244,194,76,.15);--line-strong:rgba(244,194,76,.34);--gold:#f4c24c;--gold-2:#b57b19;--red:#e14d43;--red-soft:rgba(225,77,67,.14);--muted:#918a7c;--text:#f5f0e6;--shadow:0 22px 70px rgba(0,0,0,.28);--rail:272px}
+*{box-sizing:border-box}html{background:var(--ink);overflow-x:hidden}body{margin:0;background:radial-gradient(circle at 15% 8%,rgba(244,194,76,.06),transparent 28%),radial-gradient(circle at 90% 80%,rgba(225,77,67,.05),transparent 24%),var(--ink);color:var(--text);font-family:'Cairo',sans-serif;min-height:100vh}body:before{content:'';position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent 88%)}a{color:inherit}.app{min-height:100vh}.rail{position:fixed;z-index:20;inset:0 0 0 auto;width:var(--rail);padding:24px 16px 18px;background:linear-gradient(180deg,rgba(24,19,13,.98),rgba(12,11,9,.98));border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-16px 0 50px rgba(0,0,0,.16)}.brand{display:flex;align-items:center;gap:11px;padding:4px 9px 23px;border-bottom:1px solid var(--line)}.brand-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:linear-gradient(145deg,var(--gold),var(--gold-2));color:#161007;font-size:18px;font-weight:900;box-shadow:0 10px 25px rgba(244,194,76,.18)}.brand strong{display:block;font-size:19px;letter-spacing:2px;line-height:1}.brand small{display:block;color:var(--muted);font-size:9px;letter-spacing:2px;margin-top:5px;font-family:'IBM Plex Mono',monospace}.rail-section{color:#756d61;font:600 10px 'IBM Plex Mono',monospace;letter-spacing:1px;margin:25px 10px 9px;text-transform:uppercase}.rail-nav{display:flex;flex-direction:column;gap:4px;overflow:auto;padding-bottom:10px}.rail-link{min-height:43px;display:flex;align-items:center;gap:12px;padding:9px 11px;border:1px solid transparent;border-radius:12px;text-decoration:none;color:#a59c8d;font-size:12px;font-weight:600;transition:.2s ease}.rail-link svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}.rail-link i{width:5px;height:5px;border-radius:50%;margin-right:auto;background:transparent}.rail-link:hover{background:rgba(244,194,76,.07);color:var(--text);transform:translateX(-3px)}.rail-link.is-active{background:linear-gradient(90deg,rgba(244,194,76,.16),rgba(244,194,76,.045));border-color:var(--line);color:var(--gold);box-shadow:inset -3px 0 var(--gold)}.rail-link.is-active i{background:var(--gold);box-shadow:0 0 12px var(--gold)}.rail-footer{margin-top:auto;padding:15px 10px 0;border-top:1px solid var(--line);color:var(--muted);font-size:10px}.rail-footer a{color:var(--red);text-decoration:none;float:left}.workspace{margin-right:var(--rail);min-width:0}.topbar{height:78px;padding:0 42px;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--line);background:rgba(12,11,9,.72);backdrop-filter:blur(18px);position:sticky;top:0;z-index:10}.menu-btn{display:none;border:1px solid var(--line);background:var(--panel);color:var(--gold);border-radius:11px;width:42px;height:42px;font-size:20px}.crumb{color:var(--muted);font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.5px}.crumb b{display:block;color:var(--text);font:700 18px 'Cairo',sans-serif;margin-top:2px}.top-status{margin-right:auto;display:flex;align-items:center;gap:8px;color:#b4ad9f;font-size:11px}.status-dot{width:7px;height:7px;border-radius:50%;background:#48c774;box-shadow:0 0 12px #48c774}.top-actions{display:flex;gap:8px}.top-actions a{display:grid;place-items:center;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;color:var(--muted);text-decoration:none;background:rgba(255,255,255,.015)}.top-actions a:hover{color:var(--gold);border-color:var(--line-strong)}.content{padding:38px 42px 60px;max-width:1500px;margin:auto}.welcome-strip{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:30px;padding:31px 34px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(110deg,rgba(244,194,76,.11),rgba(23,18,12,.88) 45%),var(--panel);box-shadow:var(--shadow);position:relative;overflow:hidden}.welcome-strip:after{content:'V';position:absolute;left:27px;top:-42px;color:rgba(244,194,76,.055);font:900 180px 'IBM Plex Mono',monospace}.eyebrow{color:var(--gold);font:600 10px 'IBM Plex Mono',monospace;letter-spacing:1.5px;text-transform:uppercase}.welcome-strip h1{margin:8px 0 3px;font-size:29px;letter-spacing:-.5px}.welcome-strip p{margin:0;color:var(--muted);font-size:12px}.welcome-meta{position:relative;z-index:1;text-align:left;color:var(--muted);font:500 10px 'IBM Plex Mono',monospace}.view{min-width:0}.card{background:linear-gradient(145deg,rgba(35,29,21,.88),rgba(18,15,11,.92));border:1px solid var(--line);border-radius:18px;padding:25px;margin-bottom:20px;box-shadow:0 12px 40px rgba(0,0,0,.14)}.card:hover{border-color:var(--line-strong)}.card h3{display:flex;align-items:center;gap:10px;margin:0 0 20px;font-size:16px;color:var(--text)}.card h3 svg{width:19px;color:var(--gold)}label{display:block;color:#b6ad9d;font-size:12px;margin:15px 0 7px}input,select,textarea{width:100%;padding:12px 14px;color:var(--text);background:#0f0d0a;border:1px solid rgba(255,255,255,.09);border-radius:10px;outline:0;font:500 13px 'Cairo',sans-serif;transition:.2s}input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(244,194,76,.1)}textarea{min-height:105px;resize:vertical}.btn-save{border:0;border-radius:10px;padding:12px 21px;background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#171006;font:800 12px 'Cairo',sans-serif;cursor:pointer;box-shadow:0 8px 20px rgba(244,194,76,.12);transition:.2s}.btn-save:hover{transform:translateY(-2px);filter:brightness(1.08)}.btn-danger{background:var(--red)!important;color:#fff!important}.tag{display:inline-flex;align-items:center;border-radius:20px;padding:4px 9px;font-size:10px}.tag-blue{background:rgba(244,194,76,.12);color:var(--gold);border:1px solid var(--line)}.tag-red{background:var(--red-soft);color:#f0837b;border:1px solid rgba(225,77,67,.2)}.data-table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--line);border-radius:13px;font-size:12px}.data-table th{background:rgba(244,194,76,.07);color:var(--gold);font-size:10px;text-align:right;padding:13px}.data-table td{padding:13px;border-top:1px solid rgba(255,255,255,.055);color:#c8c0b2}.data-table-wrap{overflow:auto}.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.stat-box{padding:20px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.018)}.stat-num{color:var(--gold);font:800 28px 'IBM Plex Mono',monospace}.stat-label{color:var(--muted);font-size:11px;margin-top:5px}.guild-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}.guild-card{padding:21px;border:1px solid var(--line);border-radius:17px;background:var(--panel);transition:.2s}.guild-card:hover{transform:translateY(-4px);border-color:var(--gold)}.guild-icon{width:48px;height:48px;border-radius:14px;object-fit:cover;margin-bottom:14px}.guild-card h3{margin:0 0 12px;font-size:15px}.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.06)}.toggle-row input[type=checkbox]{width:19px;height:19px;accent-color:var(--gold)}.drawer-backdrop{display:none}
+@media(max-width:950px){:root{--rail:245px}.content{padding:28px 24px}.topbar{padding:0 24px}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.rail{transform:translateX(110%);transition:transform .25s ease;width:min(300px,88vw);box-shadow:-25px 0 80px rgba(0,0,0,.5)}.rail.is-open{transform:translateX(0)}.workspace{margin-right:0}.menu-btn{display:block}.topbar{height:67px;padding:0 15px}.top-status,.top-actions a:first-child{display:none}.crumb b{font-size:15px}.content{padding:18px 13px 35px}.welcome-strip{display:block;padding:22px 20px}.welcome-strip h1{font-size:23px}.welcome-meta{text-align:right;margin-top:16px}.stats-grid{grid-template-columns:1fr 1fr;gap:9px}.stat-box{padding:15px}.stat-num{font-size:21px}.card{padding:18px 14px;border-radius:14px}.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:15}.drawer-backdrop.is-open{display:block}}
+</style>
 </head>
 <body>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <span class="sidebar-logo">VORTEX 
- <span style="-webkit-text-fill-color:var(--gold); background:none;">SYSTEM</span></span>
-            <div class="sidebar-tagline">Bot Dashboard</div>
-        </div>
-        <nav class="nav">
-            ${navItems}
-        </nav>
-    </div>
-    <div class="main">
-        <div class="page-header">
-            <h1>${guildName}</h1>
-            ${guild.id ? `<span class="badge">مدير</span>` : ''}
-        </div>
-        ${content}
-    </div>
-</body>
-</html>`;
+<div class="app">
+<aside class="rail" id="rail"><div class="brand"><div class="brand-mark">V</div><div><strong>VORTEX</strong><small>CONTROL CENTER</small></div></div>${guildId ? '<div class="rail-section">Workspace</div><nav class="rail-nav">'+navHtml+'</nav>' : ''}<div class="rail-footer">${guildId ? safe(guildName) : 'إدارة السيرفرات'}<a href="/logout">خروج</a></div></aside>
+<div class="drawer-backdrop" id="backdrop"></div>
+<section class="workspace"><header class="topbar"><button class="menu-btn" id="menuBtn" aria-label="فتح القائمة">☰</button><div class="crumb"><span>VORTEX / DASHBOARD</span><b>${safe(guildName)}</b></div><div class="top-status"><span class="status-dot"></span> النظام متصل</div><div class="top-actions"><a href="/dashboard" title="السيرفرات">⌂</a><a href="/logout" title="تسجيل الخروج">↪</a></div></header><main class="content"><section class="welcome-strip"><div><div class="eyebrow">ADMINISTRATIVE WORKSPACE</div><h1>${safe(guildName)}</h1><p>تحكم بكل أنظمة السيرفر من مساحة واحدة واضحة وسريعة.</p></div><div class="welcome-meta">LIVE / ${new Date().toLocaleDateString('en-GB')}</div></section><div class="view">${content}</div></main></section>
+</div>
+<script>
+(() => { const rail=document.getElementById('rail'), backdrop=document.getElementById('backdrop'), btn=document.getElementById('menuBtn'); if(!rail||!backdrop||!btn)return; const close=()=>{rail.classList.remove('is-open');backdrop.classList.remove('is-open')}; btn.addEventListener('click',()=>{rail.classList.toggle('is-open');backdrop.classList.toggle('is-open')}); backdrop.addEventListener('click',close); window.addEventListener('keydown',e=>{if(e.key==='Escape')close()}); })();
+</script>
+</body></html>`;
 }
-
-
-
-// ==========================================
-// 9. Dashboard Routes
-// ==========================================
 
 // --- [ Dashboard - Admin Commands ] ---
 app.get('/manage/:guildId/admincmds', checkAuth, async (req, res) => {
@@ -1427,82 +959,51 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     let img = s.welcome?.imagePath || 'https://placehold.co/800x400?text=No+Background';
 
     const content = `
-    <style>
-        .preview-container { position:relative; border:1px solid var(--gold-border); border-radius:14px; overflow:hidden; background:#000; width:100%; aspect-ratio:2/1; user-select:none; }
-        #previewAvatar { position:absolute; border:3px solid #fff; border-radius:50%; background-size:100% 100%; cursor:move; box-shadow:0 0 15px rgba(0,0,0,0.5); }
-        .resizer { width:12px; height:12px; background:var(--gold); position:absolute; border-radius:50%; cursor:se-resize; }
-        .resizer.br { bottom:-6px; right:-6px; }
-    </style>
-    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data">
-        <div class="card">
-            <h3>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                إعدادات الترحيب
-            </h3>
-
-            <div class="toggle-row">
-                <label style="color:white; margin:0;">تفعيل نظام الترحيب</label>
-                <input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--gold); cursor:pointer;">
-            </div>
-
-            <label>قناة الترحيب</label>
-            <select name="channel">
-                <option value="">-- اختر القناة --</option>
-                ${g.channels.cache.filter(c => c.type === 0).map(c =>
-                    `<option value="${c.id}" ${s.welcome?.channel === c.id ? 'selected' : ''}># ${c.name}</option>`
-                ).join('')}
-            </select>
-
-            <label>رسالة الترحيب (استخدم {member} {guild} {count})</label>
-            <textarea name="embedMessage">${s.welcome?.embedMessage || 'مرحباً بك {member} في سيرفر {guild}!'}</textarea>
-
-            <label>صورة الخلفية</label>
-            <input type="file" name="bgImage" accept="image/*" style="padding:10px;">
-
-            <div class="preview-container" id="previewContainer">
-                <img src="${img}" id="bgPreview" style="width:100%; height:100%; object-fit:cover; position:absolute;">
-                <div id="previewAvatar" style="width:${s.welcome?.avatarWidth || 150}px; height:${s.welcome?.avatarHeight || 150}px; left:calc(${(s.welcome?.avatarX || 50)}% - ${(s.welcome?.avatarWidth || 150) / 2}px); top:calc(${(s.welcome?.avatarY || 50)}% - ${(s.welcome?.avatarHeight || 150) / 2}px); background-image:url('${client.user?.displayAvatarURL() || ''}'); background-size: cover; background-position: center;">
-                    <div class="resizer br" id="resizer"></div>
+    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" class="welcome-editor">
+        <div class="editor-grid">
+            <div class="card designer-card">
+                <div class="editor-heading"><div><div class="eyebrow">WELCOME BUILDER</div><h2>صمّم بطاقة الترحيب</h2><p>حرّك الصورة أو استخدم أدوات التحكم الدقيقة. التغيير يظهر مباشرة داخل المعاينة.</p></div><span class="editor-badge">LIVE PREVIEW</span></div>
+                <div class="welcome-preview" id="previewContainer">
+                    <img src="${img}" id="bgPreview" alt="خلفية المعاينة">
+                    <div class="preview-shade"></div><div class="preview-copy"><span>WELCOME</span><strong>{member}</strong><small>إلى ${g.name}</small></div>
+                    <div id="previewAvatar" class="preview-avatar" style="width:${s.welcome?.avatarWidth || 150}px;height:${s.welcome?.avatarHeight || 150}px;left:calc(${s.welcome?.avatarX || 50}% - ${(s.welcome?.avatarWidth || 150)/2}px);top:calc(${s.welcome?.avatarY || 50}% - ${(s.welcome?.avatarHeight || 150)/2}px);background-image:url('${client.user?.displayAvatarURL() || ''}')"><button type="button" id="avatarHandle" aria-label="تحريك الصورة">✥</button></div>
+                </div>
+                <div class="range-controls">
+                    <label>حجم الصورة <output id="sizeOutput">${s.welcome?.avatarWidth || 150}px</output><input id="sizeSlider" type="range" min="70" max="320" value="${s.welcome?.avatarWidth || 150}"></label>
+                    <label>الموضع الأفقي <output id="xOutput">${s.welcome?.avatarX || 50}%</output><input id="xSlider" type="range" min="0" max="100" value="${s.welcome?.avatarX || 50}"></label>
+                    <label>الموضع العمودي <output id="yOutput">${s.welcome?.avatarY || 50}%</output><input id="ySlider" type="range" min="0" max="100" value="${s.welcome?.avatarY || 50}"></label>
                 </div>
             </div>
-            <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}">
-            <input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}">
-            <input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}">
-            <input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
-
-            <button class="btn-save" style="margin-top:20px;">حفظ الإعدادات</button>
+            <div class="card settings-card">
+                <div class="card-title"><span class="title-icon">✦</span><h3>إعدادات المحتوى</h3></div>
+                <div class="toggle-row"><label style="margin:0;color:var(--text)">تفعيل الترحيب</label><input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''}></div>
+                <label>قناة الترحيب</label><select name="channel"><option value="">-- اختر القناة --</option>${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}" ${s.welcome?.channel===c.id?'selected':''}># ${c.name}</option>`).join('')}</select>
+                <label>رسالة الترحيب</label><textarea name="embedMessage" placeholder="استخدم {member} و {guild} و {count}">${s.welcome?.embedMessage || 'مرحباً بك {member} في سيرفر {guild}!'}</textarea>
+                <label>خلفية البطاقة</label><input type="file" name="bgImage" accept="image/*" id="bgInput">
+                <div class="upload-note">PNG أو JPG · يفضل مقاس 1600×800</div>
+                <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}"><input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}"><input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}"><input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
+                <button class="btn-save" type="submit" style="width:100%;margin-top:20px">حفظ بطاقة الترحيب</button>
+            </div>
         </div>
     </form>
+    <style>
+      .editor-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(290px,.8fr);gap:20px}.designer-card{padding:25px}.editor-heading{display:flex;justify-content:space-between;gap:15px;margin-bottom:20px}.editor-heading h2{margin:6px 0 4px;font-size:21px}.editor-heading p{color:var(--muted);font-size:11px;margin:0}.editor-badge{height:max-content;padding:5px 9px;border-radius:20px;border:1px solid var(--line);color:var(--gold);font:600 9px 'IBM Plex Mono',monospace}.welcome-preview{position:relative;isolation:isolate;width:100%;aspect-ratio:2/1;overflow:hidden;border-radius:15px;background:#090806;border:1px solid var(--line);touch-action:none}.welcome-preview #bgPreview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.preview-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.68),rgba(0,0,0,.08))}.preview-copy{position:absolute;right:7%;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;color:#fff}.preview-copy span{font:600 10px 'IBM Plex Mono',monospace;letter-spacing:3px;color:var(--gold)}.preview-copy strong{font-size:32px;line-height:1.25}.preview-copy small{font-size:11px;color:#d2cabb}.preview-avatar{position:absolute;border:3px solid var(--gold);border-radius:50%;background-size:cover;background-position:center;cursor:grab;box-shadow:0 0 0 5px rgba(244,194,76,.14),0 10px 28px rgba(0,0,0,.4);touch-action:none;z-index:2}.preview-avatar:active{cursor:grabbing}.preview-avatar button{position:absolute;right:-9px;bottom:-9px;width:25px;height:25px;border:2px solid var(--gold);border-radius:50%;background:#171006;color:var(--gold);cursor:grab}.range-controls{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.range-controls label{margin:0;color:#b6ad9d;font-size:11px}.range-controls output{float:left;color:var(--gold);font:600 10px 'IBM Plex Mono',monospace}.range-controls input{padding:0;height:20px;margin-top:9px;background:transparent;border:0;box-shadow:none;accent-color:var(--gold)}.settings-card .card-title{display:flex;align-items:center;gap:9px}.settings-card .card-title h3{margin:0}.title-icon{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:rgba(244,194,76,.12);color:var(--gold)}.upload-note{color:var(--muted);font-size:10px;margin-top:7px}@media(max-width:850px){.editor-grid{grid-template-columns:1fr}.range-controls{grid-template-columns:1fr 1fr}.preview-copy strong{font-size:26px}}@media(max-width:500px){.range-controls{grid-template-columns:1fr}.editor-heading{display:block}.editor-badge{display:inline-block;margin-top:12px}}
+    </style>
     <script>
-        const container = document.getElementById('previewContainer');
-        const avatar = document.getElementById('previewAvatar');
-        const bgPreview = document.getElementById('bgPreview');
-        let dragging = false, resizing = false, startX, startY, startW, startH, startLeft, startTop;
-
-        avatar.addEventListener('mousedown', e => { if (e.target.id === 'resizer') return; dragging = true; startX = e.clientX - avatar.getBoundingClientRect().left; startY = e.clientY - avatar.getBoundingClientRect().top; e.preventDefault(); });
-        document.getElementById('resizer').addEventListener('mousedown', e => { resizing = true; startX = e.clientX; startY = e.clientY; startW = avatar.offsetWidth; startH = avatar.offsetHeight; e.preventDefault(); e.stopPropagation(); });
-        document.addEventListener('mousemove', e => {
-            if (dragging) {
-                const rect = container.getBoundingClientRect();
-                let newLeft = Math.max(0, Math.min(e.clientX - rect.left - startX, container.offsetWidth - avatar.offsetWidth));
-                let newTop = Math.max(0, Math.min(e.clientY - rect.top - startY, container.offsetHeight - avatar.offsetHeight));
-                avatar.style.left = newLeft + 'px'; avatar.style.top = newTop + 'px';
-                document.getElementById('avatarX').value = Math.round(((newLeft + avatar.offsetWidth/2) / container.offsetWidth) * 100);
-                document.getElementById('avatarY').value = Math.round(((newTop + avatar.offsetHeight/2) / container.offsetHeight) * 100);
-            }
-            if (resizing) {
-                let newW = Math.max(50, startW + (e.clientX - startX)); let newH = Math.max(50, startH + (e.clientY - startY));
-                avatar.style.width = newW + 'px'; avatar.style.height = newH + 'px';
-                document.getElementById('avatarWidth').value = newW; document.getElementById('avatarHeight').value = newH;
-            }
-        });
-        document.addEventListener('mouseup', () => { dragging = false; resizing = false; });
-        document.querySelector('input[name="bgImage"]').addEventListener('change', e => {
-            const file = e.target.files[0]; if (!file) return;
-            const reader = new FileReader(); reader.onload = ev => { bgPreview.src = ev.target.result; }; reader.readAsDataURL(file);
-        });
+    (() => {
+      const box=document.getElementById('previewContainer'), avatar=document.getElementById('previewAvatar'), handle=document.getElementById('avatarHandle'), bg=document.getElementById('bgInput');
+      const x=document.getElementById('xSlider'), y=document.getElementById('ySlider'), size=document.getElementById('sizeSlider'); const hx=document.getElementById('avatarX'), hy=document.getElementById('avatarY'), hw=document.getElementById('avatarWidth'), hh=document.getElementById('avatarHeight');
+      const xo=document.getElementById('xOutput'), yo=document.getElementById('yOutput'), so=document.getElementById('sizeOutput');
+      const paint=()=>{const w=Number(size.value); avatar.style.width=w+'px';avatar.style.height=w+'px';avatar.style.left='calc('+x.value+'% - '+(w/2)+'px)';avatar.style.top='calc('+y.value+'% - '+(w/2)+'px)';hx.value=x.value;hy.value=y.value;hw.value=w;hh.value=w;xo.value=x.value+'%';yo.value=y.value+'%';so.value=w+'px'};
+      [x,y,size].forEach(el=>el.addEventListener('input',paint));
+      bg.addEventListener('change',()=>{const file=bg.files?.[0];if(file)bgPreview.src=URL.createObjectURL(file)});
+      let drag=null;
+      const point=e=>e.touches?e.touches[0]:e;
+      const down=e=>{if(e.target===handle)e.preventDefault(); const p=point(e), r=box.getBoundingClientRect(); drag={ox:p.clientX-r.left,oy:p.clientY-r.top,x:Number(x.value),y:Number(y.value)}; avatar.setPointerCapture?.(e.pointerId);};
+      const move=e=>{if(!drag)return; const p=point(e), r=box.getBoundingClientRect(); x.value=Math.max(0,Math.min(100,drag.x+(p.clientX-(r.left+drag.ox))/r.width*100)); y.value=Math.max(0,Math.min(100,drag.y+(p.clientY-(r.top+drag.oy))/r.height*100)); paint()};
+      const up=()=>drag=null; avatar.addEventListener('pointerdown',down); avatar.addEventListener('pointermove',move); avatar.addEventListener('pointerup',up); avatar.addEventListener('pointercancel',up); paint();
+    })();
     </script>`;
-
     res.send(ui(g, 'welcome', content));
 });
 
