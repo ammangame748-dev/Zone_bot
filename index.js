@@ -45,7 +45,8 @@ const KickConfig = mongoose.model('KickConfig', new mongoose.Schema({
         channelId: String,
         roleId: String,
         customMessage: String,
-        isLive: { type: Boolean, default: false }
+        isLive: { type: Boolean, default: false },
+        lastCategoryName: { type: String, default: null }
     }]
 }));
 
@@ -2890,6 +2891,7 @@ async function checkKickLive() {
                     const data = await fetchKickChannel(username);
                     const livestream = data?.livestream ?? data?.data?.livestream ?? null;
                     const isLive = Boolean(livestream && (livestream.id || livestream.session_title || livestream.viewer_count !== undefined));
+                    const categoryName = livestream?.category?.name || livestream?.category?.title || livestream?.category?.slug || null;
                     const channel = guild.channels.cache.get(streamer.channelId);
 
                     // Send first, then persist state. This prevents a transient Discord/API failure from losing the alert forever.
@@ -2908,10 +2910,30 @@ async function checkKickLive() {
                         const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
                         await channel.send({ content: mention, embeds: [embed] });
                         streamer.isLive = true;
+                        streamer.lastCategoryName = categoryName;
+                        streamer.kickUsername = username;
+                        changed = true;
+                    } else if (isLive && streamer.isLive && categoryName && streamer.lastCategoryName && categoryName !== streamer.lastCategoryName && channel?.isTextBased()) {
+                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
+                        const categoryEmbed = new EmbedBuilder()
+                            .setTitle('تغيير كاتيقوري البث')
+                            .setDescription(`**${username}** غيّر كاتيقوري البث إلى: **${categoryName}**`)
+                            .setURL(`https://kick.com/${username}`)
+                            .setColor(0xf4c24c)
+                            .addFields({ name: 'صاحب البث', value: username, inline: true }, { name: 'الكاتيقوري الجديدة', value: categoryName, inline: true })
+                            .setTimestamp();
+                        await channel.send({ content: mention, embeds: [categoryEmbed] });
+                        streamer.lastCategoryName = categoryName;
+                        streamer.kickUsername = username;
+                        changed = true;
+                    } else if (isLive && streamer.isLive && categoryName && streamer.lastCategoryName !== categoryName) {
+                        // Initialize missing/old state without sending a false category-change alert.
+                        streamer.lastCategoryName = categoryName;
                         streamer.kickUsername = username;
                         changed = true;
                     } else if (!isLive && streamer.isLive) {
                         streamer.isLive = false;
+                        streamer.lastCategoryName = null;
                         streamer.kickUsername = username;
                         changed = true;
                     }
