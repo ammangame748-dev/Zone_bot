@@ -2875,6 +2875,35 @@ async function fetchKickChannel(username) {
     }
 }
 
+function findKickStreamImage(value, key = '', depth = 0) {
+    if (depth > 5 || value == null) return null;
+    if (typeof value === 'string') {
+        const url = value.trim();
+        if (/^https?:\/\//i.test(url) && /(thumbnail|preview|stream)/i.test(key)) return url;
+        return null;
+    }
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = findKickStreamImage(item, key, depth + 1);
+            if (found) return found;
+        }
+        return null;
+    }
+    if (typeof value === 'object') {
+        for (const [childKey, childValue] of Object.entries(value)) {
+            const found = findKickStreamImage(childValue, childKey, depth + 1);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function normalizeKickImageUrl(value) {
+    return value
+        ? String(value).replace(/\{width\}/gi, '1280').replace(/\{height\}/gi, '720')
+        : null;
+}
+
 async function checkKickLive() {
     if (kickCheckRunning) return;
     kickCheckRunning = true;
@@ -2906,10 +2935,13 @@ async function checkKickLive() {
                                 { name: 'المشاهدون', value: `${livestream.viewer_count ?? 0}`, inline: true }
                             ).setTimestamp();
                         const profilePic = data?.user?.profile_pic || data?.user?.profile_pic_url || null;
-                        const streamThumbnailRaw = livestream.thumbnail?.url || (typeof livestream.thumbnail === 'string' ? livestream.thumbnail : null);
-                        const streamThumbnail = streamThumbnailRaw
-                            ? streamThumbnailRaw.replace(/\{width\}/gi, '1280').replace(/\{height\}/gi, '720')
-                            : null;
+                        const streamThumbnail = normalizeKickImageUrl(
+                            findKickStreamImage(livestream) ||
+                            livestream?.thumbnail?.url ||
+                            livestream?.thumbnail_url ||
+                            livestream?.preview?.url ||
+                            null
+                        );
                         if (profilePic) embed.setThumbnail(profilePic);
                         if (streamThumbnail) embed.setImage(streamThumbnail);
                         const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
