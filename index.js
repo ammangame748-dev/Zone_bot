@@ -2905,8 +2905,13 @@ async function checkKickLive() {
                                 { name: 'عنوان البث', value: String(livestream.session_title || 'بث مباشر').slice(0, 1024), inline: true },
                                 { name: 'المشاهدون', value: `${livestream.viewer_count ?? 0}`, inline: true }
                             ).setTimestamp();
-                        const thumb = data?.user?.profile_pic || livestream.thumbnail?.url || (typeof livestream.thumbnail === 'string' ? livestream.thumbnail : null);
-                        if (thumb) embed.setThumbnail(thumb);
+                        const profilePic = data?.user?.profile_pic || data?.user?.profile_pic_url || null;
+                        const streamThumbnailRaw = livestream.thumbnail?.url || (typeof livestream.thumbnail === 'string' ? livestream.thumbnail : null);
+                        const streamThumbnail = streamThumbnailRaw
+                            ? streamThumbnailRaw.replace(/\{width\}/gi, '1280').replace(/\{height\}/gi, '720')
+                            : null;
+                        if (profilePic) embed.setThumbnail(profilePic);
+                        if (streamThumbnail) embed.setImage(streamThumbnail);
                         const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
                         await channel.send({ content: mention, embeds: [embed] });
                         streamer.isLive = true;
