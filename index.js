@@ -355,10 +355,21 @@ async function fetchLegacyMemberHistory(guild, userId) {
     return result;
 }
 
+const memberHistoryLegacyCache = new Map();
+
+async function getLegacyCached(guild, userId) {
+    const key = `${guild.id}:${userId}`;
+    if (!memberHistoryLegacyCache.has(key)) {
+        const promise = fetchLegacyMemberHistory(guild, userId).finally(() => setTimeout(() => memberHistoryLegacyCache.delete(key), 30000));
+        memberHistoryLegacyCache.set(key, promise);
+    }
+    return memberHistoryLegacyCache.get(key);
+}
+
 async function getCombinedMemberHistory(guild, userId, type) {
     const [stored, legacy] = await Promise.all([
         MemberHistory.find({ guildId: guild.id, userId, type }).lean(),
-        fetchLegacyMemberHistory(guild, userId)
+        getLegacyCached(guild, userId)
     ]);
     const combined = [...stored, ...legacy.filter(x => x.type === type)];
     const seen = new Set();
@@ -2352,6 +2363,7 @@ client.on('interactionCreate', async (interaction) => {
                     return interaction.reply({ content: 'هذا الأمر مخصص للإدارة فقط.', ephemeral: true });
                 }
                 const user = interaction.options.getUser('user', true);
+                await interaction.deferReply({ ephemeral: true });
                 const histories = await Promise.all(['deleted', 'edited', 'role_added', 'role_removed'].map(type => getCombinedMemberHistory(interaction.guild, user.id, type)));
                 const counts = histories.map(items => items.length);
                 const embed = new EmbedBuilder()
@@ -2367,7 +2379,7 @@ client.on('interactionCreate', async (interaction) => {
                     )
                     .setFooter({ text: 'السجل يبدأ من وقت تفعيل وحفظ النظام، ولا يمكن استرجاع أحداث لم يتم تسجيلها سابقاً.' })
                     .setTimestamp();
-                return interaction.reply({ embeds: [embed], components: [historyButtons(user.id, null, 0)], ephemeral: true });
+                return interaction.editReply({ embeds: [embed], components: [historyButtons(user.id, null, 0)] });
             }
         
             if (interaction.commandName === 'setbanner') {
