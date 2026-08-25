@@ -2324,10 +2324,10 @@ const background = await loadImage(bgUrl ).catch(() => loadImage('https://placeh
 
             const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-image.png' });
             welcomeEmbed.setImage('attachment://welcome-image.png');
-            await welcomeChannel.send({ embeds: [welcomeEmbed], files: [attachment] });
+            await welcomeChannel.send({ content: `<@${member.id}>`, allowedMentions: { users: [member.id] }, embeds: [welcomeEmbed], files: [attachment] });
         } catch (canvasErr) {
             console.error('[Canvas Welcome Error]', canvasErr);
-            await welcomeChannel.send({ embeds: [welcomeEmbed] });
+            await welcomeChannel.send({ content: `<@${member.id}>`, allowedMentions: { users: [member.id] }, embeds: [welcomeEmbed] });
         }
     } catch (err) {
         console.error('[General Welcome Error]', err);
