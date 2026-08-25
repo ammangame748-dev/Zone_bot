@@ -273,15 +273,19 @@ mongoose.connect(process.env.MONGO_CONNECTION_STRING)
 // ==========================================
 // 5. الدوال المساعدة
 // ==========================================
-async function sendLog(guild, type, embed) {
-    const config = await GuildConfig.findOne({ guildId: guild.id });
-    if (!config?.logs) return;
-    const logChannelId = config.logs[type]?.channel;
-    const enabled = config.logs[type]?.enabled;
-    if (!enabled || !logChannelId) return;
-    const logChannel = guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
-    logChannel.send({ embeds: [embed] }).catch(() => {});
+async function sendLog(guild, type, embed, files = []) {
+    if (!guild?.id || !embed) return;
+    try {
+        const config = await GuildConfig.findOne({ guildId: guild.id }).lean();
+        const logSettings = config?.logs?.[type];
+        if (!logSettings?.enabled || !logSettings.channel) return;
+        const logChannel = guild.channels.cache.get(logSettings.channel)
+            || await guild.channels.fetch(logSettings.channel).catch(() => null);
+        if (!logChannel?.isTextBased?.()) return;
+        await logChannel.send({ embeds: [embed], ...(files?.length ? { files } : {}) }).catch(() => {});
+    } catch (error) {
+        console.error('[Send Log Error]', error.message);
+    }
 }
 
 
@@ -2204,57 +2208,159 @@ client.on('messageReactionRemove', (reaction, user) => updateSuggestionVotes(rea
 // 11. Audit Log Events (بدون إيموجي في اللوق)
 // ==========================================
 
-client.on('messageDelete', async (message) => {
-    if (!message.guild || !message.author) return;
-    const logs = await message.guild.fetchAuditLogs({ type: AuditLogEvent.MessageDelete }).catch(() => {});
-    const executor = logs?.entries.first()?.executor;
+const LOG_COLORS = {
+    success: 0x2ecc71,
+    info: 0x3498db,
+    warning: 0xf1c40f,
+    danger: 0xe74c3c,
+    moderation: 0x8e44ad
+};
 
+function logValue(value, fallback = 'غير متوفر') {
+    const text = String(value ?? '').trim();
+    return text ? text.slice(0, 1024) : fallback;
+}
+
+function logUser(userOrMember, fallback = 'غير معروف') {
+    const user = userOrMember?.user || userOrMember;
+    if (!user?.id) return fallback;
+    return `${user.tag || user.username || 'عضو'} (<@${user.id}>)`;
+}
+
+function logFooter(guild, actor, target) {
+    const actorId = actor?.id || actor?.user?.id || 'غير معروف';
+    const targetId = target?.id || target?.user?.id || 'غير معروف';
+    return `السيرفر: ${guild?.id || 'غير معروف'} | المنفذ: ${actorId} | الهدف: ${targetId}`;
+}
+
+function buildLogEmbed({ title, color, guild, actor, target, fields = [], description, thumbnail, image }) {
     const embed = new EmbedBuilder()
-        .setTitle('رسالة محذوفة')
-        .setColor(0xe63946)
-        .addFields(
-            { name: 'صاحب الرسالة', value: `<@${message.author.id}>`, inline: true },
-            { name: 'حذفها', value: executor ? `<@${executor.id}>` : 'غير معروف', inline: true },
-            { name: 'القناة', value: `<#${message.channel.id}>`, inline: true },
-            { name: 'المحتوى', value: message.content || '(لا يوجد نص)' }
-        )
-        .setTimestamp();
+        .setTitle(title)
+        .setColor(color)
+        .setTimestamp()
+        .setFooter({ text: logFooter(guild, actor, target) });
+    if (description) embed.setDescription(logValue(description));
+    if (thumbnail) embed.setThumbnail(thumbnail);
+    if (image) embed.setImage(image);
+    if (fields.length) embed.addFields(fields.map(field => ({ ...field, name: logValue(field.name), value: logValue(field.value) })));
+    return embed;
+}
 
+async function findRecentExecutor(guild, type, targetId, maxAge = 15000) {
+    try {
+        const audit = await guild.fetchAuditLogs({ type, limit: 10 });
+        const entry = audit.entries.find(item => {
+            const age = Date.now() - item.createdTimestamp;
+            return age >= -2000 && age <= maxAge && (!targetId || item.target?.id === targetId);
+        });
+        return entry?.executor || null;
+    } catch {
+        return null;
+    }
+}
+
+client.on('messageDelete', async (message) => {
+    if (!message?.guild || !message?.author || !message?.channel) return;
+    const executor = await findRecentExecutor(message.guild, AuditLogEvent.MessageDelete, message.author.id);
+    const attachments = [...(message.attachments?.values?.() || [])];
+    const attachmentText = attachments.length
+        ? attachments.map(file => `${file.name || 'ملف'}: ${file.url}`).join('\n')
+        : 'لا توجد صور أو ملفات مرفقة';
+    const image = attachments.find(file => file.contentType?.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(file.name || ''))?.url;
+    const messageUrl = `https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`;
+    const embed = buildLogEmbed({
+        title: 'حذف رسالة', color: LOG_COLORS.danger, guild: message.guild, actor: executor, target: message.author,
+        description: `تم حذف رسالة في ${message.channel}.\n[فتح رابط الرسالة](${messageUrl})`,
+        image,
+        fields: [
+            { name: 'كاتب الرسالة', value: logUser(message.author), inline: true },
+            { name: 'المنفذ', value: executor ? logUser(executor) : 'غير معروف أو حذف ذاتي', inline: true },
+            { name: 'القناة', value: `${message.channel.name} (<#${message.channel.id}>)`, inline: true },
+            { name: 'المحتوى المحذوف', value: message.content || '(لا يوجد نص)' },
+            { name: 'الصور والملفات المحذوفة', value: attachmentText }
+        ]
+    });
     await sendLog(message.guild, 'messages', embed);
     await recordMemberHistory({ guildId: message.guild.id, userId: message.author.id, type: 'deleted', channelId: message.channel.id, channelName: message.channel.name, messageId: message.id, content: message.content });
 });
 
 client.on('messageUpdate', async (oldMsg, newMsg) => {
-    if (!oldMsg.guild || oldMsg.author?.bot) return;
-    if (oldMsg.content === newMsg.content) return;
-
-    const embed = new EmbedBuilder()
-        .setTitle('رسالة معدلة')
-        .setColor(0xf39c12)
-        .addFields(
-            { name: 'العضو', value: `<@${oldMsg.author.id}>`, inline: true },
-            { name: 'القناة', value: `<#${oldMsg.channel.id}>`, inline: true },
-            { name: 'قبل', value: oldMsg.content || '(فارغ)' },
-            { name: 'بعد', value: newMsg.content || '(فارغ)' }
-        )
-        .setTimestamp();
-
+    if (!oldMsg?.guild || !oldMsg?.author || !oldMsg?.channel || !newMsg?.channel || oldMsg.author.bot) return;
+    if (oldMsg.content === newMsg.content && oldMsg.attachments?.size === newMsg.attachments?.size) return;
+    const messageUrl = `https://discord.com/channels/${oldMsg.guild.id}/${oldMsg.channel.id}/${oldMsg.id}`;
+    const embed = buildLogEmbed({
+        title: 'تعديل رسالة', color: LOG_COLORS.success, guild: oldMsg.guild, actor: oldMsg.author, target: oldMsg.author,
+        description: `[فتح رابط الرسالة](${messageUrl})`,
+        fields: [
+            { name: 'العضو', value: logUser(oldMsg.author), inline: true },
+            { name: 'القناة', value: `${oldMsg.channel.name} (<#${oldMsg.channel.id}>)`, inline: true },
+            { name: 'قبل التعديل', value: oldMsg.content || '(فارغ)' },
+            { name: 'بعد التعديل', value: newMsg.content || '(فارغ)' }
+        ]
+    });
     await sendLog(oldMsg.guild, 'messages', embed);
     await recordMemberHistory({ guildId: oldMsg.guild.id, userId: oldMsg.author.id, type: 'edited', channelId: oldMsg.channel.id, channelName: oldMsg.channel.name, messageId: oldMsg.id, before: oldMsg.content, after: newMsg.content });
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    if (!newMember?.guild) return;
     const added = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
     const removed = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
-    if (!added.size && !removed.size) return;
-    let executorId;
-    try {
-        const logs = await newMember.guild.fetchAuditLogs({ type: AuditLogEvent.MemberRoleUpdate, limit: 10 });
-        const entry = logs.entries.find(e => e.target?.id === newMember.id);
-        executorId = entry?.executor?.id;
-    } catch {}
-    for (const role of added.values()) await recordMemberHistory({ guildId: newMember.guild.id, userId: newMember.id, type: 'role_added', roleId: role.id, roleName: role.name, executorId });
-    for (const role of removed.values()) await recordMemberHistory({ guildId: newMember.guild.id, userId: newMember.id, type: 'role_removed', roleId: role.id, roleName: role.name, executorId });
+    const roleExecutor = await findRecentExecutor(newMember.guild, AuditLogEvent.MemberRoleUpdate, newMember.id);
+    const operationTime = `<t:${Math.floor(Date.now() / 1000)}:F>\n<t:${Math.floor(Date.now() / 1000)}:R>`;
+    const sendRoleLog = async (role, addedRole) => {
+        const action = addedRole ? 'منح رتبة' : 'إزالة رتبة';
+        const actionColor = addedRole ? LOG_COLORS.success : LOG_COLORS.danger;
+        const roleMention = addedRole ? `<@&${role.id}>` : `@${role.name}`;
+        const embed = buildLogEmbed({
+            title: `سجل الرتب | ${action}`,
+            color: actionColor,
+            guild: newMember.guild,
+            actor: roleExecutor,
+            target: newMember,
+            thumbnail: newMember.user?.displayAvatarURL?.({ dynamic: true }),
+            description: `تم ${addedRole ? 'إعطاء' : 'إزالة'} رتبة ${roleMention} من العضو بنجاح.`,
+            fields: [
+                { name: 'نوع العملية', value: addedRole ? 'إضافة رتبة إلى العضو' : 'إزالة رتبة من العضو', inline: true },
+                { name: 'وقت العملية', value: operationTime, inline: true },
+                { name: 'العضو المستهدف', value: logUser(newMember), inline: true },
+                { name: 'معرّف العضو', value: newMember.id, inline: true },
+                { name: 'الرتبة', value: `${role.name}\n${roleMention}`, inline: true },
+                { name: 'معرّف الرتبة', value: role.id, inline: true },
+                { name: 'المشرف المنفذ', value: roleExecutor ? logUser(roleExecutor) : 'غير معروف أو تعديل ذاتي', inline: true },
+                { name: 'معرّف المنفذ', value: roleExecutor?.id || 'غير معروف', inline: true },
+                { name: 'السيرفر', value: `${newMember.guild.name}\n${newMember.guild.id}`, inline: true }
+            ]
+        });
+        await sendLog(newMember.guild, 'roles', embed);
+        await recordMemberHistory({ guildId: newMember.guild.id, userId: newMember.id, type: addedRole ? 'role_added' : 'role_removed', roleId: role.id, roleName: role.name, executorId: roleExecutor?.id });
+    };
+    for (const role of added.values()) await sendRoleLog(role, true);
+    for (const role of removed.values()) await sendRoleLog(role, false);
+
+    if (oldMember.nickname !== newMember.nickname) {
+        const actor = await findRecentExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+        const embed = buildLogEmbed({ title: 'تغيير الاسم المستعار', color: LOG_COLORS.success, guild: newMember.guild, actor, target: newMember, fields: [
+            { name: 'العضو', value: logUser(newMember), inline: true },
+            { name: 'الاسم السابق', value: oldMember.nickname || 'بدون اسم مستعار', inline: true },
+            { name: 'الاسم الجديد', value: newMember.nickname || 'بدون اسم مستعار', inline: true },
+            { name: 'المنفذ', value: actor ? logUser(actor) : 'العضو نفسه أو غير معروف', inline: true }
+        ] });
+        await sendLog(newMember.guild, 'members', embed);
+    }
+
+    if (oldMember.communicationDisabledUntilTimestamp !== newMember.communicationDisabledUntilTimestamp) {
+        const actor = await findRecentExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+        const timedOut = Boolean(newMember.communicationDisabledUntilTimestamp);
+        const until = newMember.communicationDisabledUntilTimestamp
+            ? `<t:${Math.floor(newMember.communicationDisabledUntilTimestamp / 1000)}:F>` : 'تمت إزالة التايم أوت';
+        const embed = buildLogEmbed({ title: timedOut ? 'تفعيل تايم أوت لعضو' : 'إزالة التايم أوت عن عضو', color: timedOut ? LOG_COLORS.danger : LOG_COLORS.success, guild: newMember.guild, actor, target: newMember, fields: [
+            { name: 'العضو', value: logUser(newMember), inline: true },
+            { name: 'الحالة', value: until, inline: true },
+            { name: 'المنفذ', value: actor ? logUser(actor) : 'غير معروف', inline: true }
+        ] });
+        await sendLog(newMember.guild, 'moderation', embed);
+    }
 });
 client.on('guildMemberAdd', async (member) => {
     try {
@@ -2266,12 +2372,13 @@ client.on('guildMemberAdd', async (member) => {
         ).catch(() => {});
 
         // لوق الأعضاء
-        const logEmbed = new EmbedBuilder()
-            .setTitle('عضو جديد انضم')
-            .setColor(0x00c853)
-            .setThumbnail(member.user.displayAvatarURL())
-            .addFields({ name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true })
-            .setTimestamp();
+        const accountCreated = `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F> (<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>)`;
+        const logEmbed = buildLogEmbed({ title: 'دخول عضو جديد', color: LOG_COLORS.success, guild: member.guild, actor: member.user, target: member, thumbnail: member.user.displayAvatarURL(), fields: [
+            { name: 'العضو', value: logUser(member), inline: true },
+            { name: 'معرّف العضو', value: member.id, inline: true },
+            { name: 'إنشاء الحساب', value: accountCreated, inline: true },
+            { name: 'عدد أعضاء السيرفر', value: String(member.guild.memberCount), inline: true }
+        ] });
         await sendLog(member.guild, 'members', logEmbed);
 
         // نظام الترحيب
@@ -2337,40 +2444,36 @@ const background = await loadImage(bgUrl ).catch(() => loadImage('https://placeh
 });
 
 client.on('guildMemberRemove', async (member) => {
-    const embed = new EmbedBuilder()
-        .setTitle('عضو غادر')
-        .setColor(0xe63946)
-        .setThumbnail(member.user.displayAvatarURL())
-        .addFields({ name: 'العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: true })
-        .setTimestamp();
-    await sendLog(member.guild, 'members', embed);
-    await Stats.findOneAndUpdate({ guildId: member.guild.id }, { $push: { 'membersLog.left': new Date() } }, { upsert: true });
+    const kick = await findRecentExecutor(member.guild, AuditLogEvent.MemberKick, member.id);
+    const embed = buildLogEmbed({ title: kick ? 'طرد عضو' : 'خروج عضو', color: LOG_COLORS.danger, guild: member.guild, actor: kick, target: member, thumbnail: member.user?.displayAvatarURL?.(), fields: [
+        { name: 'العضو', value: logUser(member), inline: true },
+        { name: 'معرّف العضو', value: member.id, inline: true },
+        { name: 'المنفذ', value: kick ? logUser(kick) : 'العضو غادر بنفسه أو غير معروف', inline: true },
+        { name: 'القناة', value: 'لا ينطبق على هذا الحدث', inline: true }
+    ] });
+    await sendLog(member.guild, kick ? 'moderation' : 'members', embed);
+    await Stats.findOneAndUpdate({ guildId: member.guild.id }, { $push: { 'membersLog.left': new Date() } }, { upsert: true }).catch(() => {});
 });
 
 client.on('guildBanAdd', async (ban) => {
-    const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBan);
-    const embed = new EmbedBuilder()
-        .setTitle('عضو محظور')
-        .setColor(0x8b0000)
-        .addFields(
-            { name: 'العضو', value: `${ban.user.tag}`, inline: true },
-            { name: 'بواسطة', value: executor, inline: true }
-        )
-        .setTimestamp();
+    const executor = await findRecentExecutor(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id);
+    const embed = buildLogEmbed({ title: 'حظر عضو', color: LOG_COLORS.danger, guild: ban.guild, actor: executor, target: ban.user, fields: [
+        { name: 'العضو', value: logUser(ban.user), inline: true },
+        { name: 'معرّف العضو', value: ban.user.id, inline: true },
+        { name: 'المنفذ', value: executor ? logUser(executor) : 'غير معروف', inline: true },
+        { name: 'السبب', value: 'يتم جلب السبب من سجل التدقيق إذا كان متاحاً' }
+    ] });
     await sendLog(ban.guild, 'moderation', embed);
-    await Stats.findOneAndUpdate({ guildId: ban.guild.id }, { $inc: { 'modActions.bans': 1 } }, { upsert: true });
+    await Stats.findOneAndUpdate({ guildId: ban.guild.id }, { $inc: { 'modActions.bans': 1 } }, { upsert: true }).catch(() => {});
 });
 
 client.on('guildBanRemove', async (ban) => {
-    const executor = await getExecutor(ban.guild, AuditLogEvent.MemberUnban);
-    const embed = new EmbedBuilder()
-        .setTitle('رُفع الحظر عن عضو')
-        .setColor(0x00c853)
-        .addFields(
-            { name: 'العضو', value: `${ban.user.tag}`, inline: true },
-            { name: 'بواسطة', value: executor, inline: true }
-        )
-        .setTimestamp();
+    const executor = await findRecentExecutor(ban.guild, AuditLogEvent.MemberBanRemove, ban.user.id);
+    const embed = buildLogEmbed({ title: 'إزالة حظر عن عضو', color: LOG_COLORS.success, guild: ban.guild, actor: executor, target: ban.user, fields: [
+        { name: 'العضو', value: logUser(ban.user), inline: true },
+        { name: 'معرّف العضو', value: ban.user.id, inline: true },
+        { name: 'المنفذ', value: executor ? logUser(executor) : 'غير معروف', inline: true }
+    ] });
     await sendLog(ban.guild, 'moderation', embed);
 });
 
