@@ -313,6 +313,63 @@ function historyButtons(userId, selectedType, page = 0) {
     ));
 }
 
+async function fetchLegacyMemberHistory(guild, userId) {
+    const config = await GuildConfig.findOne({ guildId: guild.id }).lean().catch(() => null);
+    const channelIds = [...new Set(Object.values(config?.logs || {}).map(x => x?.channel).filter(Boolean))];
+    const result = [];
+    const mentionMatches = value => String(value || '').match(new RegExp(`<@!?${userId}>`));
+    const fieldValue = (fields, names) => fields.find(f => names.some(n => String(f.name || '').includes(n)))?.value || '';
+
+    for (const channelId of channelIds) {
+        const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+        if (!channel?.isTextBased?.() || !channel.messages?.fetch) continue;
+        let before;
+        for (let page = 0; page < 100; page++) {
+            const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) }).catch(() => null);
+            if (!batch?.size) break;
+            for (const logMessage of batch.values()) {
+                const embed = logMessage.embeds?.[0];
+                if (!embed) continue;
+                const title = String(embed.title || '').toLowerCase();
+                const fields = embed.fields || [];
+                const names = fields.map(f => String(f.name || '').toLowerCase()).join(' ');
+                const allText = fields.map(f => `${f.name} ${f.value}`).join('\n');
+                if (!mentionMatches(allText) && !title.includes(userId)) continue;
+                const base = { guildId: guild.id, userId, createdAt: logMessage.createdAt, sourceMessageId: logMessage.id };
+
+                if (title.includes('رسالة محذوفة') || title.includes('message deleted')) {
+                    result.push({ ...base, type: 'deleted', channelId: (fieldValue(fields, ['القناة', 'channel']).match(/<#(\d+)>/) || [])[1], content: fieldValue(fields, ['المحتوى', 'content']) });
+                } else if (title.includes('رسالة معدلة') || title.includes('message edited') || title.includes('message updated')) {
+                    result.push({ ...base, type: 'edited', channelId: (fieldValue(fields, ['القناة', 'channel']).match(/<#(\d+)>/) || [])[1], before: fieldValue(fields, ['قبل', 'before']), after: fieldValue(fields, ['بعد', 'after']) });
+                } else if ((title.includes('رتبة') || names.includes('رتبة') || names.includes('role')) && (title.includes('أعط') || title.includes('إضاف') || title.includes('منح') || title.includes('سحب') || title.includes('إزال') || title.includes('remove') || title.includes('add'))) {
+                    const isRemoved = title.includes('سحب') || title.includes('إزال') || title.includes('remove') || names.includes('سحب') || names.includes('إزالة');
+                    const roleText = fieldValue(fields, ['الرتبة', 'role']) || 'رتبة غير معروفة';
+                    const roleId = (roleText.match(/<@&(\d+)>/) || [])[1];
+                    result.push({ ...base, type: isRemoved ? 'role_removed' : 'role_added', roleId, roleName: roleText.replace(/<@&\d+>/g, '').trim() });
+                }
+            }
+            before = batch.last()?.id;
+            if (batch.size < 100 || !before) break;
+        }
+    }
+    return result;
+}
+
+async function getCombinedMemberHistory(guild, userId, type) {
+    const [stored, legacy] = await Promise.all([
+        MemberHistory.find({ guildId: guild.id, userId, type }).lean(),
+        fetchLegacyMemberHistory(guild, userId)
+    ]);
+    const combined = [...stored, ...legacy.filter(x => x.type === type)];
+    const seen = new Set();
+    return combined.filter(entry => {
+        const key = entry.sourceMessageId ? `legacy:${entry.sourceMessageId}:${entry.type}` : `stored:${entry._id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
 async function buildMemberHistoryEmbed(guild, user, type, page = 0) {
     const labels = {
         deleted: 'الرسائل المحذوفة',
@@ -320,12 +377,12 @@ async function buildMemberHistoryEmbed(guild, user, type, page = 0) {
         role_added: 'الرتب التي تم تسليمها له',
         role_removed: 'الرتب التي تم سحبها منه'
     };
-    const total = await MemberHistory.countDocuments({ guildId: guild.id, userId: user.id, type });
+    const allEntries = await getCombinedMemberHistory(guild, user.id, type);
+    const total = allEntries.length;
     const pageSize = 5;
     const pages = Math.max(1, Math.ceil(total / pageSize));
     page = Math.min(Math.max(Number(page) || 0, 0), pages - 1);
-    const entries = await MemberHistory.find({ guildId: guild.id, userId: user.id, type })
-        .sort({ createdAt: -1 }).skip(page * pageSize).limit(pageSize).lean();
+    const entries = allEntries.slice(page * pageSize, (page + 1) * pageSize);
 
     const embed = new EmbedBuilder()
         .setTitle(`سجل العضو: ${user.tag}`)
@@ -2295,7 +2352,8 @@ client.on('interactionCreate', async (interaction) => {
                     return interaction.reply({ content: 'هذا الأمر مخصص للإدارة فقط.', ephemeral: true });
                 }
                 const user = interaction.options.getUser('user', true);
-                const counts = await Promise.all(['deleted', 'edited', 'role_added', 'role_removed'].map(type => MemberHistory.countDocuments({ guildId: interaction.guild.id, userId: user.id, type })));
+                const histories = await Promise.all(['deleted', 'edited', 'role_added', 'role_removed'].map(type => getCombinedMemberHistory(interaction.guild, user.id, type)));
+                const counts = histories.map(items => items.length);
                 const embed = new EmbedBuilder()
                     .setTitle(`سجل العضو: ${user.tag}`)
                     .setDescription(`العضو: <@${user.id}>\nاختر القسم الذي تريد عرضه من الأزرار بالأسفل.`)
