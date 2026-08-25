@@ -56,6 +56,8 @@ const TicketData = mongoose.model('TicketData', new mongoose.Schema({
     channelId: String,
     ownerId: String,
     ticketType: { type: String, default: 'تذكرة دعم' },
+    adminRole: String,
+    categoryId: String,
     claimedBy: String,
     openedAt: Date,
     closedAt: Date,
@@ -219,12 +221,11 @@ const TicketConfig = mongoose.model('TicketConfig', new mongoose.Schema({
     title: String,
     description: String,
     color: String,
-    adminRole: String,
     topImagePath: String,
     bottomImagePath: String,
     ticketCount: { type: Number, default: 0 },
-    buttons: [{ label: String, emoji: String }],
-    menuOptions: [{ label: String, emoji: String }]
+    buttons: [{ label: String, emoji: String, adminRole: String, categoryId: String }],
+    menuOptions: [{ label: String, emoji: String, adminRole: String, categoryId: String }]
 }));
 
 // ==========================================
@@ -1369,11 +1370,8 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     <input name="title" value="${s.title || ''}" placeholder="عنوان نظام التذاكر">
                 </div>
                 <div>
-                    <label>رتبة الإدارة</label>
-                    <select name="adminRole">
-                        <option value="">-- اختر رتبة الإدارة --</option>
-                        ${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}
-                    </select>
+                    <label>ملاحظة</label>
+                    <div style="color:var(--text-muted); padding:10px 0;">يتم تحديد رتبة الإدارة والكاتيجوري بشكل مستقل لكل قسم بالأسفل.</div>
                 </div>
             </div>
             <label>الوصف</label>
@@ -1386,6 +1384,8 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="btn_label_${i}" value="${s.buttons?.[i]?.label || ''}" placeholder="نص الزر ${i+1}">
                         <input name="btn_emoji_${i}" value="${s.buttons?.[i]?.emoji || ''}" placeholder="ID الإيموجي">
+                        <select name="btn_role_${i}" style="grid-column:1/-1;"><option value="">-- رتبة هذا القسم --</option>${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.buttons?.[i]?.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}</select>
+                        <select name="btn_category_${i}" style="grid-column:1/-1;"><option value="">-- كاتيجوري هذا القسم --</option>${g.channels.cache.filter(c => c.type === ChannelType.GuildCategory).map(c => `<option value="${c.id}" ${s.buttons?.[i]?.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
                     </div>`).join('')}
                 </div>
                 <div>
@@ -1394,6 +1394,8 @@ app.get('/manage/:guildId/tickets', checkAuth, async (req, res) => {
                     <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px; margin-bottom:8px;">
                         <input name="menu_label_${i}" value="${s.menuOptions?.[i]?.label || ''}" placeholder="خيار ${i+1}">
                         <input name="menu_emoji_${i}" value="${s.menuOptions?.[i]?.emoji || ''}" placeholder="ID الإيموجي">
+                        <select name="menu_role_${i}" style="grid-column:1/-1;"><option value="">-- رتبة هذا القسم --</option>${g.roles.cache.filter(r => r.name !== '@everyone').map(r => `<option value="${r.id}" ${s.menuOptions?.[i]?.adminRole === r.id ? 'selected' : ''}>${r.name}</option>`).join('')}</select>
+                        <select name="menu_category_${i}" style="grid-column:1/-1;"><option value="">-- كاتيجوري هذا القسم --</option>${g.channels.cache.filter(c => c.type === ChannelType.GuildCategory).map(c => `<option value="${c.id}" ${s.menuOptions?.[i]?.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
                     </div>`).join('')}
                 </div>
             </div>
@@ -1422,11 +1424,11 @@ app.post('/save/:guildId/tickets', checkAuth, upload.fields([{ name: 'topImage' 
             const btnEmoji = b[`btn_emoji_${i}`]?.trim();
             const menuLabel = b[`menu_label_${i}`]?.trim();
             const menuEmoji = b[`menu_emoji_${i}`]?.trim();
-            if (btnLabel) buttons.push({ label: btnLabel, emoji: btnEmoji || '' });
-            if (menuLabel) menuOptions.push({ label: menuLabel, emoji: menuEmoji || '' });
+            if (btnLabel) buttons.push({ label: btnLabel, emoji: btnEmoji || '', adminRole: b[`btn_role_${i}`] || '', categoryId: b[`btn_category_${i}`] || '' });
+            if (menuLabel) menuOptions.push({ label: menuLabel, emoji: menuEmoji || '', adminRole: b[`menu_role_${i}`] || '', categoryId: b[`menu_category_${i}`] || '' });
         }
 
-        let updateData = { title: b.title, description: b.description, color: b.color || '#d4af37', adminRole: b.adminRole, buttons, menuOptions };
+        let updateData = { title: b.title, description: b.description, color: b.color || '#d4af37', buttons, menuOptions };
         if (req.files?.topImage?.[0]) updateData.topImagePath = req.files.topImage[0].path;
         if (req.files?.bottomImage?.[0]) updateData.bottomImagePath = req.files.bottomImage[0].path;
 
@@ -2875,8 +2877,8 @@ client.on('interactionCreate', async (interaction) => {
             if (!ticketData) return interaction.reply({ content: 'لم يتم العثور على بيانات التكت.', ephemeral: true });
 
             const tConfig = await TicketConfig.findOne({ guildId: interaction.guild.id });
-            const adminRole = tConfig?.adminRole;
-            const isAdmin = adminRole && interaction.member.roles.cache.has(adminRole);
+            const adminRole = ticketData.adminRole;
+            const isAdmin = Boolean(adminRole && interaction.member.roles.cache.has(adminRole));
             const isOwner = ticketData.ownerId === interaction.user.id;
 
             if (selected === 'claim_ticket') {
@@ -2944,11 +2946,10 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
     // استخراج رقم الخيار من الـ value (مثلاً ticket_opt_0 → 0)
     const optIndex = parseInt(selected.replace('ticket_opt_', ''));
     let ticketType = 'تذكرة دعم';
-    if (tConfig.menuOptions?.[optIndex]) {
-        ticketType = tConfig.menuOptions[optIndex].label;
-    }
+    const sectionConfig = tConfig.menuOptions?.[optIndex] || {};
+    if (sectionConfig.label) ticketType = sectionConfig.label;
 
-    await openTicket(interaction, tConfig, ticketType);
+    await openTicket(interaction, tConfig, ticketType, sectionConfig);
     return;
 }
 
@@ -2958,11 +2959,13 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
             if (!tConfig) return interaction.reply({ content: 'لم يتم العثور على إعدادات التذاكر.', ephemeral: true });
 
             let ticketType = 'تذكرة دعم';
+            let sectionConfig = {};
             if (interaction.customId.startsWith('ticket_btn_')) {
                 const btnIndex = parseInt(interaction.customId.replace('ticket_btn_', ''));
-                if (tConfig.buttons?.[btnIndex]) ticketType = tConfig.buttons[btnIndex].label;
+                sectionConfig = tConfig.buttons?.[btnIndex] || {};
+                if (sectionConfig.label) ticketType = sectionConfig.label;
             }
-            await openTicket(interaction, tConfig, ticketType);
+            await openTicket(interaction, tConfig, ticketType, sectionConfig);
         }
         // --- [ Suggestion Menu ] ---
         if (interaction.isStringSelectMenu() && interaction.customId === 'suggestion_menu') {
@@ -3072,7 +3075,7 @@ if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') 
 // 13. Helper Functions
 // ==========================================
 
-async function openTicket(interaction, tConfig, ticketType) {
+async function openTicket(interaction, tConfig, ticketType, sectionConfig = {}) {
     try {
         const existingTicket = await TicketData.findOne({ guildId: interaction.guild.id, ownerId: interaction.user.id, closedAt: null });
         if (existingTicket) {
@@ -3086,15 +3089,18 @@ async function openTicket(interaction, tConfig, ticketType) {
             { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
             { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
         ];
-        if (tConfig.adminRole) {
-            permOverwrites.push({ id: tConfig.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] });
+        if (sectionConfig.adminRole) {
+            permOverwrites.push({ id: sectionConfig.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] });
         }
 
-        const ticketChannel = await interaction.guild.channels.create({
+        const channelOptions = {
             name: channelName,
             type: ChannelType.GuildText,
             permissionOverwrites: permOverwrites
-        }).catch(() => null);
+        };
+        if (sectionConfig.categoryId) channelOptions.parent = sectionConfig.categoryId;
+
+        const ticketChannel = await interaction.guild.channels.create(channelOptions).catch(() => null);
 
         if (!ticketChannel) return interaction.reply({ content: 'فشل إنشاء قناة التكت.', ephemeral: true });
 
@@ -3103,6 +3109,8 @@ async function openTicket(interaction, tConfig, ticketType) {
             channelId: ticketChannel.id,
             ownerId: interaction.user.id,
             ticketType,
+            adminRole: sectionConfig.adminRole || '',
+            categoryId: sectionConfig.categoryId || '',
             openedAt: new Date()
         });
 
@@ -3142,7 +3150,7 @@ async function openTicket(interaction, tConfig, ticketType) {
             ]);
 
         await ticketChannel.send({
-            content: `${interaction.user} ${tConfig.adminRole ? `<@&${tConfig.adminRole}>` : ''}`,
+            content: `${interaction.user} ${sectionConfig.adminRole ? `<@&${sectionConfig.adminRole}>` : ''}`,
             embeds: [embed],
             components: [new ActionRowBuilder().addComponents(controlMenu)],
             files
