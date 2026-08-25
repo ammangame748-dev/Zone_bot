@@ -183,6 +183,23 @@ const SuggestionConfig = mongoose.model('SuggestionConfig', new mongoose.Schema(
     emoji2: String
 }));
 
+
+const MemberHistory = mongoose.model('MemberHistory', new mongoose.Schema({
+    guildId: { type: String, required: true, index: true },
+    userId: { type: String, required: true, index: true },
+    type: { type: String, enum: ['deleted', 'edited', 'role_added', 'role_removed'], required: true, index: true },
+    channelId: String,
+    channelName: String,
+    messageId: String,
+    before: String,
+    after: String,
+    content: String,
+    roleId: String,
+    roleName: String,
+    executorId: String,
+    createdAt: { type: Date, default: Date.now, index: true }
+}, { timestamps: false }));
+
 const Suggestion = mongoose.model('Suggestion', new mongoose.Schema({
     guildId: String,
     messageId: String,
@@ -264,6 +281,78 @@ async function sendLog(guild, type, embed) {
     const logChannel = guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
     logChannel.send({ embeds: [embed] }).catch(() => {});
+}
+
+
+async function recordMemberHistory(data) {
+    try {
+        if (!data.guildId || !data.userId || !data.type) return;
+        await MemberHistory.create({
+            ...data,
+            before: data.before ? String(data.before).slice(0, 1900) : undefined,
+            after: data.after ? String(data.after).slice(0, 1900) : undefined,
+            content: data.content ? String(data.content).slice(0, 1900) : undefined
+        });
+    } catch (err) {
+        console.error('[Member History Error]', err.message);
+    }
+}
+
+function historyButtons(userId, selectedType, page = 0) {
+    const buttons = [
+        ['deleted', 'الرسائل المحذوفة'],
+        ['edited', 'الرسائل المعدلة'],
+        ['role_added', 'الرتب التي تم تسليمها له'],
+        ['role_removed', 'الرتب التي تم سحبها منه']
+    ];
+    return new ActionRowBuilder().addComponents(buttons.map(([type, label]) =>
+        new ButtonBuilder()
+            .setCustomId(`memberhistory:${type}:${userId}:${type === selectedType ? page : 0}`)
+            .setLabel(label)
+            .setStyle(type === selectedType ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    ));
+}
+
+async function buildMemberHistoryEmbed(guild, user, type, page = 0) {
+    const labels = {
+        deleted: 'الرسائل المحذوفة',
+        edited: 'الرسائل المعدلة',
+        role_added: 'الرتب التي تم تسليمها له',
+        role_removed: 'الرتب التي تم سحبها منه'
+    };
+    const total = await MemberHistory.countDocuments({ guildId: guild.id, userId: user.id, type });
+    const pageSize = 5;
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    page = Math.min(Math.max(Number(page) || 0, 0), pages - 1);
+    const entries = await MemberHistory.find({ guildId: guild.id, userId: user.id, type })
+        .sort({ createdAt: -1 }).skip(page * pageSize).limit(pageSize).lean();
+
+    const embed = new EmbedBuilder()
+        .setTitle(`سجل العضو: ${user.tag}`)
+        .setDescription(`العضو: <@${user.id}>\nالقسم: **${labels[type]}**\nإجمالي السجلات في هذا القسم: **${total}**`)
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .setColor(0xd4af37)
+        .setFooter({ text: `صفحة ${page + 1} من ${pages} • يتم حفظ السجلات منذ تشغيل النظام` })
+        .setTimestamp();
+
+    if (!entries.length) {
+        embed.addFields({ name: 'لا توجد سجلات', value: 'لا يوجد شيء محفوظ لهذا العضو في هذا القسم.' });
+        return { embed, page };
+    }
+
+    for (const [i, entry] of entries.entries()) {
+        const date = entry.createdAt ? `<t:${Math.floor(new Date(entry.createdAt).getTime() / 1000)}:F>` : 'وقت غير معروف';
+        let value;
+        if (type === 'deleted') {
+            value = `القناة: ${entry.channelId ? `<#${entry.channelId}>` : entry.channelName || 'غير معروفة'}\nالمحتوى: ${entry.content || '(لا يوجد نص)'}`;
+        } else if (type === 'edited') {
+            value = `القناة: ${entry.channelId ? `<#${entry.channelId}>` : entry.channelName || 'غير معروفة'}\nقبل: ${entry.before || '(فارغ)'}\nبعد: ${entry.after || '(فارغ)'}`;
+        } else {
+            value = `الرتبة: **${entry.roleName || 'رتبة محذوفة'}** ${entry.roleId ? `(<@&${entry.roleId}>)` : ''}\nبواسطة: ${entry.executorId ? `<@${entry.executorId}>` : 'غير معروف'}`;
+        }
+        embed.addFields({ name: `${i + 1 + page * pageSize}. ${date}`, value: value.slice(0, 1024) });
+    }
+    return { embed, page };
 }
 
 async function getExecutor(guild, actionType) {
@@ -1965,6 +2054,7 @@ client.on('messageDelete', async (message) => {
         .setTimestamp();
 
     await sendLog(message.guild, 'messages', embed);
+    await recordMemberHistory({ guildId: message.guild.id, userId: message.author.id, type: 'deleted', channelId: message.channel.id, channelName: message.channel.name, messageId: message.id, content: message.content });
 });
 
 client.on('messageUpdate', async (oldMsg, newMsg) => {
@@ -1983,8 +2073,22 @@ client.on('messageUpdate', async (oldMsg, newMsg) => {
         .setTimestamp();
 
     await sendLog(oldMsg.guild, 'messages', embed);
+    await recordMemberHistory({ guildId: oldMsg.guild.id, userId: oldMsg.author.id, type: 'edited', channelId: oldMsg.channel.id, channelName: oldMsg.channel.name, messageId: oldMsg.id, before: oldMsg.content, after: newMsg.content });
 });
 
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    const added = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
+    const removed = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
+    if (!added.size && !removed.size) return;
+    let executorId;
+    try {
+        const logs = await newMember.guild.fetchAuditLogs({ type: AuditLogEvent.MemberRoleUpdate, limit: 10 });
+        const entry = logs.entries.find(e => e.target?.id === newMember.id);
+        executorId = entry?.executor?.id;
+    } catch {}
+    for (const role of added.values()) await recordMemberHistory({ guildId: newMember.guild.id, userId: newMember.id, type: 'role_added', roleId: role.id, roleName: role.name, executorId });
+    for (const role of removed.values()) await recordMemberHistory({ guildId: newMember.guild.id, userId: newMember.id, type: 'role_removed', roleId: role.id, roleName: role.name, executorId });
+});
 client.on('guildMemberAdd', async (member) => {
     try {
         // إحصائيات
@@ -2172,8 +2276,42 @@ client.on('interactionCreate', async (interaction) => {
     try {
         if (!interaction.guild) return;
 
+        if (interaction.isButton() && interaction.customId.startsWith('memberhistory:')) {
+            const [, type, userId, rawPage] = interaction.customId.split(':');
+            const allowed = ['deleted', 'edited', 'role_added', 'role_removed'];
+            if (!allowed.includes(type)) return;
+            if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: 'هذا الأمر مخصص للإدارة فقط.', ephemeral: true });
+            }
+            const user = await client.users.fetch(userId).catch(() => null);
+            if (!user) return interaction.reply({ content: 'تعذر العثور على العضو.', ephemeral: true });
+            const result = await buildMemberHistoryEmbed(interaction.guild, user, type, rawPage);
+            return interaction.update({ embeds: [result.embed], components: [historyButtons(user.id, type, result.page)] });
+        }
         // --- [ Slash Commands ] ---
         if (interaction.isChatInputCommand()) {
+            if (interaction.commandName === 'memberhistory') {
+                if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+                    return interaction.reply({ content: 'هذا الأمر مخصص للإدارة فقط.', ephemeral: true });
+                }
+                const user = interaction.options.getUser('user', true);
+                const counts = await Promise.all(['deleted', 'edited', 'role_added', 'role_removed'].map(type => MemberHistory.countDocuments({ guildId: interaction.guild.id, userId: user.id, type })));
+                const embed = new EmbedBuilder()
+                    .setTitle(`سجل العضو: ${user.tag}`)
+                    .setDescription(`العضو: <@${user.id}>\nاختر القسم الذي تريد عرضه من الأزرار بالأسفل.`)
+                    .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+                    .setColor(0xd4af37)
+                    .addFields(
+                        { name: 'الرسائل المحذوفة', value: `\`${counts[0]}\``, inline: true },
+                        { name: 'الرسائل المعدلة', value: `\`${counts[1]}\``, inline: true },
+                        { name: 'الرتب التي تم تسليمها له', value: `\`${counts[2]}\``, inline: true },
+                        { name: 'الرتب التي تم سحبها منه', value: `\`${counts[3]}\``, inline: true }
+                    )
+                    .setFooter({ text: 'السجل يبدأ من وقت تفعيل وحفظ النظام، ولا يمكن استرجاع أحداث لم يتم تسجيلها سابقاً.' })
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed], components: [historyButtons(user.id, null, 0)], ephemeral: true });
+            }
+        
             if (interaction.commandName === 'setbanner') {
                 const image = interaction.options.getAttachment('image');
                 await GuildConfig.findOneAndUpdate(
@@ -3158,6 +3296,9 @@ async function registerSlashCommands() {
         new SlashCommandBuilder().setName('resetnick').setDescription('إرجاع أسماء الأعضاء المحدد')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames)
             .addUserOption(o => o.setName('user').setDescription('العضو').setRequired(true)),
+        new SlashCommandBuilder().setName('memberhistory').setDescription('عرض سجل عضو كامل')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true)),
         new SlashCommandBuilder().setName('emojiinfo').setDescription('عرض معلومات إيموجي')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageEmojisAndStickers)
             .addStringOption(o => o.setName('emoji').setDescription('ID الإيموجي').setRequired(true)),
