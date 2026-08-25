@@ -2349,12 +2349,21 @@ client.on('interactionCreate', async (interaction) => {
             const allowed = ['deleted', 'edited', 'role_added', 'role_removed'];
             if (!allowed.includes(type)) return;
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: 'هذا الأمر مخصص للإدارة فقط.', ephemeral: true });
+                return interaction.reply({ content: 'هذا الأمر مخصص للإدارة فقط.', ephemeral: true }).catch(() => {});
+            }
+            // تأكيد الزر فوراً قبل البحث في رسائل اللوق حتى لا تنتهي مهلة التفاعل.
+            try {
+                await interaction.deferUpdate();
+            } catch (err) {
+                if (err?.code === 10062) return;
+                throw err;
             }
             const user = await client.users.fetch(userId).catch(() => null);
-            if (!user) return interaction.reply({ content: 'تعذر العثور على العضو.', ephemeral: true });
+            if (!user) return interaction.editReply({ content: 'تعذر العثور على العضو.' }).catch(() => {});
             const result = await buildMemberHistoryEmbed(interaction.guild, user, type, rawPage);
-            return interaction.update({ embeds: [result.embed], components: [historyButtons(user.id, type, result.page)] });
+            return interaction.editReply({ embeds: [result.embed], components: [historyButtons(user.id, type, result.page)] }).catch(err => {
+                if (err?.code !== 10062) console.error('[Member History Button Error]', err);
+            });
         }
         // --- [ Slash Commands ] ---
         if (interaction.isChatInputCommand()) {
