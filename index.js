@@ -434,6 +434,81 @@ async function getExecutor(guild, actionType) {
     }
 }
 
+function createRandomWelcomeBackground(filePath) {
+    const themes = [
+        { bg: '#07131a', panel: '#0c2029', accent: '#32e6b1', text: '#f5fffc', sub: '#a8d8cb' },
+        { bg: '#090b1e', panel: '#12183d', accent: '#6d7cff', text: '#f7f8ff', sub: '#b9c0ff' },
+        { bg: '#190b16', panel: '#321329', accent: '#ff5e9c', text: '#fff7fb', sub: '#f0b8ce' },
+        { bg: '#161108', panel: '#2a1f0c', accent: '#f4c24c', text: '#fffaf0', sub: '#d9c898' },
+        { bg: '#0b1017', panel: '#172235', accent: '#53b7ff', text: '#f4fbff', sub: '#afd3e8' }
+    ];
+    const theme = themes[Math.floor(Math.random() * themes.length)];
+    const canvas = createCanvas(1200, 600);
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 1200, 600);
+    gradient.addColorStop(0, theme.bg);
+    gradient.addColorStop(1, theme.panel);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1200, 600);
+
+    for (let i = 0; i < 36; i++) {
+        ctx.fillStyle = `${theme.accent}${Math.floor(20 + Math.random() * 45).toString(16).padStart(2, '0')}`;
+        ctx.beginPath();
+        ctx.arc(Math.random() * 1200, Math.random() * 600, 1 + Math.random() * 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.strokeStyle = `${theme.accent}55`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 70 + i * 72);
+        ctx.lineTo(760 + i * 18, 20 + i * 72);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(62, 70, 7, 230);
+    ctx.fillStyle = theme.text;
+    ctx.font = '900 72px Arial';
+    ctx.fillText('WELCOME', 105, 150);
+    ctx.font = '700 30px Arial';
+    ctx.fillStyle = theme.accent;
+    ctx.fillText('TO THE SERVER', 110, 205);
+    ctx.font = '500 22px Arial';
+    ctx.fillStyle = theme.sub;
+    ctx.fillText('GLAD TO HAVE YOU HERE', 110, 250);
+    ctx.font = '600 18px Arial';
+    ctx.fillStyle = theme.text;
+    ctx.fillText('BE RESPECTFUL  •  STAY ACTIVE  •  HAVE FUN', 110, 315);
+
+    const x = 830, y = 65, w = 300, h = 470;
+    ctx.fillStyle = `${theme.accent}18`;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 28);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = `${theme.accent}66`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 20, y + 20, w - 40, h - 40);
+    ctx.font = '700 16px Arial';
+    ctx.fillStyle = theme.sub;
+    ctx.textAlign = 'center';
+    ctx.fillText('MEMBER AVATAR', x + w / 2, y + h - 30);
+    ctx.textAlign = 'left';
+    ctx.font = '700 18px Arial';
+    ctx.fillStyle = theme.accent;
+    ctx.fillText('NEW MEMBER', 110, 385);
+    ctx.fillStyle = theme.sub;
+    ctx.font = '500 17px Arial';
+    ctx.fillText('YOUR ADVENTURE STARTS HERE', 110, 420);
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(110, 465, 260 + Math.floor(Math.random() * 180), 4);
+    fs.writeFileSync(filePath, canvas.toBuffer('image/png'));
+    return { width: 1200, height: 600, theme: theme.accent };
+}
+
 function getEmojiDisplay(guild, emojiId) {
     if (!emojiId) return '❓';
     const em = guild.emojis.cache.get(emojiId);
@@ -1021,6 +1096,8 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                 <label>قناة الترحيب</label><select name="channel"><option value="">-- اختر القناة --</option>${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}" ${s.welcome?.channel===c.id?'selected':''}># ${c.name}</option>`).join('')}</select>
                 <label>رسالة الترحيب</label><textarea name="embedMessage" placeholder="استخدم {member} و {guild} و {count}">${s.welcome?.embedMessage || 'مرحباً بك {member} في سيرفر {guild}!'}</textarea>
                 <label>خلفية البطاقة</label><input type="file" name="bgImage" accept="image/*" id="bgInput">
+                <button type="button" class="btn-save" id="randomWelcomeBtn" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#2b7a67,#145343);">إنشاء صورة ترحيب عشوائية</button>
+                <div id="randomWelcomeStatus" class="upload-note">اضغط الزر لتوليد تصميم جديد وتحديث المعاينة تلقائيًا، أو ارفع صورة من جهازك.</div>
                 <div class="upload-note">PNG أو JPG · يفضل مقاس 1600×800</div>
                 <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}"><input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}"><input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}"><input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
                 <button class="btn-save" type="submit" style="width:100%;margin-top:20px">حفظ بطاقة الترحيب</button>
@@ -1038,6 +1115,8 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
       const paint=()=>{const w=Number(size.value); avatar.style.width=w+'px';avatar.style.height=w+'px';avatar.style.left='calc('+x.value+'% - '+(w/2)+'px)';avatar.style.top='calc('+y.value+'% - '+(w/2)+'px)';hx.value=x.value;hy.value=y.value;hw.value=w;hh.value=w;xo.value=x.value+'%';yo.value=y.value+'%';so.value=w+'px'};
       [x,y,size].forEach(el=>el.addEventListener('input',paint));
       bg.addEventListener('change',()=>{const file=bg.files?.[0];if(file)bgPreview.src=URL.createObjectURL(file)});
+      const randomBtn=document.getElementById('randomWelcomeBtn'), randomStatus=document.getElementById('randomWelcomeStatus');
+      randomBtn?.addEventListener('click',async()=>{randomBtn.disabled=true;randomBtn.textContent='جاري إنشاء التصميم...';try{const r=await fetch('/generate/${g.id}/welcome-random',{method:'POST',headers:{'Content-Type':'application/json'}});const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'error');bgPreview.src=data.url+'?v='+Date.now();randomStatus.textContent='تم إنشاء تصميم جديد وتحديث المعاينة. اضغط حفظ لتثبيت إعدادات الصورة.';}catch(e){randomStatus.textContent='تعذر إنشاء الصورة، حاول مرة أخرى.';}finally{randomBtn.disabled=false;randomBtn.textContent='إنشاء صورة ترحيب عشوائية';}});
       let drag=null;
       const point=e=>e.touches?e.touches[0]:e;
       const down=e=>{if(e.target===handle)e.preventDefault(); const p=point(e), r=box.getBoundingClientRect(); drag={ox:p.clientX-r.left,oy:p.clientY-r.top,x:Number(x.value),y:Number(y.value)}; avatar.setPointerCapture?.(e.pointerId);};
@@ -1046,6 +1125,24 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     })();
     </script>`;
     res.send(ui(g, 'welcome', content));
+});
+
+app.post('/generate/:guildId/welcome-random', checkAuth, checkGuildAccess, async (req, res) => {
+    try {
+        const filename = `welcome-generated-${req.params.guildId}-${Date.now()}-${Math.floor(Math.random() * 100000)}.png`;
+        const absolutePath = path.join(__dirname, 'uploads', filename);
+        createRandomWelcomeBackground(absolutePath);
+        const imagePath = `/uploads/${filename}`;
+        await GuildConfig.findOneAndUpdate(
+            { guildId: req.params.guildId },
+            { $set: { 'welcome.imagePath': imagePath } },
+            { upsert: true }
+        );
+        return res.json({ ok: true, url: imagePath });
+    } catch (err) {
+        console.error('[Random Welcome Error]', err);
+        return res.status(500).json({ ok: false, error: 'تعذر إنشاء تصميم الترحيب.' });
+    }
 });
 
 app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (req, res) => {
