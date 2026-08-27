@@ -1100,10 +1100,9 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
                 <div class="toggle-row"><label style="margin:0;color:var(--text)">تفعيل الترحيب</label><input type="checkbox" name="enabled" ${s.welcome?.enabled ? 'checked' : ''}></div>
                 <label>قناة الترحيب</label><select name="channel"><option value="">-- اختر القناة --</option>${g.channels.cache.filter(c=>c.type===0).map(c=>`<option value="${c.id}" ${s.welcome?.channel===c.id?'selected':''}># ${c.name}</option>`).join('')}</select>
                 <label>رسالة الترحيب</label><textarea name="embedMessage" placeholder="استخدم {member} و {guild} و {count}">${s.welcome?.embedMessage || 'مرحباً بك {member} في سيرفر {guild}!'}</textarea>
-                <label>خلفية البطاقة</label><input type="file" name="bgImage" accept="image/*" id="bgInput">
-                <button type="button" class="btn-save" id="randomWelcomeBtn" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#2b7a67,#145343);">إنشاء صورة ترحيب عشوائية</button>
-                <div id="randomWelcomeStatus" class="upload-note">اضغط الزر لتوليد تصميم جديد وتحديث المعاينة تلقائيًا، أو ارفع صورة من جهازك.</div>
-                <div class="upload-note">PNG أو JPG · يفضل مقاس 1600×800</div>
+                <label>رابط خلفية البطاقة</label><input type="url" name="imageUrl" value="${s.welcome?.imagePath || ''}" placeholder="https://example.com/image.png" style="direction:ltr;text-align:left">
+                <div class="upload-note">ضع رابط صورة مباشر ثم اضغط حفظ.</div>
+                <div class="upload-note">يجب أن يكون الرابط عامًا ومباشرًا ويبدأ بـ https://</div>
                 <input type="hidden" name="avatarX" id="avatarX" value="${s.welcome?.avatarX || 50}"><input type="hidden" name="avatarY" id="avatarY" value="${s.welcome?.avatarY || 50}"><input type="hidden" name="avatarWidth" id="avatarWidth" value="${s.welcome?.avatarWidth || 150}"><input type="hidden" name="avatarHeight" id="avatarHeight" value="${s.welcome?.avatarHeight || 150}">
                 <button class="btn-save" type="submit" style="width:100%;margin-top:20px">حفظ بطاقة الترحيب</button>
             </div>
@@ -1114,14 +1113,11 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     </style>
     <script>
     (() => {
-      const box=document.getElementById('previewContainer'), avatar=document.getElementById('previewAvatar'), handle=document.getElementById('avatarHandle'), bg=document.getElementById('bgInput');
+      const box=document.getElementById('previewContainer'), avatar=document.getElementById('previewAvatar'), handle=document.getElementById('avatarHandle');
       const x=document.getElementById('xSlider'), y=document.getElementById('ySlider'), size=document.getElementById('sizeSlider'); const hx=document.getElementById('avatarX'), hy=document.getElementById('avatarY'), hw=document.getElementById('avatarWidth'), hh=document.getElementById('avatarHeight');
       const xo=document.getElementById('xOutput'), yo=document.getElementById('yOutput'), so=document.getElementById('sizeOutput');
       const paint=()=>{const w=Number(size.value); avatar.style.width=w+'px';avatar.style.height=w+'px';avatar.style.left='calc('+x.value+'% - '+(w/2)+'px)';avatar.style.top='calc('+y.value+'% - '+(w/2)+'px)';hx.value=x.value;hy.value=y.value;hw.value=w;hh.value=w;xo.value=x.value+'%';yo.value=y.value+'%';so.value=w+'px'};
       [x,y,size].forEach(el=>el.addEventListener('input',paint));
-      bg.addEventListener('change',()=>{const file=bg.files?.[0];if(file)bgPreview.src=URL.createObjectURL(file)});
-      const randomBtn=document.getElementById('randomWelcomeBtn'), randomStatus=document.getElementById('randomWelcomeStatus');
-      randomBtn?.addEventListener('click',async()=>{randomBtn.disabled=true;randomBtn.textContent='جاري إنشاء التصميم...';try{const r=await fetch('/generate/${g.id}/welcome-random',{method:'POST',headers:{'Content-Type':'application/json'}});const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'error');bgPreview.src=data.url.startsWith('data:')?data.url:data.url+'?v='+Date.now();randomStatus.textContent='تم إنشاء تصميم جديد وتحديث المعاينة. اضغط حفظ لتثبيت إعدادات الصورة.';}catch(e){randomStatus.textContent='تعذر إنشاء الصورة، حاول مرة أخرى.';}finally{randomBtn.disabled=false;randomBtn.textContent='إنشاء صورة ترحيب عشوائية';}});
       let drag=null;
       const point=e=>e.touches?e.touches[0]:e;
       const down=e=>{if(e.target===handle)e.preventDefault(); const p=point(e), r=box.getBoundingClientRect(); drag={ox:p.clientX-r.left,oy:p.clientY-r.top,x:Number(x.value),y:Number(y.value)}; avatar.setPointerCapture?.(e.pointerId);};
@@ -1150,7 +1146,7 @@ app.post('/generate/:guildId/welcome-random', checkAuth, checkGuildAccess, async
     }
 });
 
-app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (req, res) => {
+app.post('/save/:guildId/welcome', checkAuth, async (req, res) => {
     const b = req.body;
     let updateData = {
         'welcome.enabled': b.enabled === 'on',
@@ -1161,7 +1157,7 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (r
         'welcome.avatarWidth': Number(b.avatarWidth),
         'welcome.avatarHeight': Number(b.avatarHeight)
     };
-   if (req.file) updateData['welcome.imagePath'] = `data:${req.file.mimetype};base64,${fs.readFileSync(req.file.path).toString('base64')}`;
+    if (b.imageUrl?.trim()) updateData['welcome.imagePath'] = b.imageUrl.trim();
     await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: updateData }, { upsert: true });
     res.redirect(`/manage/${req.params.guildId}/welcome`);
 });
