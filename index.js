@@ -1080,7 +1080,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     let img = s.welcome?.imagePath || 'https://placehold.co/800x400?text=No+Background';
 
     const content = `
-    <form method="POST" action="/save/${g.id}/welcome" enctype="multipart/form-data" class="welcome-editor">
+    <form method="POST" action="/save/${g.id}/welcome" class="welcome-editor">
         <div class="editor-grid">
             <div class="card designer-card">
                 <div class="editor-heading"><div><div class="eyebrow">WELCOME BUILDER</div><h2>صمّم بطاقة الترحيب</h2><p>حرّك الصورة أو استخدم أدوات التحكم الدقيقة. التغيير يظهر مباشرة داخل المعاينة.</p></div><span class="editor-badge">LIVE PREVIEW</span></div>
@@ -1148,14 +1148,19 @@ app.post('/generate/:guildId/welcome-random', checkAuth, checkGuildAccess, async
 
 app.post('/save/:guildId/welcome', checkAuth, async (req, res) => {
     const b = req.body;
+    const safeNumber = (value, fallback) => {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : fallback;
+    };
+
     let updateData = {
         'welcome.enabled': b.enabled === 'on',
-        'welcome.channel': b.channel,
-        'welcome.embedMessage': b.embedMessage,
-        'welcome.avatarX': Number(b.avatarX),
-        'welcome.avatarY': Number(b.avatarY),
-        'welcome.avatarWidth': Number(b.avatarWidth),
-        'welcome.avatarHeight': Number(b.avatarHeight)
+        'welcome.channel': b.channel || '',
+        'welcome.embedMessage': b.embedMessage || 'مرحباً بك {member} في سيرفر {guild}!',
+        'welcome.avatarX': safeNumber(b.avatarX, 50),
+        'welcome.avatarY': safeNumber(b.avatarY, 50),
+        'welcome.avatarWidth': safeNumber(b.avatarWidth, 150),
+        'welcome.avatarHeight': safeNumber(b.avatarHeight, 150)
     };
     if (b.imageUrl?.trim()) updateData['welcome.imagePath'] = b.imageUrl.trim();
     await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: updateData }, { upsert: true });
