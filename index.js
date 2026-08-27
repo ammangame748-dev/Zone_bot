@@ -1121,7 +1121,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
       [x,y,size].forEach(el=>el.addEventListener('input',paint));
       bg.addEventListener('change',()=>{const file=bg.files?.[0];if(file)bgPreview.src=URL.createObjectURL(file)});
       const randomBtn=document.getElementById('randomWelcomeBtn'), randomStatus=document.getElementById('randomWelcomeStatus');
-      randomBtn?.addEventListener('click',async()=>{randomBtn.disabled=true;randomBtn.textContent='جاري إنشاء التصميم...';try{const r=await fetch('/generate/${g.id}/welcome-random',{method:'POST',headers:{'Content-Type':'application/json'}});const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'error');bgPreview.src=data.url+'?v='+Date.now();randomStatus.textContent='تم إنشاء تصميم جديد وتحديث المعاينة. اضغط حفظ لتثبيت إعدادات الصورة.';}catch(e){randomStatus.textContent='تعذر إنشاء الصورة، حاول مرة أخرى.';}finally{randomBtn.disabled=false;randomBtn.textContent='إنشاء صورة ترحيب عشوائية';}});
+      randomBtn?.addEventListener('click',async()=>{randomBtn.disabled=true;randomBtn.textContent='جاري إنشاء التصميم...';try{const r=await fetch('/generate/${g.id}/welcome-random',{method:'POST',headers:{'Content-Type':'application/json'}});const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'error');bgPreview.src=data.url.startsWith('data:')?data.url:data.url+'?v='+Date.now();randomStatus.textContent='تم إنشاء تصميم جديد وتحديث المعاينة. اضغط حفظ لتثبيت إعدادات الصورة.';}catch(e){randomStatus.textContent='تعذر إنشاء الصورة، حاول مرة أخرى.';}finally{randomBtn.disabled=false;randomBtn.textContent='إنشاء صورة ترحيب عشوائية';}});
       let drag=null;
       const point=e=>e.touches?e.touches[0]:e;
       const down=e=>{if(e.target===handle)e.preventDefault(); const p=point(e), r=box.getBoundingClientRect(); drag={ox:p.clientX-r.left,oy:p.clientY-r.top,x:Number(x.value),y:Number(y.value)}; avatar.setPointerCapture?.(e.pointerId);};
@@ -1137,7 +1137,7 @@ app.post('/generate/:guildId/welcome-random', checkAuth, checkGuildAccess, async
         const filename = `welcome-generated-${req.params.guildId}-${Date.now()}-${Math.floor(Math.random() * 100000)}.png`;
         const absolutePath = path.join(__dirname, 'uploads', filename);
         createRandomWelcomeBackground(absolutePath);
-        const imagePath = `/uploads/${filename}`;
+        const imagePath = `data:image/png;base64,${fs.readFileSync(absolutePath).toString('base64')}`;
         await GuildConfig.findOneAndUpdate(
             { guildId: req.params.guildId },
             { $set: { 'welcome.imagePath': imagePath } },
@@ -1161,7 +1161,7 @@ app.post('/save/:guildId/welcome', checkAuth, upload.single('bgImage'), async (r
         'welcome.avatarWidth': Number(b.avatarWidth),
         'welcome.avatarHeight': Number(b.avatarHeight)
     };
-   if (req.file) updateData['welcome.imagePath'] = `/uploads/${req.file.filename}`;
+   if (req.file) updateData['welcome.imagePath'] = `data:${req.file.mimetype};base64,${fs.readFileSync(req.file.path).toString('base64')}`;
     await GuildConfig.findOneAndUpdate({ guildId: req.params.guildId }, { $set: updateData }, { upsert: true });
     res.redirect(`/manage/${req.params.guildId}/welcome`);
 });
