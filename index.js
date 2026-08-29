@@ -663,6 +663,7 @@ function ui(guild, active, content) {
     const safe = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[ch]));
     const nav = guildId ? [
         ['home', 'نظرة عامة', `/manage/${guildId}/home`, '<path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>'],
+        ['serverinvite', 'رابط السيرفر', `/manage/${guildId}/serverinvite`, '<path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.2-1.2"/><path d="m8 16 8-8"/>'],
         ['security', 'الحماية', `/manage/${guildId}/security`, '<path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/>'],
         ['kick', 'تنبيهات Kick', `/manage/${guildId}/kick`, '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
         ['admincmds', 'الأوامر الإدارية', `/manage/${guildId}/admincmds`, '<path d="m4 7 4-4 4 4-4 4zM12 17l4-4 4 4-4 4zM14 7h6M4 17h6"/>'],
@@ -824,6 +825,36 @@ app.get('/dashboard', checkAuth, checkDashboardOwner, (req, res) => {
 });
 
 // --- [ Home / Stats ] ---
+async function createGuildInvite(guild) {
+    const botMember = guild.members.me || await guild.members.fetch(client.user.id).catch(() => null);
+    if (!botMember) return null;
+    const channels = [...guild.channels.cache.values()]
+        .filter(channel => channel.type !== ChannelType.GuildCategory && channel.isTextBased?.());
+    for (const channel of channels) {
+        const permissions = channel.permissionsFor(botMember);
+        if (!permissions?.has(PermissionFlagsBits.CreateInstantInvite)) continue;
+        const invite = await channel.createInvite({
+            maxAge: 0,
+            maxUses: 0,
+            unique: false,
+            reason: 'إنشاء رابط دخول من لوحة تحكم VORTEX'
+        }).catch(() => null);
+        if (invite) return { url: invite.url, channelName: channel.name };
+    }
+    return null;
+}
+
+app.get('/manage/:guildId/serverinvite', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    const invite = await createGuildInvite(g);
+    const safeUrl = invite?.url ? invite.url.replace(/&/g, '&amp;').replace(/"/g, '&quot;') : '';
+    const content = invite
+        ? `<div class="card"><h3>رابط دخول السيرفر</h3><p style="color:var(--text-muted);font-size:13px;line-height:1.9;">هذا رابط دعوة دائم للسيرفر، تم إنشاؤه من القناة <b style="color:var(--gold);">#${invite.channelName}</b>.</p><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><input id="serverInvite" value="${safeUrl}" readonly style="direction:ltr;text-align:left;flex:1;min-width:240px;"><button type="button" id="copyInvite" class="btn-save">نسخ الرابط</button><a href="${safeUrl}" target="_blank" rel="noopener" class="btn-save" style="text-decoration:none;">فتح الرابط</a></div></div><script>document.getElementById('copyInvite').addEventListener('click',async function(){const input=document.getElementById('serverInvite');try{await navigator.clipboard.writeText(input.value)}catch{input.select();document.execCommand('copy')}this.textContent='تم النسخ';setTimeout(()=>this.textContent='نسخ الرابط',1800)});</script>`
+        : `<div class="card"><h3>رابط دخول السيرفر</h3><p style="color:var(--red);font-size:13px;line-height:1.9;">تعذر إنشاء رابط دعوة. تأكد أن البوت يملك صلاحية <b>Create Instant Invite</b> في روم واحد على الأقل، ثم حدّث الصفحة.</p></div>`;
+    res.send(ui(g, 'serverinvite', content));
+});
+
 app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
     const g = client.guilds.cache.get(req.params.guildId);
     if (!g) return res.redirect('/dashboard');
@@ -837,7 +868,6 @@ app.get('/manage/:guildId/home', checkAuth, async (req, res) => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const newMembersCount = (statsData.membersLog?.joined || []).filter(d => d > sevenDaysAgo).length;
     const leftMembersCount = (statsData.membersLog?.left || []).filter(d => d > sevenDaysAgo).length;
-
     const content = `
     <div class="card">
         <h3>
