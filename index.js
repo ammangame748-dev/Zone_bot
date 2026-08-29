@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -659,7 +658,8 @@ function ui(guild, active, content) {
         ['welcome', 'الترحيب', `/manage/${guildId}/welcome`, '<path d="M12 21s-8-4.5-8-10V5l8-3 8 3v6c0 5.5-8 10-8 10z"/><path d="m9 12 2 2 4-4"/>'],
         ['giveaway', 'الهدايا', `/manage/${guildId}/giveaway`, '<path d="M4 10h16v10H4zM3 7h18v3H3zM12 7v13M12 7H8a2 2 0 1 1 2-2c2 0 2 2 2 2z"/>'],
         ['roles', 'الرتب', `/manage/${guildId}/roles`, '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 0 1 5 2M17 20h4"/>'],
-        ['mod', 'الإشراف', `/manage/${guildId}/mod`, '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>']
+        ['mod', 'الإشراف', `/manage/${guildId}/mod`, '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'],
+        ['poetry', 'الشعر العراقي', `/manage/${guildId}/poetry`, '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>']
     ] : [];
     const navHtml = nav.map(([key, label, href, path]) => `<a class="rail-link ${active === key ? 'is-active' : ''}" href="${href}" aria-current="${active === key ? 'page' : 'false'}"><svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg><span>${label}</span><i></i></a>`).join('');
     return `<!doctype html>
@@ -1684,6 +1684,67 @@ app.post('/save/:guildId/mod', checkAuth, async (req, res) => {
         { upsert: true }
     );
     res.redirect(`/manage/${req.params.guildId}/mod`);
+});
+
+// --- [ Iraqi Poetry ] ---
+app.get('/manage/:guildId/poetry', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId);
+    if (!g) return res.redirect('/dashboard');
+    let s = await PoetryConfig.findOne({ guildId: g.id }) || {};
+    const totalPoems = await Poem.countDocuments();
+
+    const content = `
+    <form method="POST" action="/save/${g.id}/poetry">
+        <div class="card">
+            <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                نظام الشعر العراقي
+            </h3>
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">
+                يقوم البوت بإرسال بيت شعر عراقي (باللهجة العراقية) بشكل دوري في الروم المحدد، بدون تكرار حتى تنتهي كل الأبيات المخزنة (يوجد حالياً <b style="color:var(--gold);">${totalPoems}</b> بيت في قاعدة البيانات).
+            </p>
+            <div class="toggle-row">
+                <label style="color:white; margin:0;">تفعيل نظام الشعر</label>
+                <input type="checkbox" name="enabled" ${s.enabled ? 'checked' : ''} style="width:20px; height:20px; accent-color:var(--gold); cursor:pointer;">
+            </div>
+            <label>روم إرسال الشعر</label>
+            <select name="channelId" required>
+                <option value="">-- اختر القناة --</option>
+                ${g.channels.cache.filter(c => c.type === 0).map(c =>
+                    `<option value="${c.id}" ${s.channelId === c.id ? 'selected' : ''}># ${c.name}</option>`
+                ).join('')}
+            </select>
+            <label>كل كم دقيقة يرسل بيت شعر جديد</label>
+            <input type="number" name="intervalMinutes" min="1" max="1440" value="${s.intervalMinutes || 2}" placeholder="2">
+            <label>رتبة يتم منشنها عند إرسال الشعر (اختياري)</label>
+            <select name="roleId">
+                <option value="">-- بدون منشن --</option>
+                ${g.roles.cache.filter(r => r.name !== '@everyone').map(r =>
+                    `<option value="${r.id}" ${s.roleId === r.id ? 'selected' : ''}>${r.name}</option>`
+                ).join('')}
+            </select>
+            <button class="btn-save" style="margin-top:20px;">حفظ إعدادات الشعر</button>
+        </div>
+    </form>`;
+
+    res.send(ui(g, 'poetry', content));
+});
+
+app.post('/save/:guildId/poetry', checkAuth, async (req, res) => {
+    const { guildId } = req.params;
+    const b = req.body;
+    const intervalMinutes = Math.min(1440, Math.max(1, parseInt(b.intervalMinutes) || 2));
+    await PoetryConfig.findOneAndUpdate(
+        { guildId },
+        { $set: {
+            enabled: b.enabled === 'on',
+            channelId: b.channelId || '',
+            intervalMinutes,
+            roleId: b.roleId || ''
+        }},
+        { upsert: true }
+    );
+    res.redirect(`/manage/${guildId}/poetry`);
 });
 
 
@@ -3418,6 +3479,261 @@ async function checkKickLive() {
 
 setInterval(checkKickLive, Number(process.env.KICK_CHECK_INTERVAL_MS || 30000));
 
+// ==========================================
+// 14.5 Iraqi Poetry System (شعر عراقي دوري)
+// ==========================================
+
+const Poem = mongoose.model('Poem', new mongoose.Schema({
+    text: { type: String, required: true, unique: true }
+}));
+
+const PoetryConfig = mongoose.model('PoetryConfig', new mongoose.Schema({
+    guildId: { type: String, required: true, unique: true },
+    enabled: { type: Boolean, default: false },
+    channelId: String,
+    roleId: String,
+    intervalMinutes: { type: Number, default: 2 },
+    lastSentAt: Date,
+    // طابور مخلوط من الـ ObjectId الخاصة بالأبيات المتبقية قبل إعادة التدوير، لضمان عدم تكرار أي بيت قبل ما تخلص كل الأبيات
+    queue: [{ type: mongoose.Schema.Types.ObjectId }]
+}));
+
+// أبيات شعر عراقي قصيرة، من تأليف أصلي بأسلوب الشعر الشعبي العراقي (دارمي/أبوذية/حكم) - مو منسوخة من أي مصدر
+const IRAQI_POEMS_SEED = [
+"يا كل ما جيت أحجيلك تعب اللسان\nوتبقه الروح تدور الك أمان",
+"سؤال الك ياكلبي شنو الدوه\nيريد الصبر ما بيه اشوفه",
+"دربنه طويل وياريت نوصل\nولو تعبت الروح ما ننكسر",
+"الفرگه صعبه بس الذكرى أصعب\nتبقه تدور بيك وياك تهرب",
+"شفتك من بعيد وحسيت گلبي\nيرجف مثل ريشه بيها الهوه",
+"چم مره گلت اسكت وما گدرت\nلأن الحچي يفضح اللي مخبيه",
+"عيوني تدور دربك بكل مكان\nولو غبت ساعة تحسبها زمان",
+"ما اريد غيرك ولا غيرك أريد\nوروحي بيك تحلم وتعيد",
+"صبرت وصبري صار مثل الجبل\nبس گلبي ما زال يحبك ويحل",
+"يا طيرالبيك اطير وياه\nخذ سلامي واحچيله اشتياگه",
+"الدنيه دوارة وحنه بيها ضيوف\nنعيش يومين وناخذ الحلوف",
+"گلبي صغير بس همومه چبار\nيتحمل الجرح وما يبين آثار",
+"مو كل اللي يبتسم يكون مرتاح\nبعضهم يبچي بداخله وياه سلاح",
+"العمر مايوگف على حالة\nيمشي ويمشي وياخذ رجالة",
+"لو تسال الگلب شلون حاله\nيگلك تعبان بس ما يبين حاله",
+"ما يفهم الحزن الا اللي ذاگه\nوما يعرف الفرح الا اللي باگه",
+"صديج زين يسوه ألف قريب\nويبقه وياك بالفرح والنصيب",
+"الصدگ صعب بزمن الكذب سهل\nبس اللي يصدگ يبقه بالمحل",
+"چم ندمت على كلمة گلتها\nوچم فرحت بابتسامة رديتها",
+"الوگت يمشي وما يوگف لحد\nخذ العبرة وسوي الخير وحد",
+"يا ليل طول وخل الهم يفوت\nولا تخليني اعيش بهل السكوت",
+"العتب مو حل والصبر أحسن طريج\nلأن الصبر بالآخر يصير بريج",
+"ما كل من يضحك گلبه مرتاح\nوما كل من يبچي يريد سماح",
+"احبك مثل ما يحب الگمر الليل\nوانته بگلبي مثل ماي السيل",
+"سكتنه سنين وحچينه بساعة\nلأن الشوگ ما يعرف طاعة",
+"يا وطني الغالي وين ما اروح\nگلبي وياك وروحي معك تلوح",
+"الاصل يبين بالمواقف مو بالحچي\nواللي اصله زين يبين بلا شي",
+"چان الفراگ صعب واليوم اصعب\nبس الأمل يبقه وما ينهزم",
+"من كثر ما تعبت ما بقه ادعي\nبس اني اعرف الرب يسمعني",
+"يا ايام مرت شگد كانت حلوة\nوليتها ترجع ولو ساعة وحدة",
+"الوفه صار غالي والناس تغيرت\nبس گلبي الطيب ما زال ثابت",
+"العين تشوف والگلب يحس\nوالروح تعرف اللي بيها امس",
+"مو عيب تبچي إذا الجرح وجعك\nالعيب تخفي وتخلي الهم ياكلك",
+"يا نجمة بالسمه شفتيه وين راح\nخبريه اني لهسه بعده ما ارتاح",
+"دنيه غدارة وناسها تتغير\nبس روحي الطيبة ما راح تتغير",
+"چم درب مشيته لحد ما وصلت\nوچم مرة تعبت وچم مرة ابتسمت",
+"احچيلك عن گلبي وشلون تعب\nوانته السبب باللي صاير وسبب",
+"العمر گصير والدنيه فانية\nخل نعيش بالخير ونترك امانة",
+"يا حبيبي البعد صعب ونار\nبس گلبي بيك يفتخر ويفتخر",
+"الصبر مفتاح الفرج يا اخوان\nولو طال الليل لازم يجي الاذان",
+"ما ننسه اللي وقف وياي بضيقي\nولا ننسه اللي زرع الشوگ بطريقي",
+"يا حظي العاثر ليش دايم تلعب\nخليني مرة اضحك بلا تعب",
+"الگلب يعشگ والعين تدمع\nوالروح تحن للي ما ترجع",
+"عيني تدور وجهك بكل زحمة\nوالگلب يحسب ثانية سنة",
+"يا ريتني طير اطير وياك\nواحط براس التل واحچيلك احچاياك",
+"مثل شمعة تحترگ وتنور غيرها\nهيچي الطيب يفنى ويبقه ذكرها",
+"البعد قاسي والوصل احلى امنية\nوگلبي دايم يحلم بيك ثانية",
+"لا تلوم گلبي إذا حن لأصله\nفكل شي براسه يرجع لأهله",
+"يا ورده حمره شبيهه خدك\nوريحتك بالگلب ما تفارگ عندك",
+"العمر مثل الماي يمشي وما يرجع\nخل نغتنم كل يوم قبل ما يوجع",
+"صرت اتعلم من جروحي دروس\nواعرف مين الصادگ ومين الفلوس",
+"يا صاحبي الزين وين ما تروح\nذكرك بگلبي ما يفارگ ولا يروح",
+"الگربه صعبة والوطن بالگلب\nولو غبنه سنين نرجع بلا حسب",
+"چم مرة گلت راح انسه واعيش\nبس گلبي يرجع ليك بلا تفتيش",
+"يا شمعة العمر ليش تنطفي بسرعة\nخلي ضويچ يبقه بالگلب دفعة",
+"الحچي يبين شنو نوع الانسان\nوالصمت احيان يحچي اكثر من لسان",
+"يا غايب عن عيني حاضر بروحي\nما ينسه گلبي غيابك يا نوحي",
+"العتب صار موده بزمن الغربه\nوالصبر صار زاد يا هل التربة",
+"شگد صعب اضحك وگلبي مكسور\nبس الحياة تفرض هل الشعور",
+"يا ريت الزمن يرجع الينه ايام\nنعيشها من جديد بلا ازعاج والام",
+"الصدگ يبقه ولو مر الزمان\nوالكذب ينكشف ولو طال الأمان",
+"گلبي تعلم يصبر على الجراح\nويحاول دايما يلگه طريج الفلاح",
+"يا ابو العيون السود شفتك وهويت\nوانسه العالم كله وياك سبيت",
+"الدرب طويل والزاد گليل\nبس العزيمة توصلنه بالتفصيل",
+"يا حزن گلبي متى بتروح وتخلص\nتعبت اتحمل وابچي واتنفس",
+"الاصدقاء بوگت الضيگ يبينون\nواللي يصبرون وياك هم الطيبون",
+"يا ليل خذني بعيد عن همومي\nوردني اطفل العب بايامي",
+"العشگ صعب لو صادگ ونظيف\nويصير سهل لو كان زيف وخفيف",
+"چم حاولت انسه وچم فشلت\nلأن الذكرى بگلبي ما اندفنت",
+"يا وردة الصبر تفتحي بروحي\nوخليني اتحمل واقاوم جروحي",
+"الگلب لو صافي يشوف الصفه\nوالعين الحسودة ما تشوف الا العله",
+"يا نسمة الصبح خذي سلامي\nوصليه لحبيبي بعيد امامي",
+"العمر فرصة وحدة وما ترجع\nخل نعيشها بمعنه وما نضيع",
+"چم مره سامحت وچم مره جرحوني\nبس گلبي الطيب دايم يرجع لهوني",
+"يا اهل الطيبة الله يخليكم\nوياريت دايما الخير يوصلكم",
+"الصبر مو ضعف الصبر قوة\nواللي يصبر بالنهاية يلگه الحلوة",
+"يا نجمة تلمعين وسط الظلام\nكوني دليلي واهديني للسلام",
+"العتاب بين الحبايب دليل شوگ\nوالسكوت بينهم اصعب من الفراگ",
+"چم درب سلكته لحد ما لگيتك\nوچم ليلة سهرت وانه اتذكرك",
+"يا ابو الگلب الطيب زادك الله خير\nوخلا ربي يحفظك من كل شر",
+"العين لما تدمع تفضح گلب حزين\nوالابتسامة احيانا تخفي جرح دفين",
+"يا وطن الاجداد كل الگلب اليك\nولو بعدت اجسادنه ارواحنه اليك",
+"الصبر مفتاح والدعه سلاح\nوالله كريم يبدل الضيگ فلاح",
+"يا صديج العمر شكراً على وفاك\nوعلى وگفتك وياي بايام شگاك",
+"العمر دقايق تعدي وما ترجع\nخل كل دقيقة نعيشها ما تضيع",
+"چم مره حاولت اداري دمعتي\nبس الحزن يبين ولو خفيت غصتي",
+"يا رب فرجها على كل مهموم\nواسترها على كل مذنوب ومظلوم",
+"الحياة درس وكل يوم فصل جديد\nنتعلم ونغلط ونحاول نعيد",
+"يا حمامة السطح غنيلي شوية\nخفف عني الهم بهل العشية",
+"العتب الك يا زمن ليش تدور\nوتاخذ الطيبين وتخلي الشرور",
+"چم شخص مر بحياتي وترك اثر\nوچم شخص نسيته بلمح البصر",
+"يا اهل الگلوب الصافية دوموا هيچي\nلأن الدنيه تحتاج قلوب نظيفة",
+"الفرح لو صادگ ينور الوجه\nوالحزن لو ثگيل يبين بلا لبس",
+"يا نور عيني وين ما تكون تنور\nودربك بگلبي محفور ومسطور",
+"العمر مثل الكتاب كل يوم صفحة\nنكتبها احنه ونعيش القصة",
+"چم مرة ضحكت وگلبي يبچي بداخل\nوچم مرة صبرت والصبر بيه فاصل",
+"يا ابو الخلگ الزين تسلم يمينك\nوربي يديم عليك الخير ويحفظك",
+"الصدگ نور ولو كان مر\nوالكذب ظلام ولو زين المظهر",
+"يا صوت الاذان يريح گلوبنه\nويذكرنه بربنه وبديننه",
+"العتاب حلو لو كان بين الاحباب\nويصير مر لو زاد عن الاسباب",
+"چم ليلة سهرت اداري همومي\nوچم صباح ابتسمت رغم جروحي",
+"يا اهل الوفه دوموا الينه سند\nوخلوا المحبة تجمعنه للأبد",
+"العمر لو طال او گصر لازم ينتهي\nخل نسوي الخير قبل لا ينتهي",
+"يا شمس الصبح طلعي بهاء\nوخلي النور يمحي كل ظلماء",
+"الگلب الطيب ما يحمل حقد\nويسامح ويصفح ويبقه بالود",
+"چم مرة گلت هذا اخر العنه\nوچم مرة رجعت نفس المكان",
+"يا نسيم الفجر خذني بعيد\nوردني اعيش يوم زين وسعيد",
+"العمر رحلة والزاد الايمان\nوالصبر رفيگ يوصلنه للأمان",
+"يا صديگ الدرب شكرا لوجودك\nوعلى المحبة اللي دايم بعهودك",
+"الحزن يمر مثل ما تمر الغيمة\nوبعده تطلع شمس الفرح بحكمة",
+"چم مره سالت الگمر عنك يريد\nوچم مره حچيت الريح بلا ما تعيد",
+"يا اهل البيت العتيگ ذكراكم تعيش\nوگلوبنه بيها الحنين ما يطيش",
+"العمر گصير والدنيه ما تدوم\nخل نعيش بمحبة وناخذ عبر ونهوم",
+"يا طير الحمام غني للمحبين\nوخبرهم اننه دايما ذاكرين",
+"الصبر تاج ما يلبسه الا الكرام\nواللي يصبر ينال في الاخر مقام",
+"چم درب صعب مشيته لحد النور\nوچم مرة كنت اظن اني مقهور",
+"يا اهل الطيبة نورو دربنه\nوخلو المحبة تسود بيننه",
+"العتب على الزمن مو على الناس\nلأن الزمن هو اللي يغير الاحساس",
+"يا صوت الگيثارة عزف الأسى\nخل الالحان توصف اللي جرى",
+"الگلب الجريح يشفى بوگتها\nويرجع يحب ويعيش فرحتها",
+"چم مرة ندمت وچم مرة سامحت\nوچم مرة بالصمت گلبي تكلم وباح",
+"يا اهل الاصالة انتم زين الديار\nوبيكم نفتخر ونعيش بكل فخار",
+"العمر لحظات تعدي وتنمحي\nخل كل لحظة نعيشها بمعنى وحي",
+"يا ابو الطيبة يخليك الله لينه\nونورك يبقه دايم يهدينه",
+"الصدگ بالحچي يبين الرجال\nوالكذب يفضح صاحبه بلا سؤال",
+"چم مرة تعبت وچم مرة ارتحت\nوچم مرة بعد الظلام النور لمحت",
+"يا نجوم الليل شهدوا على شوگي\nوعلى صبري وعلى طول طريگي",
+"العمر امانة والوگت يمشي بسرعة\nخل نسوي فيه اللي يفرح وينفعنه",
+"يا صديگ الطفولة وين ما تكون\nذكرياتنه بگلبي ما تهون",
+"الفرح الحقيقي يجي من گلب صافي\nوما يشترى بمال ولا بفلوس وافي",
+"چم حلم حلمته وچم حلم تحقق\nوچم مرة بالصبر طريگي انفتح",
+"يا اهل الگرية الطيبة عادت الينه ذكرى\nوگلبي بيها يحن وياخذ صورة",
+"العمر مدرسة نتعلم منها كل يوم\nونحاول نصلح اخطانه ونقوم",
+"يا شمس المغيب ودعي بهدوء\nوخلي غدنه يجي احلى وانقى",
+"الصبر على البلوى فرج قريب\nوالله كريم مايخلي عبده بلا نصيب",
+"چم صديج صدگ وچم صديج خان\nوگلبي مايزال يثق ومايهان",
+"يا اهل المحبة دوموا كل هالطيب\nوخلو الگلوب تلتگي بلا عيب",
+"العمر كتاب وكل صفحة درس\nنتعلم منها ونمشي بلا وسواس",
+"يا طير مسافر خذ اشواگي وياك\nوردهن الحبيب اللي دايم بباله",
+"الگلب الوفي ما ينسه اهله\nولو بعدت المسافة يبقه فيهم امله",
+"چم مرة بچيت من الفرح لا من الحزن\nوچم مرة ضحكت وگلبي بيه شجن",
+"يا اهل الصبر ربي وياكم دايما\nويجزيكم خير على كل ما تحملتوا",
+"العمر لو طال يبقه ذكرى حلوة\nولو گصر يبقه بگلوبنه صورة",
+"يا نسيم الليل بلغ سلامي\nلكل حبيب بعيد عن مكاني",
+"الصدگ سلاح ولو كان صعب حمله\nوالكذب راحة موقتة وبعدها ذله",
+"چم درب مشيته وچم درب بقه\nوگلبي دايم يدور طريگ الحق",
+"يا اهل الوفه انتم زين الزمان\nوبيكم نفتخر بكل مكان",
+"العمر رحلة قصيرة بس عميقة\nنعيشها بمحبة ونخلي الذكرى رقيقة"
+];
+
+async function seedPoemsIfNeeded() {
+    try {
+        const count = await Poem.countDocuments();
+        if (count > 0) return;
+        const docs = [...new Set(IRAQI_POEMS_SEED)].map(text => ({ text }));
+        await Poem.insertMany(docs, { ordered: false }).catch(() => {});
+        console.log(`[Poetry] تم زرع ${docs.length} بيت شعر عراقي في قاعدة البيانات.`);
+    } catch (err) {
+        console.error('[Poetry Seed Error]', err.message);
+    }
+}
+
+async function refillPoetryQueue(config, excludeId = null) {
+    const allIds = (await Poem.find({}, { _id: 1 }).lean()).map(p => p._id.toString());
+    if (allIds.length === 0) return [];
+    // خلط عشوائي (Fisher-Yates)
+    for (let i = allIds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
+    }
+    // نتجنب انو نفس البيت الاخير يطلع اول وحدة بالدورة الجديدة إذا العدد يسمح
+    if (excludeId && allIds.length > 1 && allIds[0] === excludeId.toString()) {
+        [allIds[0], allIds[1]] = [allIds[1], allIds[0]];
+    }
+    return allIds;
+}
+
+async function sendPoemToGuild(config) {
+    const guild = client.guilds.cache.get(config.guildId);
+    if (!guild) return;
+    const channel = guild.channels.cache.get(config.channelId) || await guild.channels.fetch(config.channelId).catch(() => null);
+    if (!channel?.isTextBased?.()) return;
+
+    let queue = Array.isArray(config.queue) ? [...config.queue] : [];
+    if (queue.length === 0) {
+        queue = await refillPoetryQueue(config);
+        if (queue.length === 0) return; // لا يوجد أي شعر بقاعدة البيانات
+    }
+
+    const nextId = queue.shift();
+    const poem = await Poem.findById(nextId).catch(() => null);
+
+    config.queue = queue;
+    config.lastSentAt = new Date();
+    await config.save().catch(() => {});
+
+    if (!poem) return; // البيت انحذف بينهم، الدورة الجاية بتصلحها
+
+    const colors = [0xd4af37, 0x53fc18, 0x6d7cff, 0xff5e9c, 0x32e6b1, 0xf4c24c];
+    const embed = new EmbedBuilder()
+        .setTitle('📜 بيت شعر عراقي')
+        .setDescription(`**${poem.text.replace(/\n/g, '\n')}**`)
+        .setColor(colors[Math.floor(Math.random() * colors.length)])
+        .setFooter({ text: 'VORTEX  - الشعر العراقي' })
+        .setTimestamp();
+
+    const mention = config.roleId ? `<@&${config.roleId}>` : undefined;
+    await channel.send({ content: mention, embeds: [embed], allowedMentions: config.roleId ? { roles: [config.roleId] } : undefined }).catch(e => console.error('[Poetry Send Error]', e.message));
+}
+
+let poetryCheckRunning = false;
+async function checkPoetrySchedules() {
+    if (poetryCheckRunning) return;
+    poetryCheckRunning = true;
+    try {
+        const configs = await PoetryConfig.find({ enabled: true, channelId: { $exists: true, $ne: '' } });
+        const now = Date.now();
+        for (const config of configs) {
+            const intervalMs = Math.max(1, config.intervalMinutes || 2) * 60 * 1000;
+            const last = config.lastSentAt ? new Date(config.lastSentAt).getTime() : 0;
+            if (now - last >= intervalMs) {
+                await sendPoemToGuild(config);
+            }
+        }
+    } catch (err) {
+        console.error('[Poetry Scheduler Error]', err.message);
+    } finally {
+        poetryCheckRunning = false;
+    }
+}
+
+// نفحص كل 20 ثانية بس الإرسال الفعلي يصير بس إذا وصل وگت العدّاد الخاص بكل سيرفر (intervalMinutes)
+setInterval(checkPoetrySchedules, 20 * 1000);
+
 
 // ==========================================
 // 15. Slash Commands Registration
@@ -3627,7 +3943,9 @@ client.once('ready', async () => {
     }
 
     await registerSlashCommands();
+    await seedPoemsIfNeeded();
     checkKickLive();
+    checkPoetrySchedules();
 });
 
 // ==========================================
