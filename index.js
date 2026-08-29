@@ -3857,17 +3857,27 @@ for (const [first, second, meaning] of GENERATED_IRAQI_POEMS) {
 
 // تحويل الأبيات القديمة إلى سجلات تحمل معنى، مع إبقاء النصوص كما هي.
 const POEM_MEANINGS = [
-    ['فراگ|غياب|بعد', 'المعنى: يحچي عن وجع الفراق والاشتياق لشخص غالي.'],
-    ['صبر|جراح|حزن|هم', 'المعنى: يعبّر عن الصبر وتحمل التعب إلى أن يجي الفرج.'],
-    ['صديج|رفيق|وفه|عشرة', 'المعنى: يمدح الصداقة الصادقة والوقفة وقت الشدة.'],
-    ['وطن|دار|گرية|بيت', 'المعنى: يعبّر عن الحنين للوطن والبيت والأهل.'],
-    ['حب|عشگ|حبيب|شوگ', 'المعنى: يعبّر عن محبة صادقة واشتياق من القلب.'],
-    ['صدق|صدگ|كذب|مواقف', 'المعنى: يوضح أن الصدق والأصل يبانن بالمواقف مو بالحچي.'],
-    ['عمر|وگت|دنيه|حياة', 'المعنى: يذكّرنا بأن العمر يمشي بسرعة ولازم نستثمره بالخير.']
-]
+    { words: ['فراگ', 'غياب', 'بعد', 'غايب'], values: ['المعنى: يحچي عن وجع الفراگ والاشتياگ لشخص غالي.', 'المعنى: يصف شلون الغياب يطوّل الوقت ويخلّي الذكرى حاضرة.', 'المعنى: يعبّر عن أمل الوصل رغم قسوة البعد.'] },
+    { words: ['صبر', 'جراح', 'حزن', 'هم', 'دمع'], values: ['المعنى: يعبّر عن تحمل التعب لحد ما يجي الفرج.', 'المعنى: يذكّر أن الجرح يعلّم الإنسان ويقوّي قلبه.', 'المعنى: يحچي عن حزن مخفي وراء السكوت والابتسامة.'] },
+    { words: ['صديج', 'رفيق', 'وفه', 'عشرة'], values: ['المعنى: يمدح الصديق اللي يوقف ويّاك بوقت الضيگ.', 'المعنى: يبيّن أن العشرة الصادقة أغلى من كثرة المعارف.', 'المعنى: يعبّر عن امتنان شخص ما نسى وگفة حبيبه.'] },
+    { words: ['وطن', 'دار', 'گرية', 'بيت', 'أهل'], values: ['المعنى: يعبّر عن حنين الروح للوطن والأهل.', 'المعنى: يبيّن أن الدار تبقى بالگلب حتى لو طال السفر.', 'المعنى: يحچي عن فخر الإنسان بمكانه وذكرياته.'] },
+    { words: ['حب', 'عشگ', 'حبيب', 'شوگ', 'گلبي'], values: ['المعنى: يعبّر عن محبة صادگة ساكنة بالگلب.', 'المعنى: يصف اشتياگ المحب لشخص ما يگدر ينساه.', 'المعنى: يحچي عن أثر الحبيب اللي يبقى بكل تفاصيل اليوم.'] },
+    { words: ['صدق', 'صدگ', 'كذب', 'مواقف', 'أصل'], values: ['المعنى: يوضح أن الصدگ يبان بالمواقف مو بكثرة الحچي.', 'المعنى: يفرّق بين صاحب الأصل وبين الكلام اللي ما وراه فعل.', 'المعنى: يذكّر أن الكذب ينكشف مهما طال الوقت.'] },
+    { words: ['عمر', 'وگت', 'دنيه', 'حياة', 'يوم'], values: ['المعنى: يذكّرنا أن العمر يمشي بسرعة ولازم نغتنم أيامه.', 'المعنى: يحثّ على ترك أثر طيب قبل ما تمر السنين.', 'المعنى: يبيّن أن كل يوم فرصة جديدة للتغيير والفرح.'] }
+];
 function meaningForPoem(text) {
-    const hit = POEM_MEANINGS.find(([words]) => words.split('|').some(word => text.includes(word)))
-    return hit ? hit[1] : 'المعنى: يحچي عن إحساس صادق وتجربة من تجارب الحياة.'
+    const source = String(text || '');
+    const matched = POEM_MEANINGS.find(group => group.words.some(word => source.includes(word)));
+    const values = matched?.values || ['المعنى: يحچي عن إحساس صادق وتجربة من تجارب الحياة.', 'المعنى: يعبّر عن مشاعر وتجربة تركت أثرها بالروح.', 'المعنى: يصف إحساساً عميقاً يمر بيه الإنسان بحياته.'];
+    let hash = 0;
+    for (const char of source) hash = (hash * 31 + char.codePointAt(0)) >>> 0;
+    return values[hash % values.length];
+}
+function resolvedPoemMeaning(poem) {
+    const stored = String(poem?.meaning || '').trim();
+    return !stored || stored === 'يحچي عن إحساس صادق ومشاعر من القلب.' || stored === 'المعنى: يحچي عن إحساس صادق وتجربة من تجارب الحياة.'
+        ? meaningForPoem(poem?.text)
+        : stored;
 }
 const NORMALIZED_POEMS = IRAQI_POEMS_SEED.map(item => typeof item === 'string'
     ? { text: item, meaning: meaningForPoem(item) }
@@ -3926,12 +3936,16 @@ async function sendPoemToGuild(config) {
 
     const guildConfig = await GuildConfig.findOne({ guildId: guild.id }).lean().catch(() => null);
     const bannerURL = guildConfig?.welcome?.bannerURL;
+    const actualMeaning = resolvedPoemMeaning(poem);
+    if (poem.meaning !== actualMeaning) {
+        await Poem.updateOne({ _id: poem._id }, { $set: { meaning: actualMeaning } }).catch(() => {});
+    }
     const embed = new EmbedBuilder()
         .setTitle('بيت شعر عراقي')
         .setDescription(`**${String(poem.text).replace(/\n/g, '\n')}**`)
         .addFields(
             { name: 'ــــــــــــــــــــــــــــ', value: 'ــــــــــــــــــــــــــــ', inline: false },
-            { name: 'المعنى', value: poem.meaning || meaningForPoem(String(poem.text)), inline: false }
+            { name: 'المعنى', value: actualMeaning, inline: false }
         )
         .setColor(0xff0000)
         .setFooter({ text: 'VORTEX - الشعر العراقي' })
