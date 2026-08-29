@@ -661,6 +661,8 @@ function ui(guild, active, content) {
         ['giveaway', 'الهدايا', `/manage/${guildId}/giveaway`, '<path d="M4 10h16v10H4zM3 7h18v3H3zM12 7v13M12 7H8a2 2 0 1 1 2-2c2 0 2 2 2 2z"/>'],
         ['roles', 'الرتب', `/manage/${guildId}/roles`, '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0M16 11a3 3 0 0 1 5 2M17 20h4"/>'],
         ['mod', 'الإشراف', `/manage/${guildId}/mod`, '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'],
+        ['massban', 'تبنيد الأشخاص', `/manage/${guildId}/massban`, '<path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6z"/><path d="M8 12h8"/>'],
+        ['channelswipe', 'حذف جميع الرومات', `/manage/${guildId}/channelswipe`, '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"/>'],
         ['poetry', 'الشعر العراقي', `/manage/${guildId}/poetry`, '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>']
     ] : [];
     const navHtml = nav.map(([key, label, href, path]) => `<a class="rail-link ${active === key ? 'is-active' : ''}" href="${href}" aria-current="${active === key ? 'page' : 'false'}"><svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg><span>${label}</span><i></i></a>`).join('');
@@ -768,27 +770,17 @@ app.post('/save/:guildId/admincmds', checkAuth, async (req, res) => {
 
 // --- [ Dashboard - Server List ] ---
 app.get('/dashboard', checkAuth, (req, res) => {
-    const adminGuilds = req.user.guilds.filter(g => {
-        const p = BigInt(g.permissions);
-        return (p & 8n) === 8n || (p & 32n) === 32n;
-    });
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
-
-    const cards = adminGuilds.map(g => {
-        const hasBot = client.guilds.cache.has(g.id);
-        const iconURL = g.icon
-            ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256`
-            : 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-        return `
-        <div class="guild-card">
-            <img src="${iconURL}" class="guild-icon" alt="${g.name}">
-            <h3>${g.name}</h3>
-            ${hasBot
-                ? `<a href="/manage/${g.id}/home" style="color:var(--gold);">الإعدادات</a>`
-                : `<a href="${inviteLink}" style="color:#00c853;">اضافة البوت</a>`
-            }
-        </div>`;
+    const userGuilds = new Map((req.user.guilds || []).map(g => [g.id, g]));
+    const botGuilds = [...client.guilds.cache.values()];
+    const cards = botGuilds.map(g => {
+        const userGuild = userGuilds.get(g.id);
+        let canManage = false;
+        try {
+            const p = BigInt(userGuild?.permissions || 0);
+            canManage = !!userGuild && (((p & 8n) === 8n) || ((p & 32n) === 32n));
+        } catch {}
+        const iconURL = g.iconURL({ extension: 'png', size: 256 }) || 'https://cdn.discordapp.com/embed/avatars/0.png';
+        return `<div class="guild-card"><img src="${iconURL}" class="guild-icon" alt="${g.name}"><h3>${g.name}</h3>${canManage ? `<a href="/manage/${g.id}/home" style="color:var(--gold);">الإعدادات</a>` : '<span style="color:var(--text-muted);">لا تملك صلاحية الإدارة</span>'}</div>`;
     }).join('');
 
     const content = `
@@ -1822,6 +1814,57 @@ app.post('/save/:guildId/poetry', checkAuth, async (req, res) => {
 });
 
 
+
+// --- [ Dashboard - Bulk Moderation ] ---
+function parseExcludedIds(value) {
+    return new Set(String(value || '').split(/[\s,؛،]+/).map(x => x.trim()).filter(x => /^\d{15,22}$/.test(x)));
+}
+function actionNotice(type, message) {
+    const color = type === 'error' ? 'var(--red)' : 'var(--gold)';
+    return `<div style="padding:13px 16px;border:1px solid ${color};border-radius:12px;background:rgba(244,194,76,.08);color:${color};margin-bottom:18px;font-weight:700;">${message}</div>`;
+}
+app.get('/manage/:guildId/massban', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId); if (!g) return res.redirect('/dashboard');
+    const botMember = g.members.me || await g.members.fetch(client.user.id).catch(() => null);
+    const canBan = !!botMember?.permissions.has(PermissionFlagsBits.BanMembers);
+    const notice = req.query.notice ? actionNotice(req.query.type === 'error' ? 'error' : 'ok', String(req.query.notice).replace(/[<>"']/g, '')) : '';
+    const content = `${notice}<div class="card"><h3>تبنيد عدد محدد من الأشخاص</h3><p style="color:var(--text-muted);font-size:13px;line-height:1.9;">اكتب العدد المطلوب. سيختار البوت أعضاءً يمكنه تبنيدهم فقط، ولن يتجاوز مالك السيرفر أو الأعضاء الأعلى من رتبة البوت أو الأعضاء الموجودين في قائمة الاستثناء.</p><div style="padding:12px 14px;border-radius:12px;border:1px solid ${canBan ? 'rgba(95,208,131,.35)' : 'rgba(225,77,67,.45)'};color:${canBan ? '#8de4a6' : 'var(--red)'};margin-bottom:18px;">${canBan ? 'صلاحية التبنيد متوفرة للبوت.' : 'البوت لا يملك صلاحية Ban Members.'}</div><form method="POST" action="/manage/${g.id}/massban" onsubmit="return confirm('سيتم تنفيذ التبنيد مباشرة. هل تريد المتابعة؟');"><label>عدد الأشخاص المطلوب تبنيدهم</label><input type="number" name="count" min="1" max="500" required placeholder="مثال: 10"><label>استثناءات (User IDs فقط، افصل بينها بفواصل أو أسطر)</label><textarea name="excludedIds" rows="5" placeholder="123456789012345678\n987654321098765432"></textarea><small style="display:block;color:var(--text-muted);margin-top:8px;">فعّل Developer Mode في Discord لنسخ User ID.</small><button class="btn-save" type="submit" style="margin-top:20px;" ${canBan ? '' : 'disabled'}>تم — ابدأ التبنيد</button></form></div>`;
+    res.send(ui(g, 'massban', content));
+});
+app.post('/manage/:guildId/massban', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId); if (!g) return res.redirect('/dashboard');
+    const count = Math.min(500, Math.max(1, Number.parseInt(req.body.count, 10) || 0));
+    const excluded = parseExcludedIds(req.body.excludedIds);
+    const botMember = g.members.me || await g.members.fetch(client.user.id).catch(() => null);
+    if (!count || !botMember?.permissions.has(PermissionFlagsBits.BanMembers)) return res.redirect(`/manage/${g.id}/massban?type=error&notice=${encodeURIComponent('العدد غير صالح أو صلاحية التبنيد غير متوفرة.')}`);
+    try {
+        const members = await g.members.fetch();
+        const candidates = [...members.values()].filter(member => !member.user.bot && member.id !== g.ownerId && !excluded.has(member.id) && member.bannable && botMember.roles.highest.comparePositionTo(member.roles.highest) > 0).slice(0, count);
+        let banned = 0;
+        for (const member of candidates) if (await member.ban({ reason: `تبنيد جماعي من لوحة التحكم بواسطة ${req.user.username || req.user.id}` }).then(() => true).catch(() => false)) banned++;
+        return res.redirect(`/manage/${g.id}/massban?type=${banned ? 'ok' : 'error'}&notice=${encodeURIComponent(`تم تبنيد ${banned} من أصل ${count}. تم تجاوز ${count - banned} بسبب الرتبة أو الاستثناءات أو عدم إمكانية التبنيد.`)}`);
+    } catch (err) { console.error('[Mass Ban Error]', err); return res.redirect(`/manage/${g.id}/massban?type=error&notice=${encodeURIComponent('حدث خطأ أثناء تنفيذ التبنيد.')}`); }
+});
+app.get('/manage/:guildId/channelswipe', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId); if (!g) return res.redirect('/dashboard');
+    const botMember = g.members.me || await g.members.fetch(client.user.id).catch(() => null);
+    const canManage = !!botMember?.permissions.has(PermissionFlagsBits.ManageChannels);
+    const notice = req.query.notice ? actionNotice(req.query.type === 'error' ? 'error' : 'ok', String(req.query.notice).replace(/[<>"']/g, '')) : '';
+    const content = `${notice}<div class="card"><h3>حذف جميع الرومات</h3><p style="color:var(--text-muted);font-size:13px;line-height:1.9;">هذا الإجراء يحذف كل القنوات والتصنيفات نهائيًا ولا يمكن التراجع عنه. لن يبدأ التنفيذ إلا بعد كتابة عبارة التأكيد حرفيًا.</p><div style="padding:14px;border:1px solid rgba(225,77,67,.5);border-radius:12px;background:rgba(225,77,67,.1);color:#ffaaa3;margin-bottom:18px;font-weight:700;">تحذير: سيتم حذف ${g.channels.cache.size} رومًا/تصنيفًا.</div><form method="POST" action="/manage/${g.id}/channelswipe" onsubmit="return confirm('تحذير أخير: حذف جميع الرومات نهائي. هل تريد المتابعة؟');"><label>اكتب: حذف كل الرومات</label><input name="confirmation" required autocomplete="off" placeholder="حذف كل الرومات"><button class="btn-save" type="submit" style="margin-top:20px;background:linear-gradient(100deg,#e14d43,#a5221d);" ${canManage ? '' : 'disabled'}>تم — احذف جميع الرومات</button></form></div>`;
+    res.send(ui(g, 'channelswipe', content));
+});
+app.post('/manage/:guildId/channelswipe', checkAuth, async (req, res) => {
+    const g = client.guilds.cache.get(req.params.guildId); if (!g) return res.redirect('/dashboard');
+    const botMember = g.members.me || await g.members.fetch(client.user.id).catch(() => null);
+    if (req.body.confirmation !== 'حذف كل الرومات') return res.redirect(`/manage/${g.id}/channelswipe?type=error&notice=${encodeURIComponent('عبارة التأكيد غير صحيحة، لم يتم حذف أي روم.')}`);
+    if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels)) return res.redirect(`/manage/${g.id}/channelswipe?type=error&notice=${encodeURIComponent('البوت لا يملك صلاحية Manage Channels.')}`);
+    try {
+        const channels = [...g.channels.cache.values()].sort((a, b) => (a.type === ChannelType.GuildCategory ? 1 : 0) - (b.type === ChannelType.GuildCategory ? 1 : 0));
+        let deleted = 0;
+        for (const channel of channels) if (await channel.delete('حذف جماعي من لوحة التحكم').then(() => true).catch(() => false)) deleted++;
+        return res.redirect(`/manage/${g.id}/channelswipe?type=${deleted ? 'ok' : 'error'}&notice=${encodeURIComponent(`تم حذف ${deleted} من أصل ${channels.length} قناة/تصنيف.`)}`);
+    } catch (err) { console.error('[Delete All Channels Error]', err); return res.redirect(`/manage/${g.id}/channelswipe?type=error&notice=${encodeURIComponent('حدث خطأ أثناء حذف الرومات.')}`); }
+});
 
 // ==========================================
 // 10. Discord Event Handlers
