@@ -596,6 +596,18 @@ const checkAuth = (req, res, next) => {
     res.redirect('/login');
 };
 
+const checkDashboardOwner = (req, res, next) => {
+    const ownerId = String(process.env.DASHBOARD_OWNER_ID || '').trim();
+    if (!ownerId) return res.status(500).send('DASHBOARD_OWNER_ID غير مضبوط في متغيرات البيئة.');
+    if (String(req.user?.id || '') !== ownerId) return res.status(403).send('هذا الحساب غير مخول لدخول لوحة التحكم.');
+    next();
+};
+
+const checkBotGuildAccess = (req, res, next) => {
+    if (!client.guilds.cache.has(req.params.guildId)) return res.status(404).send('البوت غير موجود في هذا السيرفر.');
+    next();
+};
+
 const checkGuildAccess = (req, res, next) => {
     const guildId = req.params.guildId;
     const guild = req.user?.guilds?.find(g => g.id === guildId);
@@ -607,9 +619,11 @@ const checkGuildAccess = (req, res, next) => {
     next();
 };
 
-app.use('/manage/:guildId', checkAuth, checkGuildAccess);
-app.use('/save/:guildId', checkAuth, checkGuildAccess);
-app.use('/delete-kick/:guildId', checkAuth, checkGuildAccess);
+// The dashboard owner may view and configure every guild where the bot is present.
+// Discord permissions are still checked separately before each bot action.
+app.use('/manage/:guildId', checkAuth, checkDashboardOwner, checkBotGuildAccess);
+app.use('/save/:guildId', checkAuth, checkDashboardOwner, checkBotGuildAccess);
+app.use('/delete-kick/:guildId', checkAuth, checkDashboardOwner, checkBotGuildAccess);
 
 app.get('/auth/discord', passport.authenticate('discord'));
 app.get('/callback', passport.authenticate('discord', { failureRedirect: '/login' }), (req, res) => {
@@ -769,18 +783,11 @@ app.post('/save/:guildId/admincmds', checkAuth, async (req, res) => {
 // ==========================================
 
 // --- [ Dashboard - Server List ] ---
-app.get('/dashboard', checkAuth, (req, res) => {
-    const userGuilds = new Map((req.user.guilds || []).map(g => [g.id, g]));
+app.get('/dashboard', checkAuth, checkDashboardOwner, (req, res) => {
     const botGuilds = [...client.guilds.cache.values()];
     const cards = botGuilds.map(g => {
-        const userGuild = userGuilds.get(g.id);
-        let canManage = false;
-        try {
-            const p = BigInt(userGuild?.permissions || 0);
-            canManage = !!userGuild && (((p & 8n) === 8n) || ((p & 32n) === 32n));
-        } catch {}
         const iconURL = g.iconURL({ extension: 'png', size: 256 }) || 'https://cdn.discordapp.com/embed/avatars/0.png';
-        return `<div class="guild-card"><img src="${iconURL}" class="guild-icon" alt="${g.name}"><h3>${g.name}</h3>${canManage ? `<a href="/manage/${g.id}/home" style="color:var(--gold);">الإعدادات</a>` : '<span style="color:var(--text-muted);">لا تملك صلاحية الإدارة</span>'}</div>`;
+        return `<div class="guild-card"><img src="${iconURL}" class="guild-icon" alt="${g.name}"><h3>${g.name}</h3><a href="/manage/${g.id}/home" style="color:var(--gold);">الإعدادات</a></div>`;
     }).join('');
 
     const content = `
@@ -1122,7 +1129,7 @@ app.get('/manage/:guildId/welcome', checkAuth, async (req, res) => {
     res.send(ui(g, 'welcome', content));
 });
 
-app.post('/generate/:guildId/welcome-random', checkAuth, checkGuildAccess, async (req, res) => {
+app.post('/generate/:guildId/welcome-random', checkAuth, checkDashboardOwner, checkBotGuildAccess, async (req, res) => {
     try {
         const filename = `welcome-generated-${req.params.guildId}-${Date.now()}-${Math.floor(Math.random() * 100000)}.png`;
         const absolutePath = path.join(__dirname, 'uploads', filename);
