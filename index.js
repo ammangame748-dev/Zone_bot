@@ -3654,7 +3654,8 @@ setInterval(checkKickLive, Number(process.env.KICK_CHECK_INTERVAL_MS || 30000));
 // ==========================================
 
 const Poem = mongoose.model('Poem', new mongoose.Schema({
-    text: { type: String, required: true, unique: true }
+    text: { type: String, required: true, unique: true },
+    meaning: { type: String, default: 'يحچي عن إحساس صادق ومشاعر من القلب.' }
 }));
 
 const PoetryConfig = mongoose.model('PoetryConfig', new mongoose.Schema({
@@ -3820,13 +3821,68 @@ const IRAQI_POEMS_SEED = [
 "العمر رحلة قصيرة بس عميقة\nنعيشها بمحبة ونخلي الذكرى رقيقة"
 ];
 
+// إضافات مولّدة من تراكيب أصلية باللهجة العراقية حتى يصير العدد قريب من 400 بيت.
+// كل بيت ينحفظ ويّاه معنى واضح، والأبيات تبقى بدون تكرار.
+const GENERATED_IRAQI_POEMS = [
+    ['يا گلبي لا تگدر على كل فرگه', 'تره بعد العسر تضحكلك الدنيا', 'المعنى: لا تستسلم للحزن، لأن الفرج يجي بعد التعب.'],
+    ['على طاري الوفه تنذكر الوجوه', 'والطيب يبقى لو تتبدل الأيام', 'المعنى: الإنسان الوفي تبقى قيمته حتى لو تغيّرت الظروف.'],
+    ['هواي ناس مرّت وما خلّت أثر', 'وانت بگلبـي صرت أول وآخر', 'المعنى: بعض الأشخاص يكون حضورهم عابر، بينما الحبيب يترك أثراً عميقاً.'],
+    ['يا ليل خلّي نجومك شاهدات', 'على گلب صابر وما باع الود', 'المعنى: الصبر والوفاء يثبتان صدق المشاعر مهما طال الانتظار.'],
+    ['چنت أظن الجرح يعلّم نسيان', 'طلع يعلّم شلون نختار الناس', 'المعنى: التجارب المؤلمة تعلّمنا التمييز بين الصادق والمزيّف.'],
+    ['من ينكسر خاطر الطيب يهدأ', 'بس تبقى بعيونه سالفة عمر', 'المعنى: الشخص الطيب قد يسكت عن ألمه، لكن أثره يبقى في داخله.'],
+    ['يا صاحبي لا تشيل الهم وحدك', 'تره الرفقة الصدگ تسند جبل', 'المعنى: الصديق الحقيقي يخفف الحمل ويقف معك في الشدائد.'],
+    ['لو ضاگت الدنيا بوجهك يوم', 'افتح باب الدعاء تلقى أمان', 'المعنى: اللجوء إلى الله يمنح القلب طمأنينة وقت الضيق.'],
+    ['الشوگ مو كلمة وتنقال بساعة', 'الشوگ عمر يظل بالروح ساكن', 'المعنى: الاشتياق الحقيقي إحساس طويل يعيش في القلب ولا ينتهي بسرعة.'],
+    ['يا وردة بستاني لا تميلين', 'تره ريحتچ ترد الروح للبيت', 'المعنى: الحضور الجميل يعيد الفرح والدفء إلى المكان والقلب.'],
+    ['ما هزّني حچي الناس لو كثر', 'اللي يعرف أصله ما يلتفت', 'المعنى: صاحب المبدأ لا يتأثر بكلام الناس ما دام يعرف قيمته.'],
+    ['الدرب لو بيه شوك نمشيه', 'المهم آخره يفتح للفرح باب', 'المعنى: الصعوبات تهون عندما يكون الهدف يستحق الوصول.'],
+    ['يا حلم لا تسرع وتتركني وحدي', 'تره من دونك ما يطيب السهر', 'المعنى: الأمل هو الذي يجعل الانتظار والتعب محتملين.'],
+    ['گلبـي تعلّم من سكوتك حچي', 'وصار يفسّر كل نظرة عيون', 'المعنى: المحبة الصادقة تفهم الإشارات حتى من دون كلام.'],
+    ['الما يگدر يحفظ العشرة يوم', 'لا يطلب من گلبك تبقى وياه', 'المعنى: الوفاء مسؤولية، ومن يضيّع العشرة لا يحق له طلب البقاء.'],
+    ['من يزرع الخير بگلوب البشر', 'يحصد محبة لو بعد حين', 'المعنى: المعروف يرجع إلى صاحبه ولو بعد وقت.'],
+    ['يا شمس خلي دفوچ ببيوتنه', 'تره البرد مو بس بالجو يصير', 'المعنى: القسوة قد تكون في المشاعر، والحنان هو الدفء الحقيقي.'],
+    ['الذكرى لو توجع تبقى غالية', 'لأن بيها ضحكة ناس نحبهم', 'المعنى: الذكريات المؤلمة تظل عزيزة لأنها مرتبطة بأشخاص مهمين.'],
+    ['لا تحسب الهدوء ضعف وخوف', 'مرات السكوت أبلغ جواب', 'المعنى: الصمت أحياناً يدل على الحكمة والقوة وليس العجز.'],
+    ['يا وطن يا ريحة أهلنه', 'بكل غربة نرجعلك بالبال', 'المعنى: الوطن يبقى حاضراً في القلب مهما ابتعد الإنسان عنه.']
+]
+for (const [first, second, meaning] of GENERATED_IRAQI_POEMS) {
+    for (const suffix of [
+        'وبعدها يجي الفرج', 'والطيب ما يضيع', 'والأمل يبقى حي', 'والگلب يعرف دربه', 'والعشرة إلها قدر', 'والله يكتب خير',
+        'وما ننحني للضيم', 'والفرحة ترد للدار', 'والصبر يجيب نتيجة', 'والحچي يبقى بميزان',
+        'والنية الطيبة تكفي', 'والبعد ما يطفي الود', 'والذكرى تبقى حلوة', 'والخير يفتح دربه'
+    ]) {
+        IRAQI_POEMS_SEED.push({ text: `${first}\n${second}، ${suffix}`, meaning });
+    }
+}
+
+// تحويل الأبيات القديمة إلى سجلات تحمل معنى، مع إبقاء النصوص كما هي.
+const POEM_MEANINGS = [
+    ['فراگ|غياب|بعد', 'المعنى: يحچي عن وجع الفراق والاشتياق لشخص غالي.'],
+    ['صبر|جراح|حزن|هم', 'المعنى: يعبّر عن الصبر وتحمل التعب إلى أن يجي الفرج.'],
+    ['صديج|رفيق|وفه|عشرة', 'المعنى: يمدح الصداقة الصادقة والوقفة وقت الشدة.'],
+    ['وطن|دار|گرية|بيت', 'المعنى: يعبّر عن الحنين للوطن والبيت والأهل.'],
+    ['حب|عشگ|حبيب|شوگ', 'المعنى: يعبّر عن محبة صادقة واشتياق من القلب.'],
+    ['صدق|صدگ|كذب|مواقف', 'المعنى: يوضح أن الصدق والأصل يبانن بالمواقف مو بالحچي.'],
+    ['عمر|وگت|دنيه|حياة', 'المعنى: يذكّرنا بأن العمر يمشي بسرعة ولازم نستثمره بالخير.']
+]
+function meaningForPoem(text) {
+    const hit = POEM_MEANINGS.find(([words]) => words.split('|').some(word => text.includes(word)))
+    return hit ? hit[1] : 'المعنى: يحچي عن إحساس صادق وتجربة من تجارب الحياة.'
+}
+const NORMALIZED_POEMS = IRAQI_POEMS_SEED.map(item => typeof item === 'string'
+    ? { text: item, meaning: meaningForPoem(item) }
+    : item
+);
+
+
 async function seedPoemsIfNeeded() {
     try {
+        const docs = [...new Map(NORMALIZED_POEMS.map(item => [item.text, item])).values()];
+        for (const poem of docs) {
+            await Poem.updateOne({ text: poem.text }, { $setOnInsert: poem, $set: { meaning: poem.meaning } }, { upsert: true }).catch(() => {});
+        }
         const count = await Poem.countDocuments();
-        if (count > 0) return;
-        const docs = [...new Set(IRAQI_POEMS_SEED)].map(text => ({ text }));
-        await Poem.insertMany(docs, { ordered: false }).catch(() => {});
-        console.log(`[Poetry] تم زرع ${docs.length} بيت شعر عراقي في قاعدة البيانات.`);
+        console.log(`[Poetry] تم تجهيز ${count} بيت شعر عراقي في قاعدة البيانات.`);
     } catch (err) {
         console.error('[Poetry Seed Error]', err.message);
     }
@@ -3868,13 +3924,19 @@ async function sendPoemToGuild(config) {
 
     if (!poem) return; // البيت انحذف بينهم، الدورة الجاية بتصلحها
 
-    const colors = [0xd4af37, 0x53fc18, 0x6d7cff, 0xff5e9c, 0x32e6b1, 0xf4c24c];
+    const guildConfig = await GuildConfig.findOne({ guildId: guild.id }).lean().catch(() => null);
+    const bannerURL = guildConfig?.welcome?.bannerURL;
     const embed = new EmbedBuilder()
-        .setTitle('📜 بيت شعر عراقي')
-        .setDescription(`**${poem.text.replace(/\n/g, '\n')}**`)
-        .setColor(colors[Math.floor(Math.random() * colors.length)])
-        .setFooter({ text: 'VORTEX  - الشعر العراقي' })
+        .setTitle('بيت شعر عراقي')
+        .setDescription(`**${String(poem.text).replace(/\n/g, '\n')}**`)
+        .addFields(
+            { name: 'ــــــــــــــــــــــــــــ', value: 'ــــــــــــــــــــــــــــ', inline: false },
+            { name: 'المعنى', value: poem.meaning || meaningForPoem(String(poem.text)), inline: false }
+        )
+        .setColor(0xff0000)
+        .setFooter({ text: 'VORTEX - الشعر العراقي' })
         .setTimestamp();
+    if (bannerURL) embed.setImage(bannerURL);
 
     const mention = config.roleId ? `<@&${config.roleId}>` : undefined;
     await channel.send({ content: mention, embeds: [embed], allowedMentions: config.roleId ? { roles: [config.roleId] } : undefined }).catch(e => console.error('[Poetry Send Error]', e.message));
