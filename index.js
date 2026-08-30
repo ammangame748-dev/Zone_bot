@@ -3577,7 +3577,11 @@ async function checkKickLive() {
                     const data = await fetchKickChannel(username);
                     const livestream = data?.livestream ?? data?.data?.livestream ?? null;
                     const isLive = Boolean(livestream && (livestream.id || livestream.session_title || livestream.viewer_count !== undefined));
-                    const categoryName = livestream?.category?.name || livestream?.category?.title || livestream?.category?.slug || null;
+                    const categorySource = livestream?.category
+    || (Array.isArray(livestream?.categories) ? livestream.categories[0] : null)
+    || (Array.isArray(data?.categories) ? data.categories[0] : null);
+const categoryName = categorySource?.name || categorySource?.title || categorySource?.slug || null;
+const categorySlug = categorySource?.slug || null;
                     const channel = guild.channels.cache.get(streamer.channelId);
 
                     // Send first, then persist state. This prevents a transient Discord/API failure from losing the alert forever.
@@ -3607,16 +3611,24 @@ async function checkKickLive() {
                         streamer.lastCategoryName = categoryName;
                         streamer.kickUsername = username;
                         changed = true;
-                    } else if (isLive && streamer.isLive && categoryName && streamer.lastCategoryName && categoryName !== streamer.lastCategoryName && channel?.isTextBased()) {
-                        const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
-                        const categoryEmbed = new EmbedBuilder()
-                            .setTitle('تغيير كاتيقوري البث')
-                            .setDescription(`**${username}** غيّر كاتيقوري البث إلى: **${categoryName}**`)
-                            .setURL(`https://kick.com/${username}`)
-                            .setColor(0xf4c24c)
-                            .addFields({ name: 'صاحب البث', value: username, inline: true }, { name: 'الكاتيقوري الجديدة', value: categoryName, inline: true })
-                            .setTimestamp();
-                        await channel.send({ content: mention, embeds: [categoryEmbed] });
+                    } else if (isLive && streamer.isLive && categoryName && streamer.lastCategoryName && categoryName !== streamer.lastCategoryName) {
+                        const targetChannel = channel?.isTextBased() ? channel : null;
+                        const categoryUrl = categorySlug ? `https://kick.com/category/${categorySlug}` : `https://kick.com/${username}`;
+                        if (targetChannel) {
+                            const mention = streamer.roleId ? `<@&${streamer.roleId}>` : undefined;
+                            const categoryEmbed = new EmbedBuilder()
+                                .setTitle('تغيير كاتيقوري البث')
+                                .setURL(`https://kick.com/${username}`)
+                                .setColor(0xf4c24c)
+                                .setDescription(`**${username}** غيّر كاتيقوري بثه المباشر.`)
+                                .addFields(
+                                    { name: 'صاحب البث', value: `[${username}](https://kick.com/${username})`, inline: true },
+                                    { name: 'من', value: String(streamer.lastCategoryName).slice(0, 1024), inline: true },
+                                    { name: 'إلى', value: `[${categoryName}](${categoryUrl})`.slice(0, 1024), inline: true }
+                                )
+                                .setTimestamp();
+                            await targetChannel.send({ content: mention, embeds: [categoryEmbed] });
+                        }
                         streamer.lastCategoryName = categoryName;
                         streamer.kickUsername = username;
                         changed = true;
