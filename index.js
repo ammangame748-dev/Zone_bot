@@ -71,6 +71,18 @@ const UserLevel = mongoose.model('UserLevel', new mongoose.Schema({
     msgCount: { type: Number, default: 0 }
 }));
 
+const LevelBackup = mongoose.model('LevelBackup', new mongoose.Schema({
+    guildId: { type: String, required: true, index: true },
+    resetBy: { type: String, required: true },
+    resetAt: { type: Date, default: Date.now },
+    levels: [{
+        userId: { type: String, required: true },
+        xp: { type: Number, default: 0 },
+        level: { type: Number, default: 1 },
+        msgCount: { type: Number, default: 0 }
+    }]
+}, { timestamps: false }));
+
 const ModConfig = mongoose.model('ModConfig', new mongoose.Schema({
     guildId: String,
     jail: {
@@ -2886,6 +2898,68 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.editReply({ embeds: [embed], components: [historyButtons(user.id, null, 0)] });
             }
         
+            if (interaction.commandName === 'resetlevels') {
+                if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+                    return interaction.reply({ content: 'هذا الأمر مخصص للإدارة العليا فقط.', ephemeral: true });
+                }
+                await interaction.deferReply({ ephemeral: true });
+                const existingLevels = await UserLevel.find({ guildId: interaction.guild.id }).lean();
+                if (!existingLevels.length) {
+                    return interaction.editReply({ content: 'لا توجد بيانات مستويات حتى يتم تصفيرها.' });
+                }
+                await LevelBackup.findOneAndUpdate(
+                    { guildId: interaction.guild.id },
+                    {
+                        $set: {
+                            resetBy: interaction.user.id,
+                            resetAt: new Date(),
+                            levels: existingLevels.map(row => ({
+                                userId: row.userId,
+                                xp: row.xp || 0,
+                                level: row.level || 1,
+                                msgCount: row.msgCount || 0
+                            }))
+                        }
+                    },
+                    { upsert: true, setDefaultsOnInsert: true }
+                );
+                await UserLevel.deleteMany({ guildId: interaction.guild.id });
+                const embed = new EmbedBuilder()
+                    .setTitle('تم تصفير المستويات')
+                    .setDescription(`تم تصفير مستويات **${existingLevels.length}** عضو، وحُفظت نسخة احتياطية يمكن استرجاعها بواسطة \`/restorelevels\`.`)
+                    .setColor(0xe67e22)
+                    .setFooter({ text: `بواسطة ${interaction.user.tag}` })
+                    .setTimestamp();
+                return interaction.editReply({ embeds: [embed] });
+            }
+
+            if (interaction.commandName === 'restorelevels') {
+                if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+                    return interaction.reply({ content: 'هذا الأمر مخصص للإدارة العليا فقط.', ephemeral: true });
+                }
+                await interaction.deferReply({ ephemeral: true });
+                const backup = await LevelBackup.findOne({ guildId: interaction.guild.id }).lean();
+                if (!backup?.levels?.length) {
+                    return interaction.editReply({ content: 'لا توجد نسخة احتياطية محفوظة لهذا السيرفر.' });
+                }
+                await UserLevel.deleteMany({ guildId: interaction.guild.id });
+                await UserLevel.insertMany(backup.levels.map(row => ({
+                    guildId: interaction.guild.id,
+                    userId: row.userId,
+                    xp: row.xp || 0,
+                    level: row.level || 1,
+                    msgCount: row.msgCount || 0
+                })), { ordered: false });
+                const embed = new EmbedBuilder()
+                    .setTitle('تم استرجاع المستويات')
+                    .setDescription(`تم استرجاع مستويات **${backup.levels.length}** عضو كما كانت قبل آخر تصفير.`)
+                    .setColor(0x2ecc71)
+                    .addFields({ name: 'تاريخ النسخة', value: `<t:${Math.floor(new Date(backup.resetAt).getTime() / 1000)}:F>`, inline: true })
+                    .setFooter({ text: 'هذه هي آخر نسخة احتياطية محفوظة.' })
+                    .setTimestamp();
+                return interaction.editReply({ embeds: [embed] });
+            }
+
             if (interaction.commandName === 'invites') {
                 const inviter = interaction.options.getUser('user', true);
                 await interaction.deferReply();
@@ -4260,6 +4334,10 @@ async function registerSlashCommands() {
         new SlashCommandBuilder().setName('invites').setDescription('عرض إحصائيات دعوات عضو')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
             .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true)),
+        new SlashCommandBuilder().setName('resetlevels').setDescription('تصفير جميع مستويات السيرفر مع حفظ نسخة احتياطية')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        new SlashCommandBuilder().setName('restorelevels').setDescription('استرجاع المستويات المحفوظة قبل آخر تصفير')
+            .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
         new SlashCommandBuilder().setName('emojiinfo').setDescription('عرض معلومات إيموجي')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageEmojisAndStickers)
             .addStringOption(o => o.setName('emoji').setDescription('ID الإيموجي').setRequired(true)),
