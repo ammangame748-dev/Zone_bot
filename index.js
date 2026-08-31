@@ -203,6 +203,17 @@ const MemberHistory = mongoose.model('MemberHistory', new mongoose.Schema({
     createdAt: { type: Date, default: Date.now, index: true }
 }, { timestamps: false }));
 
+const InviteRecord = mongoose.model('InviteRecord', new mongoose.Schema({
+    guildId: { type: String, required: true, index: true },
+    inviterId: { type: String, required: true, index: true },
+    invitedUserId: { type: String, required: true, index: true },
+    inviteCode: { type: String, required: true },
+    joinedAt: { type: Date, default: Date.now },
+    leftAt: { type: Date, default: null },
+    currentlyInGuild: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now }
+}, { timestamps: false }));
+
 const Suggestion = mongoose.model('Suggestion', new mongoose.Schema({
     guildId: String,
     messageId: String,
@@ -825,6 +836,53 @@ app.get('/dashboard', checkAuth, checkDashboardOwner, (req, res) => {
 });
 
 // --- [ Home / Stats ] ---
+const inviteCache = new Map();
+
+async function fetchGuildInvites(guild) {
+    try {
+        const invites = await guild.invites.fetch();
+        const snapshot = new Map();
+        for (const invite of invites.values()) snapshot.set(invite.code, {
+            uses: invite.uses || 0,
+            inviterId: invite.inviter?.id || null,
+            inviterTag: invite.inviter?.tag || invite.inviter?.username || null
+        });
+        inviteCache.set(guild.id, snapshot);
+        return snapshot;
+    } catch (error) {
+        console.error(`[Invite Fetch Error] ${guild.id}:`, error.message);
+        return inviteCache.get(guild.id) || new Map();
+    }
+}
+
+async function attributeMemberInvite(member) {
+    const guild = member.guild;
+    const previous = inviteCache.get(guild.id) || new Map();
+    const current = await fetchGuildInvites(guild);
+    let usedInvite = null;
+    for (const [code, invite] of current) {
+        const before = previous.get(code);
+        if (invite.uses > (before?.uses || 0)) {
+            usedInvite = { code, ...invite };
+            break;
+        }
+    }
+    if (!usedInvite?.inviterId || usedInvite.inviterId === member.id) return null;
+    await InviteRecord.findOneAndUpdate(
+        { guildId: guild.id, invitedUserId: member.id },
+        { $set: { inviterId: usedInvite.inviterId, inviteCode: usedInvite.code, joinedAt: new Date(), leftAt: null, currentlyInGuild: true } },
+        { upsert: true, setDefaultsOnInsert: true }
+    );
+    return usedInvite;
+}
+
+async function markInviteMemberPresent(guildId, userId, present) {
+    await InviteRecord.updateOne(
+        { guildId, invitedUserId: userId },
+        { $set: { currentlyInGuild: present, ...(present ? { leftAt: null } : { leftAt: new Date() }) } }
+    ).catch(() => {});
+}
+
 async function createGuildInvite(guild) {
     const botMember = guild.members.me || await guild.members.fetch(client.user.id).catch(() => null);
     if (!botMember) return null;
@@ -2580,6 +2638,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 client.on('guildMemberAdd', async (member) => {
     try {
+        const usedInvite = await attributeMemberInvite(member).catch(() => null);
         // إحصائيات
         await Stats.findOneAndUpdate(
             { guildId: member.guild.id },
@@ -2593,7 +2652,8 @@ client.on('guildMemberAdd', async (member) => {
             { name: 'العضو', value: logUser(member), inline: true },
             { name: 'معرّف العضو', value: member.id, inline: true },
             { name: 'إنشاء الحساب', value: accountCreated, inline: true },
-            { name: 'عدد أعضاء السيرفر', value: String(member.guild.memberCount), inline: true }
+{ name: 'عدد أعضاء السيرفر', value: String(member.guild.memberCount), inline: true },
+            ...(usedInvite ? [{ name: 'الدعوة المستخدمة', value: `\`${usedInvite.code}\` بواسطة <@${usedInvite.inviterId}>`, inline: true }] : [])
         ] });
         await sendLog(member.guild, 'members', logEmbed);
 
@@ -2660,6 +2720,7 @@ const background = await loadImage(bgUrl ).catch(() => loadImage('https://placeh
 });
 
 client.on('guildMemberRemove', async (member) => {
+    await markInviteMemberPresent(member.guild.id, member.id, false);
     const kick = await findRecentExecutor(member.guild, AuditLogEvent.MemberKick, member.id);
     const embed = buildLogEmbed({ title: kick ? 'طرد عضو' : 'خروج عضو', color: LOG_COLORS.danger, guild: member.guild, actor: kick, target: member, thumbnail: member.user?.displayAvatarURL?.(), fields: [
         { name: 'العضو', value: logUser(member), inline: true },
@@ -2825,6 +2886,41 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.editReply({ embeds: [embed], components: [historyButtons(user.id, null, 0)] });
             }
         
+            if (interaction.commandName === 'invites') {
+                const inviter = interaction.options.getUser('user', true);
+                await interaction.deferReply();
+                const records = await InviteRecord.find({ guildId: interaction.guild.id, inviterId: inviter.id })
+                    .sort({ joinedAt: -1 }).lean();
+                const memberIds = records.map(record => record.invitedUserId);
+                const currentMembers = new Set();
+                for (const id of memberIds) {
+                    if (interaction.guild.members.cache.has(id)) currentMembers.add(id);
+                    else if (await interaction.guild.members.fetch(id).catch(() => null)) currentMembers.add(id);
+                }
+                const joined = records.length;
+                const stillHere = records.filter(record => currentMembers.has(record.invitedUserId)).length;
+                const left = joined - stillHere;
+                const details = records.length
+                    ? records.slice(0, 20).map(record => {
+                        const isHere = currentMembers.has(record.invitedUserId);
+                        return `${isHere ? '✅' : '❌'} <@${record.invitedUserId}> — ${isHere ? 'موجود حالياً' : 'غادر السيرفر'}\nالدعوة: \`${record.inviteCode}\` | الدخول: <t:${Math.floor(new Date(record.joinedAt).getTime() / 1000)}:d>`;
+                    }).join('\n\n')
+                    : 'لا توجد دعوات مسجلة لهذا العضو منذ تشغيل نظام التتبع.';
+                const embed = new EmbedBuilder()
+                    .setTitle(`إحصائيات دعوات ${inviter.tag}`)
+                    .setDescription(`العضو: <@${inviter.id}>\n\n**تفاصيل آخر ${Math.min(records.length, 20)} دعوة:**\n${details}`)
+                    .setThumbnail(inviter.displayAvatarURL({ dynamic: true }))
+                    .setColor(0xd4af37)
+                    .addFields(
+                        { name: 'إجمالي من دخلوا بدعواته', value: `\`${joined}\``, inline: true },
+                        { name: 'ما زالوا في السيرفر', value: `\`${stillHere}\``, inline: true },
+                        { name: 'غادروا السيرفر', value: `\`${left}\``, inline: true }
+                    )
+                    .setFooter({ text: 'يتم تسجيل الدعوات الجديدة تلقائياً عبر قاعدة البيانات.' })
+                    .setTimestamp();
+                return interaction.editReply({ embeds: [embed] });
+            }
+
             if (interaction.commandName === 'setbanner') {
                 const image = interaction.options.getAttachment('image');
                 await GuildConfig.findOneAndUpdate(
@@ -4161,6 +4257,9 @@ async function registerSlashCommands() {
         new SlashCommandBuilder().setName('memberhistory').setDescription('عرض سجل عضو كامل')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
             .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true)),
+        new SlashCommandBuilder().setName('invites').setDescription('عرض إحصائيات دعوات عضو')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+            .addUserOption(o => o.setName('user').setDescription('العضو المطلوب').setRequired(true)),
         new SlashCommandBuilder().setName('emojiinfo').setDescription('عرض معلومات إيموجي')
             .setDefaultMemberPermissions(PermissionFlagsBits.ManageEmojisAndStickers)
             .addStringOption(o => o.setName('emoji').setDescription('ID الإيموجي').setRequired(true)),
@@ -4200,6 +4299,7 @@ client.once('ready', async () => {
         console.error('[Jail Resume Error]', err);
     }
 
+    for (const guild of client.guilds.cache.values()) await fetchGuildInvites(guild);
     await registerSlashCommands();
     await seedPoemsIfNeeded();
     checkKickLive();
